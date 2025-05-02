@@ -1,0 +1,622 @@
+#!/usr/bin/env python3
+import json
+import base64
+from dataclasses import dataclass, field
+from enum import Enum
+import pathlib
+from typing import Any, Dict, List, Optional, Union, TextIO
+
+
+class ParameterType(str, Enum):
+    STRING = "string"
+    NUMBER = "number"
+    BOOLEAN = "boolean"
+    ARRAY = "array"
+    OBJECT = "object"
+
+
+@dataclass
+class MCPParameterDefinition:
+    name: str
+    description: str
+    type: ParameterType
+    required: bool = True
+    default: Optional[Any] = None
+    enum: Optional[List[str]] = None
+    items: Optional[Dict[str, Any]] = None  # For array types
+    properties: Optional[Dict[str, Any]] = None  # For object types
+
+    def __eq__(self, other):
+        if not isinstance(other, MCPParameterDefinition):
+            return False
+        return (
+            self.name == other.name
+            and self.description == other.description
+            and self.type == other.type
+            and self.required == other.required
+            and self.default == other.default
+            and self.enum == other.enum
+            and self.items == other.items
+            and self.properties == other.properties
+        )
+
+
+@dataclass
+class MCPToolDefinition:
+    name: str
+    description: str
+    parameters: List[MCPParameterDefinition]
+
+    def __eq__(self, other):
+        if not isinstance(other, MCPToolDefinition):
+            return False
+
+        if self.name != other.name or self.description != other.description:
+            return False
+
+        # Compare parameters regardless of order
+        if len(self.parameters) != len(other.parameters):
+            return False
+
+        # Create parameter maps by name for easier comparison
+        self_params = {param.name: param for param in self.parameters}
+        other_params = {param.name: param for param in other.parameters}
+
+        if set(self_params.keys()) != set(other_params.keys()):
+            return False
+
+        for name, param in self_params.items():
+            if param != other_params[name]:
+                return False
+
+        return True
+
+
+@dataclass
+class ConfigDiff:
+    """Class representing differences between two MCP server configurations."""
+
+    added_tools: List[str] = field(default_factory=list)
+    removed_tools: List[str] = field(default_factory=list)
+    modified_tools: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+
+    def has_differences(self) -> bool:
+        """Check if there are any differences."""
+        return bool(self.added_tools or self.removed_tools or self.modified_tools)
+
+    def __str__(self) -> str:
+        """Generate a human-readable representation of the diff."""
+        if not self.has_differences():
+            return "No differences found."
+
+        lines = []
+
+        if self.added_tools:
+            lines.append("Added tools:")
+            for tool_name in self.added_tools:
+                lines.append(f"  + {tool_name}")
+            lines.append("")
+
+        if self.removed_tools:
+            lines.append("Removed tools:")
+            for tool_name in self.removed_tools:
+                lines.append(f"  - {tool_name}")
+            lines.append("")
+
+        if self.modified_tools:
+            lines.append("Modified tools:")
+            for tool_name, changes in self.modified_tools.items():
+                lines.append(f"  ~ {tool_name}:")
+
+                if "description" in changes:
+                    lines.append("    Description changed:")
+                    lines.append(f"      - {changes['description']['old']}")
+                    lines.append(f"      + {changes['description']['new']}")
+
+                if "added_params" in changes and changes["added_params"]:
+                    lines.append("    Added parameters:")
+                    for param in changes["added_params"]:
+                        lines.append(f"      + {param}")
+
+                if "removed_params" in changes and changes["removed_params"]:
+                    lines.append("    Removed parameters:")
+                    for param in changes["removed_params"]:
+                        lines.append(f"      - {param}")
+
+                if "modified_params" in changes and changes["modified_params"]:
+                    lines.append("    Modified parameters:")
+                    for param_name, param_changes in changes["modified_params"].items():
+                        lines.append(f"      ~ {param_name}:")
+                        for field, values in param_changes.items():
+                            lines.append(
+                                f"        {field}: {values['old']} → {values['new']}"
+                            )
+
+        return "\n".join(lines)
+
+
+@dataclass
+class MCPServerConfig:
+    """Class representing an MCP server configuration."""
+
+    tools: List[MCPToolDefinition] = field(default_factory=list)
+
+    def add_tool(self, tool: Union[MCPToolDefinition, Dict[str, Any]]) -> None:
+        """Add a tool to the server configuration.
+
+        Args:
+            tool: Either a MCPToolDefinition object or a dictionary with tool properties
+        """
+        if isinstance(tool, dict):
+            # Convert dictionary to MCPToolDefinition
+            parameters = []
+            for param_data in tool.get("parameters", []):
+                if isinstance(param_data, dict):
+                    param = MCPParameterDefinition(
+                        name=param_data.get("name", ""),
+                        description=param_data.get("description", ""),
+                        type=ParameterType(param_data.get("type", "string")),
+                        required=param_data.get("required", True),
+                    )
+                    parameters.append(param)
+
+            tool_obj = MCPToolDefinition(
+                name=tool.get("name", ""),
+                description=tool.get("description", ""),
+                parameters=parameters,
+            )
+            self.tools.append(tool_obj)
+        else:
+            # It's already an MCPToolDefinition
+            self.tools.append(tool)
+
+    def remove_tool(self, tool_name: str) -> None:
+        """Remove a tool from the server configuration by name."""
+        self.tools = [tool for tool in self.tools if tool.name != tool_name]
+
+    def get_tool(self, tool_name: str) -> Optional[MCPToolDefinition]:
+        """Get a tool from the server configuration by name."""
+        for tool in self.tools:
+            if tool.name == tool_name:
+                return tool
+        return None
+
+    def to_json(
+        self, path: str = None, fp: TextIO = None, indent: int = 2
+    ) -> Optional[str]:
+        """
+        Serialize the configuration to JSON.
+
+        Args:
+            path: Optional file path to write the JSON to
+            fp: Optional file-like object to write the JSON to
+            indent: Number of spaces for indentation (default: 2)
+
+        Returns:
+            JSON string if neither path nor fp is provided, None otherwise
+        """
+        config_dict = self.to_dict()
+        json_str = json.dumps(config_dict, indent=indent)
+
+        if path:
+            with open(path, "w") as f:
+                f.write(json_str)
+            return None
+        elif fp:
+            fp.write(json_str)
+            return None
+        else:
+            return json_str
+
+    @classmethod
+    def get_default_config_path(cls) -> str:
+        """
+        Get the default config path (~/.mapo/config).
+
+        Returns:
+            The default config path as a string
+        """
+        home_dir = pathlib.Path.home()
+        mapo_dir = home_dir / ".mapo"
+
+        # Create the directory if it doesn't exist
+        mapo_dir.mkdir(exist_ok=True)
+
+        return str(mapo_dir / "config")
+
+    @classmethod
+    def from_json(
+        cls, json_str: str = None, path: str = None, fp: TextIO = None
+    ) -> "MCPServerConfig":
+        """
+        Deserialize the configuration from JSON.
+
+        Args:
+            json_str: JSON string to parse
+            path: Optional file path to read the JSON from
+            fp: Optional file-like object to read the JSON from
+
+        Returns:
+            MCPServerConfig instance
+
+        Raises:
+            ValueError: If no source is provided or multiple sources are provided
+        """
+        if sum(x is not None for x in (json_str, path, fp)) != 1:
+            raise ValueError("Exactly one of json_str, path, or fp must be provided")
+
+        data = None
+        if path:
+            try:
+                with open(path, "r") as f:
+                    data = json.load(f)
+            except (FileNotFoundError, json.decoder.JSONDecodeError):
+                pass
+        elif fp:
+            data = json.load(fp)
+        else:
+            data = json.loads(json_str)
+        return cls.from_dict(data)
+
+    def to_binary(self, path: str) -> None:
+        """
+        Serialize the configuration to a binary file using JSON and base64 encoding.
+        This is a secure alternative to pickle serialization.
+
+        Args:
+            path: File path to write the binary data to
+        """
+        # Convert to JSON first
+        config_dict = self.to_dict()
+        json_str = json.dumps(config_dict)
+
+        # Encode using base64 for binary storage
+        encoded_data = base64.b64encode(json_str.encode("utf-8"))
+
+        with open(path, "wb") as f:
+            f.write(encoded_data)
+
+    @classmethod
+    def from_binary(cls, path: str) -> "MCPServerConfig":
+        """
+        Deserialize the configuration from a binary file using base64 decoding and JSON.
+
+        Args:
+            path: File path to read the binary data from
+
+        Returns:
+            MCPServerConfig instance
+        """
+        with open(path, "rb") as f:
+            encoded_data = f.read()
+
+        # Decode from base64
+        json_str = base64.b64decode(encoded_data).decode("utf-8")
+
+        # Parse JSON
+        config_dict = json.loads(json_str)
+
+        return cls.from_dict(config_dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the server configuration to a dictionary."""
+        return {
+            "tools": [
+                {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": [
+                        {
+                            "name": param.name,
+                            "description": param.description,
+                            "type": param.type.value,
+                            "required": param.required,
+                            **(
+                                {"default": param.default}
+                                if param.default is not None
+                                else {}
+                            ),
+                            **({"enum": param.enum} if param.enum is not None else {}),
+                            **(
+                                {"items": param.items}
+                                if param.items is not None
+                                else {}
+                            ),
+                            **(
+                                {"properties": param.properties}
+                                if param.properties is not None
+                                else {}
+                            ),
+                        }
+                        for param in tool.parameters
+                    ],
+                }
+                for tool in self.tools
+            ]
+        }
+
+    @classmethod
+    def from_dict(cls, data: Optional[Dict[str, Any]]) -> "MCPServerConfig":
+        """Create a server configuration from a dictionary."""
+        config = cls()
+
+        if data is None:
+            return config
+
+        for tool_data in data.get("tools", {}):
+            parameters = []
+
+            for param_data in tool_data.get("parameters", []):
+                param = MCPParameterDefinition(
+                    name=param_data["name"],
+                    description=param_data["description"],
+                    type=ParameterType(param_data["type"]),
+                    required=param_data.get("required", True),
+                    default=param_data.get("default"),
+                    enum=param_data.get("enum"),
+                    items=param_data.get("items"),
+                    properties=param_data.get("properties"),
+                )
+                parameters.append(param)
+
+            tool = MCPToolDefinition(
+                name=tool_data["name"],
+                description=tool_data["description"],
+                parameters=parameters,
+            )
+
+            config.add_tool(tool)
+
+        return config
+
+    def to_json_schema(self) -> Dict[str, Any]:
+        """Convert the tool parameters to JSON Schema format."""
+        schema = {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "properties": {},
+            "required": [],
+        }
+
+        for tool in self.tools:
+            tool_schema = {"type": "object", "properties": {}, "required": []}
+
+            for param in tool.parameters:
+                param_schema = {
+                    "type": param.type.value,
+                    "description": param.description,
+                }
+
+                if param.enum is not None:
+                    param_schema["enum"] = param.enum
+
+                if param.type == ParameterType.ARRAY and param.items is not None:
+                    param_schema["items"] = param.items
+
+                if param.type == ParameterType.OBJECT and param.properties is not None:
+                    param_schema["properties"] = param.properties
+
+                tool_schema["properties"][param.name] = param_schema
+
+                if param.required:
+                    tool_schema["required"].append(param.name)
+
+            schema["properties"][tool.name] = tool_schema
+
+        return schema
+
+    def __eq__(self, other) -> bool:
+        """Compare two server configurations semantically."""
+        if not isinstance(other, MCPServerConfig):
+            return False
+
+        # Compare tools regardless of order
+        if len(self.tools) != len(other.tools):
+            return False
+
+        # Create tool maps by name for easier comparison
+        self_tools = {tool.name: tool for tool in self.tools}
+        other_tools = {tool.name: tool for tool in other.tools}
+
+        if set(self_tools.keys()) != set(other_tools.keys()):
+            return False
+
+        for name, tool in self_tools.items():
+            if tool != other_tools[name]:
+                return False
+
+        return True
+
+    def compare(self, other: "MCPServerConfig") -> ConfigDiff:
+        """Compare two server configurations and return the differences."""
+        diff = ConfigDiff()
+
+        # Create tool maps by name for easier comparison
+        self_tools = {tool.name: tool for tool in self.tools}
+        other_tools = {tool.name: tool for tool in other.tools}
+
+        # Find added and removed tools
+        self_tool_names = set(self_tools.keys())
+        other_tool_names = set(other_tools.keys())
+
+        diff.added_tools = list(other_tool_names - self_tool_names)
+        diff.removed_tools = list(self_tool_names - other_tool_names)
+
+        # Find modified tools
+        common_tool_names = self_tool_names.intersection(other_tool_names)
+
+        for tool_name in common_tool_names:
+            self_tool = self_tools[tool_name]
+            other_tool = other_tools[tool_name]
+
+            # Skip if the tools are identical
+            if self_tool == other_tool:
+                continue
+
+            # Initialize changes for this tool
+            tool_changes = {}
+
+            # Check for description changes
+            if self_tool.description != other_tool.description:
+                tool_changes["description"] = {
+                    "old": self_tool.description,
+                    "new": other_tool.description,
+                }
+
+            # Create parameter maps by name for easier comparison
+            self_params = {param.name: param for param in self_tool.parameters}
+            other_params = {param.name: param for param in other_tool.parameters}
+
+            # Find added and removed parameters
+            self_param_names = set(self_params.keys())
+            other_param_names = set(other_params.keys())
+
+            added_params = list(other_param_names - self_param_names)
+            removed_params = list(self_param_names - other_param_names)
+
+            if added_params:
+                tool_changes["added_params"] = added_params
+
+            if removed_params:
+                tool_changes["removed_params"] = removed_params
+
+            # Find modified parameters
+            common_param_names = self_param_names.intersection(other_param_names)
+            modified_params = {}
+
+            for param_name in common_param_names:
+                self_param = self_params[param_name]
+                other_param = other_params[param_name]
+
+                # Skip if the parameters are identical
+                if self_param == other_param:
+                    continue
+
+                # Initialize changes for this parameter
+                param_changes = {}
+
+                # Check for parameter changes
+                if self_param.description != other_param.description:
+                    param_changes["description"] = {
+                        "old": self_param.description,
+                        "new": other_param.description,
+                    }
+
+                if self_param.type != other_param.type:
+                    param_changes["type"] = {
+                        "old": self_param.type.value,
+                        "new": other_param.type.value,
+                    }
+
+                if self_param.required != other_param.required:
+                    param_changes["required"] = {
+                        "old": self_param.required,
+                        "new": other_param.required,
+                    }
+
+                if self_param.default != other_param.default:
+                    param_changes["default"] = {
+                        "old": self_param.default,
+                        "new": other_param.default,
+                    }
+
+                if self_param.enum != other_param.enum:
+                    param_changes["enum"] = {
+                        "old": self_param.enum,
+                        "new": other_param.enum,
+                    }
+
+                if self_param.items != other_param.items:
+                    param_changes["items"] = {
+                        "old": self_param.items,
+                        "new": other_param.items,
+                    }
+
+                if self_param.properties != other_param.properties:
+                    param_changes["properties"] = {
+                        "old": self_param.properties,
+                        "new": other_param.properties,
+                    }
+
+                if param_changes:
+                    modified_params[param_name] = param_changes
+
+            if modified_params:
+                tool_changes["modified_params"] = modified_params
+
+            if tool_changes:
+                diff.modified_tools[tool_name] = tool_changes
+
+        return diff
+
+    def to_yaml(self, path: str = None, fp: TextIO = None) -> Optional[str]:
+        """
+        Serialize the configuration to YAML.
+
+        Args:
+            path: Optional file path to write the YAML to
+            fp: Optional file-like object to write the YAML to
+
+        Returns:
+            YAML string if neither path nor fp is provided, None otherwise
+
+        Raises:
+            ImportError: If PyYAML is not installed
+        """
+        try:
+            import yaml
+        except ImportError:
+            raise ImportError(
+                "PyYAML is required for YAML serialization. Install it with 'pip install pyyaml'."
+            )
+
+        config_dict = self.to_dict()
+
+        if path:
+            with open(path, "w") as f:
+                yaml.dump(config_dict, f, default_flow_style=False)
+            return None
+        elif fp:
+            yaml.dump(config_dict, fp, default_flow_style=False)
+            return None
+        else:
+            return yaml.dump(config_dict, default_flow_style=False)
+
+    @classmethod
+    def from_yaml(
+        cls, yaml_str: str = None, path: str = None, fp: TextIO = None
+    ) -> "MCPServerConfig":
+        """
+        Deserialize the configuration from YAML.
+
+        Args:
+            yaml_str: YAML string to parse
+            path: Optional file path to read the YAML from
+            fp: Optional file-like object to read the YAML from
+
+        Returns:
+            MCPServerConfig instance
+
+        Raises:
+            ImportError: If PyYAML is not installed
+            ValueError: If no source is provided or multiple sources are provided
+        """
+        try:
+            import yaml
+        except ImportError:
+            raise ImportError(
+                "PyYAML is required for YAML deserialization. Install it with 'pip install pyyaml'."
+            )
+
+        if sum(x is not None for x in (yaml_str, path, fp)) != 1:
+            raise ValueError("Exactly one of yaml_str, path, or fp must be provided")
+
+        if path:
+            with open(path, "r") as f:
+                data = yaml.safe_load(f)
+        elif fp:
+            data = yaml.safe_load(fp)
+        else:
+            data = yaml.safe_load(yaml_str)
+
+        return cls.from_dict(data)
