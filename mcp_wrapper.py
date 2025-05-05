@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 import argparse
 import asyncio
-import json
 import logging
+from itertools import count
+import json
+import os
+import pwd
+import signal
 import sys
 from typing import List
 
@@ -17,10 +21,8 @@ from mcp_config import (
     ParameterType,
 )
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("mcp_wrapper")
 logger.addHandler(logging.StreamHandler(sys.stderr))
-
 
 class MCPWrapperServer:
     def __init__(self, child_command: str, config_path: str = None):
@@ -191,6 +193,117 @@ class MCPWrapperServer:
 
         return {"type": "object", "required": required, "properties": properties}
 
+    def _convert_mcp_tools_to_specs(self, tools):
+        """
+        Convert MCP tool definitions to internal tool specs.
+        
+        Args:
+            tools: List of MCP tool definitions
+            
+        Returns:
+            List of MCPToolSpec objects
+        """
+        from mcp_models import MCPToolSpec
+        tool_specs = []
+        
+        for tool in tools:
+            parameters = {}
+            required = []
+            
+            # Extract properties and required fields from schema
+            if tool.inputSchema and "properties" in tool.inputSchema:
+                for prop_name, prop_details in tool.inputSchema["properties"].items():
+                    parameters[prop_name] = {
+                        "description": prop_details.get("description", ""),
+                        "schema": {
+                            "type": prop_details.get("type", "string")
+                        }
+                    }
+                    
+                    # Add enum values if present
+                    if "enum" in prop_details:
+                        parameters[prop_name]["schema"]["enum"] = prop_details["enum"]
+            
+            # Extract required fields
+            if tool.inputSchema and "required" in tool.inputSchema:
+                required = tool.inputSchema["required"]
+            
+            # Create our tool spec
+            tool_spec = MCPToolSpec(
+                name=tool.name,
+                description=tool.description,
+                parameters=parameters,
+                required=required
+            )
+            
+            tool_specs.append(tool_spec)
+            
+        return tool_specs
+
+    async def _handle_tool_updates(self, tools):
+        """
+        Handle tool update notifications from the downstream server.
+        
+        Args:
+            tools: Updated list of tools from the downstream server
+        """
+        logger.warning(f"TOOLS UPDATED: Received update with {len(tools)} tools from downstream server")
+        
+        # Convert MCP tools to our internal format
+        old_tools_count = len(self.tool_specs)
+        self.tool_specs = self._convert_mcp_tools_to_specs(tools)
+        
+        # Update server configuration and reset approval if tools changed
+        old_config = self.current_config
+        self.current_config = self._create_server_config()
+        
+        # If tools have changed, require re-approval
+        if old_config != self.current_config:
+            logger.warning("Tools changed, requiring re-approval")
+            self.config_approved = False
+            
+            # Generate diff for logging
+            diff = old_config.compare(self.current_config)
+            if diff.has_differences():
+                logger.warning(f"Configuration differences: {diff}")
+        else:
+            logger.info("Tools updated but configuration unchanged")
+        
+        logger.info(f"Tool count changed from {old_tools_count} to {len(self.tool_specs)}")
+
+    async def _handle_client_message(self, message):
+        """
+        Message handler for the ClientSession to process notifications, 
+        particularly tool update notifications.
+        
+        Args:
+            message: The message from the server, can be a notification or other message type
+        """
+        from mcp.types import ServerNotification
+        
+        logger.info(f"Received message: {type(message)}")
+        
+        # Check if it's a notification
+        if isinstance(message, ServerNotification):
+            if message.method == "tools/updated":
+                logger.info("Received tools/updated notification")
+                
+                # Request updated tools list
+                try:
+                    # Get updated tools from the downstream server
+                    downstream_tools = await self.session.list_tools()
+                    assert downstream_tools.tools
+                    logger.info(f"Received {len(downstream_tools.tools)} tools after update notification")
+                    
+                    # Process the updated tools
+                    await self._handle_tool_updates(downstream_tools.tools)
+                except Exception as e:
+                    logger.error(f"Error handling tool update notification: {e}")
+            else:
+                logger.info(f"Received notification: {message.method}")
+        else:
+            logger.info(f"Received non-notification message: {type(message)}")
+            
     async def start_child_process(self):
         """Initialize the connection to the downstream server."""
         logger.info(f"Connecting to downstream server: {self.child_command}")
@@ -219,7 +332,14 @@ class MCPWrapperServer:
             logger.info(f"Starting downstream server with command: {command_parts[0]} {' '.join(command_parts[1:])}")
             self._client_context = stdio_client(server_params)
             self.streams = await self._client_context.__aenter__()
-            self.session = await ClientSession(self.streams[0], self.streams[1]).__aenter__()
+            
+            # Create the client session with a message handler to process notifications
+            self.session = await ClientSession(
+                self.streams[0], 
+                self.streams[1],
+                message_handler=self._handle_client_message
+            ).__aenter__()
+            
             await self.session.initialize()
             
             # Get tool specifications from the downstream server
@@ -228,39 +348,7 @@ class MCPWrapperServer:
             logger.info(f"Received {len(downstream_tools.tools)} tools from downstream server")
 
             # Convert MCP tools to our internal format
-            from mcp_models import MCPToolSpec
-            self.tool_specs = []
-            
-            for tool in downstream_tools.tools:
-                parameters = {}
-                required = []
-                # Extract properties and required fields from schema
-                if tool.inputSchema and "properties" in tool.inputSchema:
-                    for prop_name, prop_details in tool.inputSchema["properties"].items():
-                        parameters[prop_name] = {
-                            "description": prop_details.get("description", ""),
-                            "schema": {
-                                "type": prop_details.get("type", "string")
-                            }
-                        }
-                        
-                        # Add enum values if present
-                        if "enum" in prop_details:
-                            parameters[prop_name]["schema"]["enum"] = prop_details["enum"]
-                
-                # Extract required fields
-                if tool.inputSchema and "required" in tool.inputSchema:
-                    required = tool.inputSchema["required"]
-                
-                # Create our tool spec
-                tool_spec = MCPToolSpec(
-                    name=tool.name,
-                    description=tool.description,
-                    parameters=parameters,
-                    required=required
-                )
-                
-                self.tool_specs.append(tool_spec)
+            self.tool_specs = self._convert_mcp_tools_to_specs(downstream_tools.tools)
                 
         except Exception as e:
             logger.error(f"Error connecting to downstream server: {e}")
@@ -455,7 +543,6 @@ async def main():
         logger.info("Shutting down")
     finally:
         await wrapper.stop_child_process()
-
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -18,11 +18,20 @@ Key features:
 MCP uses stdio-based transport for communication, making it easy to chain tools together.
 
 ```bash
-# Start a downstream server
+# Start a simple downstream server
 python3 tests/simple_downstream_server.py
 
 # Start the wrapper pointing to the downstream server
 python3 mcp_wrapper.py "python3 tests/simple_downstream_server.py"
+
+# Start a dynamic downstream server with changing tools
+python3 tests/dynamic_downstream_server.py --pidfile dynamic_server.pid
+
+# Start the wrapper pointing to the dynamic server
+python3 mcp_wrapper.py "python3 tests/dynamic_downstream_server.py --pidfile dynamic_server.pid"
+
+# Trigger a tool update in the dynamic server (adds a new tool)
+kill -HUP $(cat dynamic_server.pid)
 ```
 
 ## Development
