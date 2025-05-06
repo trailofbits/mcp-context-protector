@@ -71,6 +71,7 @@ class MCPWrapperServer:
         self.client_context = None
         self.streams = None
         self.session = None
+        self.initialize_result = None
         self.tool_specs = []
         self.config_approved = False
         self.config_path = config_path
@@ -421,7 +422,7 @@ class MCPWrapperServer:
                 message_handler=self._handle_client_message
             ).__aenter__()
             
-            await self.session.initialize()
+            self.initialize_result = await self.session.initialize()
             
             # Get tool specifications from the downstream server
             downstream_tools = await self.session.list_tools()
@@ -463,7 +464,8 @@ class MCPWrapperServer:
                 message_handler=self._handle_client_message
             ).__aenter__()
             
-            await self.session.initialize()
+            # Initialize the session and store the result
+            self.initialize_result = await self.session.initialize()
             
             # Get tool specifications from the downstream server
             downstream_tools = await self.session.list_tools()
@@ -479,6 +481,10 @@ class MCPWrapperServer:
     def _create_server_config(self) -> MCPServerConfig:
         """Create a server configuration from the tool specs."""
         config = MCPServerConfig()
+
+        # Add server instructions if available
+        if self.initialize_result and hasattr(self.initialize_result, 'instructions'):
+            config.instructions = self.initialize_result.instructions
 
         for spec in self.tool_specs:
             parameters = []

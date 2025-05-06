@@ -95,13 +95,14 @@ class MCPToolDefinition:
 class ConfigDiff:
     """Class representing differences between two MCP server configurations."""
 
+    new_instructions: Optional[str] = field(default=None)
     added_tools: List[str] = field(default_factory=list)
     removed_tools: List[str] = field(default_factory=list)
     modified_tools: Dict[str, Dict[str, Any]] = field(default_factory=dict)
 
     def has_differences(self) -> bool:
         """Check if there are any differences."""
-        return bool(self.added_tools or self.removed_tools or self.modified_tools)
+        return bool(self.new_instructions is not None or self.added_tools or self.removed_tools or self.modified_tools)
 
     def __str__(self) -> str:
         """Generate a human-readable representation of the diff."""
@@ -109,6 +110,12 @@ class ConfigDiff:
             return "No differences found."
 
         lines = []
+        
+        # Show instruction changes first since they're important
+        if self.new_instructions is not None:
+            lines.append("Instructions changed:")
+            lines.append(f"  New: {self.new_instructions}")
+            lines.append("")
 
         if self.added_tools:
             lines.append("Added tools:")
@@ -159,6 +166,7 @@ class MCPServerConfig:
     """Class representing an MCP server configuration."""
 
     tools: List[MCPToolDefinition] = field(default_factory=list)
+    instructions: str = field(default="")
 
     def add_tool(self, tool: Union[MCPToolDefinition, Dict[str, Any]]) -> None:
         """Add a tool to the server configuration.
@@ -320,6 +328,7 @@ class MCPServerConfig:
     def to_dict(self) -> Dict[str, Any]:
         """Convert the server configuration to a dictionary."""
         return {
+            "instructions": self.instructions,
             "tools": [
                 {
                     "name": tool.name,
@@ -361,6 +370,8 @@ class MCPServerConfig:
 
         if data is None:
             return config
+
+        config.instructions = data.get("instructions", "")
 
         for tool_data in data.get("tools", {}):
             parameters = []
@@ -429,6 +440,9 @@ class MCPServerConfig:
         if not isinstance(other, MCPServerConfig):
             return False
 
+        if self.instructions != other.instructions:
+            return False
+
         # Compare tools regardless of order
         if len(self.tools) != len(other.tools):
             return False
@@ -449,6 +463,9 @@ class MCPServerConfig:
     def compare(self, other: "MCPServerConfig") -> ConfigDiff:
         """Compare two server configurations and return the differences."""
         diff = ConfigDiff()
+
+        if self.instructions != other.instructions:
+            diff.new_instructions = other.instructions
 
         # Create tool maps by name for easier comparison
         self_tools = {tool.name: tool for tool in self.tools}

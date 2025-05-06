@@ -28,6 +28,7 @@ def test_config_database_save_load():
         
         # Create a sample tool config
         echo_config = MCPServerConfig()
+        echo_config.instructions = "This is a test server for echoing messages."
         
         # Add a parameter for the echo tool
         echo_param = MCPParameterDefinition(
@@ -48,6 +49,7 @@ def test_config_database_save_load():
         
         # Add a calculator tool
         calc_config = MCPServerConfig()
+        calc_config.instructions = "This is a calculator server for performing arithmetic operations."
         
         # Add parameters for the calculator tool
         a_param = MCPParameterDefinition(
@@ -101,12 +103,14 @@ def test_config_database_save_load():
         assert echo_loaded.tools[0].name == "echo"
         assert len(echo_loaded.tools[0].parameters) == 1
         assert echo_loaded.tools[0].parameters[0].name == "message"
+        assert echo_loaded.instructions == "This is a test server for echoing messages."
         
         # Verify the calculator config
         assert calc_loaded is not None
         assert len(calc_loaded.tools) == 1
         assert calc_loaded.tools[0].name == "calculator"
         assert len(calc_loaded.tools[0].parameters) == 3
+        assert calc_loaded.instructions == "This is a calculator server for performing arithmetic operations."
         
         # Check tool listing
         servers = db2.list_servers()
@@ -220,6 +224,44 @@ def test_config_database_file_structure():
         # Clean up
         if os.path.exists(config_path):
             os.unlink(config_path)
+
+
+def test_config_instructions_comparison():
+    """Test that changes in instructions are detected in configuration comparison."""
+    # Create two configs with the same tools but different instructions
+    config1 = MCPServerConfig()
+    config1.instructions = "Original instructions"
+    
+    tool = MCPToolDefinition(
+        name="test",
+        description="Test tool",
+        parameters=[]
+    )
+    config1.add_tool(tool)
+    
+    # Clone the config but change the instructions
+    config2 = MCPServerConfig()
+    config2.instructions = "New instructions"
+    config2.add_tool(tool)  # Same tool
+    
+    # Compare the configs
+    diff = config1.compare(config2)
+    
+    # Verify the difference is detected
+    assert diff.has_differences()
+    assert diff.new_instructions == "New instructions"
+    
+    # No tool differences
+    assert not diff.added_tools
+    assert not diff.removed_tools
+    assert not diff.modified_tools
+    
+    # Verify equality operator
+    assert config1 != config2
+    
+    # Make instructions match and verify configs are now equal
+    config2.instructions = "Original instructions"
+    assert config1 == config2
 
 
 def test_config_database_default_path():

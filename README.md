@@ -1,6 +1,6 @@
 # Context Protector
 
-A security wrapper for MCP servers that enforces trust-on-first-use pinning of tool descriptions and parameters.
+A security wrapper for MCP servers that enforces trust-on-first-use pinning of server instructions, tool descriptions, and tool parameters.
 
 ## Overview
 
@@ -99,6 +99,5 @@ ruff format .
 
 # To do
 
-* Add server instructions to server configs
 * Add support for resources
 * Add built-in detection for prompt injection in tool descriptions
