@@ -211,18 +211,18 @@ class MCPServerConfig:
     @classmethod
     def get_default_config_path(cls) -> str:
         """
-        Get the default config path (~/.mapo/config).
+        Get the default config path (~/.context-protector/config).
 
         Returns:
             The default config path as a string
         """
         home_dir = pathlib.Path.home()
-        mapo_dir = home_dir / ".mapo"
+        data_dir = home_dir / ".context-protector"
 
         # Create the directory if it doesn't exist
-        mapo_dir.mkdir(exist_ok=True)
+        data_dir.mkdir(exist_ok=True)
 
-        return str(mapo_dir / "config")
+        return str(data_dir / "config")
 
     @classmethod
     def from_json(
