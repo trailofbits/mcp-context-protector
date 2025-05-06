@@ -16,6 +16,23 @@ class ParameterType(str, Enum):
 
 
 @dataclass
+class MCPToolSpec:
+    """Specification for a tool that can be used by a model."""
+    name: str
+    description: str
+    parameters: Dict[str, Any]
+    required: List[str]
+
+    def model_dump(self) -> Dict[str, Any]:
+        """Convert to a dictionary representation."""
+        return {
+            "name": self.name,
+            "description": self.description,
+            "parameters": self.parameters,
+            "required": self.required,
+        }
+
+@dataclass
 class MCPParameterDefinition:
     name: str
     description: str

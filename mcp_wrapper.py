@@ -2,12 +2,7 @@
 import argparse
 import asyncio
 import logging
-from itertools import count
 import json
-import os
-import pwd
-import signal
-import sys
 from typing import List
 
 import mcp.types as types
@@ -16,13 +11,13 @@ from mcp.server.models import InitializationOptions
 
 from mcp_config import (
     MCPServerConfig,
+    MCPToolSpec,
     MCPToolDefinition,
     MCPParameterDefinition,
     ParameterType,
 )
 
 logger = logging.getLogger("mcp_wrapper")
-# logger.addHandler(logging.StreamHandler(sys.stderr))
 
 class MCPWrapperServer:
     def __init__(self, child_command: str, config_path: str = None):
@@ -210,7 +205,6 @@ class MCPWrapperServer:
         Returns:
             List of MCPToolSpec objects
         """
-        from mcp_models import MCPToolSpec
         tool_specs = []
         
         for tool in tools:
@@ -255,17 +249,16 @@ class MCPWrapperServer:
             tools: Updated list of tools from the downstream server
         """
         # Convert MCP tools to our internal format
-        old_tools_count = len(self.tool_specs)
         self.tool_specs = self._convert_mcp_tools_to_specs(tools)
         
         # Update server configuration and reset approval if tools changed
+        self.config_approved = False
         old_config = self.current_config
         self.current_config = self._create_server_config()
         
         # If tools have changed, require re-approval
         if old_config != self.current_config:
             logger.warning("Tools changed, requiring re-approval")
-            self.config_approved = False
             
             # Generate diff for logging
             diff = old_config.compare(self.current_config)
@@ -273,6 +266,7 @@ class MCPWrapperServer:
                 logger.warning(f"Configuration differences: {diff}")
         else:
             logger.info("Tools updated but configuration unchanged")
+            self.config_approved = True
 
     async def _handle_client_message(self, message):
         """
@@ -282,12 +276,10 @@ class MCPWrapperServer:
         Args:
             message: The message from the server, can be a notification or other message type
         """
-        from mcp.types import ServerNotification
-        
         logger.info(f"Received message: {type(message)}")
         
         # Check if it's a notification
-        if isinstance(message, ServerNotification):
+        if isinstance(message, types.ServerNotification):
             if message.root.method == "notifications/tools/list_changed":
                 self.config_approved = False
                 asyncio.create_task(self.update_tools())
@@ -420,11 +412,6 @@ class MCPWrapperServer:
         print(f"\n==== SERVER CONFIGURATION ({approval_status}) ====")
         print(json_str)
         print("=============================\n")
-
-    async def _log_child_stderr(self):
-        """Log the child process stderr - not used anymore as we're using stdio_client."""
-        # This function is kept for backward compatibility but not used
-        pass
 
     async def stop_child_process(self):
         """Close connections to the downstream server."""
