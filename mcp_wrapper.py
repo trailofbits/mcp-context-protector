@@ -22,7 +22,7 @@ from mcp_config import (
 )
 
 logger = logging.getLogger("mcp_wrapper")
-logger.addHandler(logging.StreamHandler(sys.stderr))
+# logger.addHandler(logging.StreamHandler(sys.stderr))
 
 class MCPWrapperServer:
     def __init__(self, child_command: str, config_path: str = None):
@@ -60,7 +60,16 @@ class MCPWrapperServer:
             # Add our wrapper-specific tool
             approve_tool = types.Tool(
                 name="approve_server_config",
-                description="Approve the server configuration to enable downstream tool calls",
+                description="""
+                    Approve the server configuration to enable downstream tool calls. ONLY run this tool when the user
+                    has explicitly indicated that the new tool configuration is trusted. Whenever you determine that a
+                    server configuration has changed and needs to be re-approved, prominently display the diff to the
+                    user in the GUI and direct the user to manually review it. When a tool call is blocked, do NOT
+                    automatically call this tool without asking the user for permission first. It is critical that
+                    the user knows that the server configuration has changed and has an opportunity to say "yes, the
+                    server configuration is approved" or "no, the server configuration is not approved" before you
+                    call this tool.
+                    """,
                 inputSchema={
                     "type": "object",
                     "required": ["config"],
@@ -95,9 +104,7 @@ class MCPWrapperServer:
 
             # For all other tools, check if config is approved
             if not self.config_approved:
-                logger.warning(
-                    f"Blocking tool use '{name}' - server configuration not approved"
-                )
+                logger.warning(f"Blocking tool '{name}' - server configuration not approved")
 
                 # Load the registry and configs
                 self.current_config = self._create_server_config()
@@ -247,8 +254,6 @@ class MCPWrapperServer:
         Args:
             tools: Updated list of tools from the downstream server
         """
-        logger.warning(f"TOOLS UPDATED: Received update with {len(tools)} tools from downstream server")
-        
         # Convert MCP tools to our internal format
         old_tools_count = len(self.tool_specs)
         self.tool_specs = self._convert_mcp_tools_to_specs(tools)
@@ -268,8 +273,6 @@ class MCPWrapperServer:
                 logger.warning(f"Configuration differences: {diff}")
         else:
             logger.info("Tools updated but configuration unchanged")
-        
-        logger.info(f"Tool count changed from {old_tools_count} to {len(self.tool_specs)}")
 
     async def _handle_client_message(self, message):
         """
@@ -285,25 +288,28 @@ class MCPWrapperServer:
         
         # Check if it's a notification
         if isinstance(message, ServerNotification):
-            if message.method == "tools/updated":
-                logger.info("Received tools/updated notification")
-                
-                # Request updated tools list
-                try:
-                    # Get updated tools from the downstream server
-                    downstream_tools = await self.session.list_tools()
-                    assert downstream_tools.tools
-                    logger.info(f"Received {len(downstream_tools.tools)} tools after update notification")
-                    
-                    # Process the updated tools
-                    await self._handle_tool_updates(downstream_tools.tools)
-                except Exception as e:
-                    logger.error(f"Error handling tool update notification: {e}")
+            if message.root.method == "notifications/tools/list_changed":
+                self.config_approved = False
+                asyncio.create_task(self.update_tools())
             else:
                 logger.info(f"Received notification: {message.method}")
         else:
             logger.info(f"Received non-notification message: {type(message)}")
+
+    async def update_tools(self):
+        try:
+            # Get updated tools from the downstream server
+            downstream_tools = await self.session.list_tools()
+
+            assert downstream_tools.tools
+            logger.info(f"Received {len(downstream_tools.tools)} tools after update notification")
             
+            # Process the updated tools
+            logger.info(f"Handling tool update with f{downstream_tools.tools}")
+            await self._handle_tool_updates(downstream_tools.tools)
+        except Exception as e:
+            logger.warning(f"Error handling tool update notification: {e}")
+
     async def start_child_process(self):
         """Initialize the connection to the downstream server."""
         logger.info(f"Connecting to downstream server: {self.child_command}")
@@ -345,7 +351,6 @@ class MCPWrapperServer:
             # Get tool specifications from the downstream server
             downstream_tools = await self.session.list_tools()
             assert downstream_tools.tools
-            logger.info(f"Received {len(downstream_tools.tools)} tools from downstream server")
 
             # Convert MCP tools to our internal format
             self.tool_specs = self._convert_mcp_tools_to_specs(downstream_tools.tools)
@@ -520,7 +525,7 @@ class MCPWrapperServer:
                         server_name="mcp_wrapper",
                         server_version="0.1.0",
                         capabilities=self.server.get_capabilities(
-                            notification_options=NotificationOptions(),
+                            notification_options=NotificationOptions(tools_changed=True),
                             experimental_capabilities={},
                         ),
                     ),

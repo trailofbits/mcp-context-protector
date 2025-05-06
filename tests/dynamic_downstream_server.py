@@ -25,20 +25,16 @@ import argparse
 import asyncio
 import atexit
 from contextlib import AsyncExitStack
-import logging
 import os
 import signal
 import sys
 from typing import Dict, Any
 import anyio
-from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 
 from mcp.server.fastmcp import FastMCP
-from mcp.types import Tool
-from mcp.server.models import InitializationOptions
 from mcp.server.session import ServerSession
 from mcp.server.stdio import stdio_server as stdio_server
-from mcp.types import JSONRPCMessage
+from mcp.server.lowlevel import NotificationOptions
 
 # Global counter for the number of tools
 num_tools = 1
@@ -148,7 +144,8 @@ def signal_handler(signum, frame):
     # Notify clients of the updated tools list
     # This triggers the _handle_tool_updates callback in the wrapper
     # app.notify_tools_updated()
-    app._session.send_tool_list_changed()
+    loop = asyncio.get_running_loop()
+    asyncio.run_coroutine_threadsafe(app._session.send_tool_list_changed(), loop)
     
     print(f"Increased num_tools to {num_tools} and sent tool update notification", file=sys.stderr)
 
@@ -201,7 +198,9 @@ async def my_run(
     a bit. This functino is replicated directly from mcp/server/fastmcp/server.py and
     mcp/server/low-level/server.py.
     """
-    opts = self._mcp_server.create_initialization_options()
+    opts = self._mcp_server.create_initialization_options(
+        notification_options=NotificationOptions(tools_changed=True)
+    )
     async with stdio_server() as (read_stream, write_stream):
         async with AsyncExitStack() as stack:
             lifespan_context = await stack.enter_async_context(self._mcp_server.lifespan(self))

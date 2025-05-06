@@ -18,6 +18,45 @@ SERVER_PID = None
 # Global variable for temporary pidfile
 TEMP_PIDFILE = None
 
+
+class ToolUpdateTracker:
+    """Helper class to track tool update notifications from the server."""
+
+    def __init__(self):
+        self.updates_received = 0
+        self.latest_tools = []
+        self.notification_event = asyncio.Event()
+
+    async def handle_message(self, message):
+        """
+        Message handler function that processes notifications from the server.
+
+        Args:
+            message: The message from the server
+        """
+        from mcp.types import ServerNotification
+
+        # Check if it's a notification
+        if isinstance(message, ServerNotification):
+            print(f"Received notification: {message.root.method}")
+
+            if message.root.method == "notifications/tools/list_changed":
+                self.updates_received += 1
+                # We need to fetch the latest tools list since the notification doesn't include it
+                print("Received notifications/tools/list_changed notification")
+                self.notification_event.set()  # Signal that a notification was received
+        else:
+            print(f"Received non-notification message: {type(message)}")
+
+    async def wait_for_notification(self, timeout=2.0):
+        """Wait for a tool update notification to be received."""
+        try:
+            await asyncio.wait_for(self.notification_event.wait(), timeout=timeout)
+            return True
+        except asyncio.TimeoutError:
+            return False
+
+
 async def verify_tools(session, expected_tool_names):
     """
     Verify that the session has the expected tools.
@@ -42,25 +81,41 @@ async def verify_tools(session, expected_tool_names):
     return tools
 
 
-async def send_sighup_and_wait(session, expected_tools):
+async def send_sighup_and_wait(session, expected_tools, tracker):
     """
-    Send SIGHUP to the server, wait for 2 seconds, then verify tools were updated.
+    Send SIGHUP to the server, verify a notification is received, then check tools were updated.
 
     Args:
         session: The client session to check
         expected_tools: List of tool names that should be present after the update
+        tracker: The ToolUpdateTracker instance to check for notifications
 
     Returns:
-        tools_list: The list of tools from the server after the update
+        None
     """
+    # Reset the notification event
+    tracker.notification_event.clear()
+
     # Send SIGHUP to the server
     os.kill(SERVER_PID, signal.SIGHUP)
 
-    # Wait to allow the server to process the signal and update tools
-    await asyncio.sleep(.5)
+    # Wait for the notification to be received
+    notification_received = await tracker.wait_for_notification(timeout=2.0)
+    assert (
+        notification_received
+    ), "No tool update notification was received after sending SIGHUP"
+
+    # Additional verification: check that updates_received counter was incremented
+    assert (
+        tracker.updates_received > 0
+    ), "Tool update tracker did not receive any notifications"
 
     # Verify that the tools list now contains the expected tools
     await verify_tools(session, expected_tools)
+
+    # Get the updated tools list and store it in the tracker
+    tools = await session.list_tools()
+    tracker.latest_tools = tools.tools
 
 
 async def start_dynamic_server(callback: callable):
@@ -87,9 +142,15 @@ async def start_dynamic_server(callback: callable):
         env=None,
     )
 
+    # Create a notification tracker
+    tracker = ToolUpdateTracker()
+
     async with stdio_client(server_params) as (read, write):
         assert read is not None and write is not None
-        async with ClientSession(read, write) as session:
+        # Create the session with the tracker's message handler
+        async with ClientSession(
+            read, write, message_handler=tracker.handle_message
+        ) as session:
             await session.initialize()
 
             # Get the server PID from the pidfile
@@ -107,8 +168,8 @@ async def start_dynamic_server(callback: callable):
 
             assert SERVER_PID is not None, f"Failed to read PID from {TEMP_PIDFILE}"
 
-            # Run the test callback with the session
-            await callback(session)
+            # Run the test callback with the session and tracker
+            await callback(session, tracker)
 
 
 def cleanup_pidfile():
@@ -123,7 +184,12 @@ def cleanup_pidfile():
 
 @pytest.fixture(autouse=True)
 def cleanup_after_test():
-    """Fixture to clean up resources after each test."""
+    """
+    Fixture to clean up resources after each test.
+
+    This fixture runs automatically after each test function completes
+    and ensures that temporary files are properly removed.
+    """
     yield
     cleanup_pidfile()
 
@@ -131,9 +197,24 @@ def cleanup_after_test():
 @pytest.mark.asyncio
 @pytest.mark.timeout(5)
 async def test_initial_tools():
-    """Test that the dynamic server starts with the initial echo tool."""
+    """
+    Test that the dynamic server starts with the initial echo tool.
 
-    async def callback(session):
+    This test verifies:
+    1. The server initializes with the echo tool
+    2. The echo tool functions correctly by returning the input message
+
+    The timeout ensures the test won't hang indefinitely if there's an issue.
+    """
+
+    async def callback(session, tracker):
+        """
+        Test callback that verifies the initial tool state and tests the echo tool.
+
+        Args:
+            session: The MCP client session connected to the server
+            tracker: The notification tracker for monitoring tool updates
+        """
         await verify_tools(session, ["echo"])
 
         # Test the echo tool
@@ -142,9 +223,9 @@ async def test_initial_tools():
             name="echo", arguments={"message": input_message}
         )
 
-        assert type(result) is types.CallToolResult
+        assert isinstance(result, types.CallToolResult)
         assert len(result.content) == 1
-        assert type(result.content[0]) is types.TextContent
+        assert isinstance(result.content[0], types.TextContent)
 
         response = json.loads(result.content[0].text)
         assert response == {"echo_message": input_message}
@@ -154,21 +235,48 @@ async def test_initial_tools():
 
 @pytest.mark.asyncio
 async def test_sighup_adds_tool():
-    """Test that sending SIGHUP adds a new tool."""
+    """
+    Test that sending SIGHUP adds a new tool and triggers a tool update notification.
 
-    async def callback(session):
+    This test verifies:
+    1. The server starts with the echo tool
+    2. When a SIGHUP signal is sent, a notification is received
+    3. The calculator tool is added to the available tools
+    4. The calculator tool functions correctly with different operations
+    5. The notification contains the updated tool list
+    """
+
+    async def callback(session, tracker):
+        """
+        Test callback that verifies tool updates after SIGHUP signal.
+
+        Args:
+            session: The MCP client session connected to the server
+            tracker: The notification tracker for monitoring tool updates
+        """
         # Check initial state - only echo tool should be present
         await verify_tools(session, ["echo"])
-        
-        # Send SIGHUP to add calculator tool and wait for it to be added
-        await send_sighup_and_wait(session, ["echo", "calculator"])
+
+        # Send SIGHUP to add calculator tool and verify notification is received
+        await send_sighup_and_wait(session, ["echo", "calculator"], tracker)
+
+        # Log notification details for debugging
+        print(
+            f"Tool update notification received after {tracker.updates_received} updates"
+        )
+
+        # The latest_tools in the notification should include the calculator tool
+        tool_names = [tool.name for tool in tracker.latest_tools]
+        assert (
+            "calculator" in tool_names
+        ), "Calculator tool not found in the update notification"
 
         # Test the calculator tool
         result = await session.call_tool(
             name="calculator", arguments={"a": 10, "b": 5, "operation": "add"}
         )
 
-        assert type(result) is types.CallToolResult
+        assert isinstance(result, types.CallToolResult)
         assert len(result.content) == 1
         response = json.loads(result.content[0].text)
         assert response == {"result": 15}
@@ -185,28 +293,140 @@ async def test_sighup_adds_tool():
 
 
 @pytest.mark.asyncio
-async def test_multiple_sighups():
-    """Test that multiple SIGHUPs add multiple tools."""
+async def test_notification_on_sighup():
+    """
+    Explicit test focusing on notifications being sent when SIGHUP is received.
 
-    async def callback(session):
+    This test verifies:
+    1. No notifications are received initially
+    2. When SIGHUP is sent, a tool update notification is received
+    3. The notification counter is incremented correctly
+    4. Multiple SIGHUPs result in multiple notifications
+    5. After each SIGHUP, the tool list is updated with the expected new tools
+    """
+
+    async def callback(session, tracker):
+        """
+        Test callback that explicitly checks notification receipt after SIGHUP signals.
+
+        Args:
+            session: The MCP client session connected to the server
+            tracker: The notification tracker for monitoring tool updates
+        """
+        # Verify no notifications yet
+        assert (
+            tracker.updates_received == 0
+        ), "Should have no notifications before SIGHUP"
+
+        # Send SIGHUP
+        os.kill(SERVER_PID, signal.SIGHUP)
+
+        # Wait for the notification
+        notification_received = await tracker.wait_for_notification(timeout=2.0)
+        assert notification_received, "No notification received within timeout period"
+
+        # Verify a notification was received
+        assert tracker.updates_received == 1, "Expected exactly one notification"
+
+        # Fetch the tools list
+        tools = await session.list_tools()
+        tool_names = [tool.name for tool in tools.tools]
+        assert "calculator" in tool_names, "Calculator tool missing after notification"
+        print(f"Notification verified with tools: {tool_names}")
+
+        # Send another SIGHUP and verify we get a second notification
+        tracker.notification_event.clear()  # Reset the event
+        os.kill(SERVER_PID, signal.SIGHUP)
+
+        notification_received = await tracker.wait_for_notification(timeout=2.0)
+        assert (
+            notification_received
+        ), "No second notification received within timeout period"
+        assert tracker.updates_received == 2, "Expected two notifications total"
+
+        # Get updated tools list
+        tools = await session.list_tools()
+        tool_names = [tool.name for tool in tools.tools]
+        assert "counter" in tool_names, "Counter tool missing after second notification"
+        print(f"Second notification verified with tools: {tool_names}")
+
+    await start_dynamic_server(callback)
+
+
+@pytest.mark.asyncio
+async def test_multiple_sighups():
+    """
+    Test that multiple SIGHUPs add multiple tools and trigger notifications for each.
+
+    This test verifies:
+    1. Each SIGHUP signal adds a new tool in sequence (calculator, counter, echo4)
+    2. Each SIGHUP triggers a separate notification
+    3. The notification counter increments correctly after each signal
+    4. The tools are functional after being added
+    5. The tools are added in the expected order based on the server implementation
+    """
+
+    async def callback(session, tracker):
+        """
+        Test callback that verifies multiple SIGHUP signals add tools in sequence.
+
+        Args:
+            session: The MCP client session connected to the server
+            tracker: The notification tracker for monitoring tool updates
+        """
         # Check initial state - only echo tool should be present
         await verify_tools(session, ["echo"])
 
         # Send first SIGHUP to add calculator tool
-        await send_sighup_and_wait(session, ["echo", "calculator"])
+        await send_sighup_and_wait(session, ["echo", "calculator"], tracker)
+
+        # Verify notification for first SIGHUP
+        assert (
+            tracker.updates_received == 1
+        ), "Expected 1 notification after first SIGHUP"
+        tools = await session.list_tools()
+        tool_names1 = [tool.name for tool in tools.tools]
+        assert "calculator" in tool_names1, "Calculator tool missing after first SIGHUP"
+        print(f"First SIGHUP notification verified with tools: {tool_names1}")
+
+        # Reset notification event counter before second SIGHUP
+        tracker.notification_event.clear()
 
         # Send second SIGHUP to add counter tool
-        await send_sighup_and_wait(session, ["echo", "calculator", "counter"])
+        await send_sighup_and_wait(session, ["echo", "calculator", "counter"], tracker)
+
+        # Verify notification for second SIGHUP
+        assert (
+            tracker.updates_received == 2
+        ), "Expected 2 notifications total after second SIGHUP"
+        tools = await session.list_tools()
+        tool_names2 = [tool.name for tool in tools.tools]
+        assert "counter" in tool_names2, "Counter tool missing after second SIGHUP"
+        print(f"Second SIGHUP notification verified with tools: {tool_names2}")
 
         # Test the counter tool
         result = await session.call_tool(name="counter", arguments={})
 
-        assert type(result) is types.CallToolResult
+        assert isinstance(result, types.CallToolResult)
         assert len(result.content) == 1
         response = json.loads(result.content[0].text)
         assert response == {"count": 3}  # Should reflect num_tools=3
 
+        # Reset notification event counter before third SIGHUP
+        tracker.notification_event.clear()
+
         # Send third SIGHUP to add echo4 tool
-        await send_sighup_and_wait(session, ["echo", "calculator", "counter", "echo4"])
+        await send_sighup_and_wait(
+            session, ["echo", "calculator", "counter", "echo4"], tracker
+        )
+
+        # Verify notification for third SIGHUP
+        assert (
+            tracker.updates_received == 3
+        ), "Expected 3 notifications total after third SIGHUP"
+        tools = await session.list_tools()
+        tool_names3 = [tool.name for tool in tools.tools]
+        assert "echo4" in tool_names3, "Echo4 tool missing after third SIGHUP"
+        print(f"Third SIGHUP notification verified with tools: {tool_names3}")
 
     await start_dynamic_server(callback)

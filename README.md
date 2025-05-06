@@ -1,45 +1,71 @@
-# MAPO Context Protector
+# Mapo Context Protector
 
-A security wrapper for Model API Orchestration (MAPO) tools that enforces review and approval of downstream server configurations.
+A security wrapper for MCP servers that enforces trust-on-first-use pinning of tool descriptions and parameters.
 
 ## Overview
 
-The Mapo Context Protector (MCP) sits between a client and a downstream server, intercepting all tool calls. It ensures that the client approves the downstream server configuration before allowing any tool calls to pass through, protecting against unexpected configuration changes.
+The Mapo Context Protector (Mapo) is a security wrapper for MCP servers that provides trust-on-first-use pinning for server configuration data. Any deviation from the approved or known-good server configuration will cause downstream tool calls to be blocked until the user explicitly approves the changed server configuration. Server approval is handled through the `approve_server_config` tool, which the wrapper adds to the downstream server's tool list.
 
-Key features:
-- Intercepts and proxies tool calls to downstream servers
-- Caches and validates server configurations against trusted versions
-- Requires explicit approval of server configurations before allowing tool usage
-- Monitors for dynamic tool changes and enforces reapproval
-- Securely stores approved configurations
+Implementing these security controls through a wrapper (rather than through a separate tool that lives outside the host app) streamlines enforcement, makes the tool as frictionless as possible for the user, and ensures universal compatibility with all MCP apps.
+
+## Server configuration semantics and caching
+
+Mapo currently compares tool descriptions and input schemas to determine whether a server configuration is equivalent to any approved one. Comparisons are semantic and ignore irrelevant factors like tool order.
+
+The database of server configurations is stored in a JSON-encoded file at `~/.mapo/config`. If a server configuration is in that file, it's approved and will run without tool blocking and without requiring user approval. The wrapper server checks downstream server configurations as soon as the connection is initiated and again whenever the wrapper receives a notification that the downstream server's tools have changed (`notifications/tools/list_changed`).
+
 
 ## Usage
 
-MCP uses stdio-based transport for communication, making it easy to chain tools together.
+Mapo currently supports only the stdio transport, meaning that it does not accept incoming HTTP connections or downstream servers that use streamable HTTP.
+
+To start using Mapo, first set up a virtual environment and install dependencies:
 
 ```bash
-# Start a simple downstream server
-python3 tests/simple_downstream_server.py
+# Environment setup (can also use venv directly)
+uv venv && uv pip install -r requirements.txt
 
+# Run tests if you like
+uv run pytest -v
+```
+
+To start Mapo, run `mcp_wrapper.py` with the command to start your downstream server as the first argument:
+
+```
 # Start the wrapper pointing to the downstream server
-python3 mcp_wrapper.py "python3 tests/simple_downstream_server.py"
+uv run mcp_wrapper.py DOWNSTREAM_SERVER_COMMAND
+```
 
-# Start a dynamic downstream server with changing tools
-python3 tests/dynamic_downstream_server.py --pidfile dynamic_server.pid
+Configure your host app to run the command above using full paths to `uv`. In the case of Claude Desktop, your `claude_config.json` file should look something like this:
 
-# Start the wrapper pointing to the dynamic server
-python3 mcp_wrapper.py "python3 tests/dynamic_downstream_server.py --pidfile dynamic_server.pid"
-
-# Trigger a tool update in the dynamic server (adds a new tool)
-kill -HUP $(cat dynamic_server.pid)
+```json
+{
+  "mcpServers": {
+    "wrapped_weather": {
+      "command": "/Users/user/.local/bin/uv",
+      "args": ["--directory", "/path/to/mapocontextprotector", "run", "/path/to/node /path/to/downstream/server.js"]
+    }
+  }
+}
 ```
 
 ## Development
 
 ### Setup
 
+Using `uv`:
 ```bash
-# Create virtual environment (using venv)
+# Create virtual environment
+uv venv
+
+# Install dependencies
+uv pip install -r requirements.txt
+```
+
+Using `venv`:
+
+```bash
+# Create virtual environment
 python -m venv .venv
 source .venv/bin/activate
 
@@ -67,23 +93,9 @@ ruff check .
 ruff format .
 ```
 
-## Architecture
+# To do
 
-The MCP wrapper uses the Model Context Protocol (MCP) with stdio transport to communicate between components:
-
-1. The client application sends tool requests via stdio
-2. The wrapper server intercepts these requests
-3. If the configuration is approved, requests are forwarded to the downstream server
-4. If the configuration is not approved, requests are blocked until approval
-
-All communication happens over stdio streams, with no HTTP or TCP networking required.
-
-### Core Components
-
-- `mcp_wrapper.py`: The main wrapper server that intercepts and proxies tool calls
-- `mcp_config.py`: Configuration management and diff generation for server configurations
-- `mcp_models.py`: Data models for MCP tool specifications and usage
-
-## License
-
-MIT
+* Add support for downstream servers over streamable HTTP
+* Add server instructions to server configs
+* Add support for resources
+* Add built-in detection for prompt injection in tool descriptions
