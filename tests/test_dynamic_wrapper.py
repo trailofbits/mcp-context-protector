@@ -50,7 +50,9 @@ async def run_with_dynamic_wrapper_session(callback, config_path=None):
         command="python",  # Executable
         args=[
             str(Path(__file__).resolve().parent.parent.joinpath("mcp_wrapper.py")),
+            "--command",
             dynamic_server_cmd,
+            "--config-file",
             str(config_path),
         ],  # Wrapper command + downstream server
         env=None,  # Optional environment variables

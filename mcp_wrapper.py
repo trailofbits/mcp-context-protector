@@ -20,9 +20,54 @@ from mcp_config import (
 logger = logging.getLogger("mcp_wrapper")
 
 class MCPWrapperServer:
-    def __init__(self, child_command: str, config_path: str = None):
-        self.child_command = child_command
+    @classmethod
+    def wrap_stdio(cls, command: str, config_path: str = None):
+        """
+        Create a wrapper server that connects to a child process via stdio.
+        
+        Args:
+            command: The command to run as a child process
+            config_path: Optional path to the wrapper config file
+            
+        Returns:
+            An instance of MCPWrapperServer configured for stdio
+        """
+        instance = cls(config_path)
+        instance.connection_type = "stdio"
+        instance.child_command = command
+        return instance
+        
+    @classmethod
+    def wrap_http(cls, url: str, config_path: str = None):
+        """
+        Create a wrapper server that connects to a remote MCP server via HTTP.
+        
+        Args:
+            url: The URL to connect to for a remote MCP server
+            config_path: Optional path to the wrapper config file
+            
+        Returns:
+            An instance of MCPWrapperServer configured for HTTP
+        """
+        instance = cls(config_path)
+        instance.connection_type = "http"
+        instance.server_url = url
+        return instance
+    
+    def __init__(self, config_path: str = None):
+        """
+        Initialize the wrapper server with common attributes.
+        Use wrap_stdio or wrap_http class methods instead of calling this directly.
+        
+        Args:
+            config_path: Optional path to the wrapper config file
+        """
+        self.child_command = None
+        self.server_url = None
+        self.connection_type = None
         self.child_process = None
+        self.client_context = None
+        self.streams = None
         self.session = None
         self.tool_specs = []
         self.config_approved = False
@@ -304,7 +349,21 @@ class MCPWrapperServer:
 
     async def start_child_process(self):
         """Initialize the connection to the downstream server."""
-        logger.info(f"Connecting to downstream server: {self.child_command}")
+        if self.connection_type == "stdio":
+            await self._connect_via_stdio()
+        elif self.connection_type == "http":
+            await self._connect_via_http()
+        else:
+            raise ValueError(f"Unknown connection type: {self.connection_type}")
+        
+        # Create server configuration
+        self.current_config = self._create_server_config()
+        if self.saved_config == self.current_config:
+            self.config_approved = True
+            
+    async def _connect_via_stdio(self):
+        """Connect to a downstream server via stdio."""
+        logger.info(f"Connecting to downstream server via stdio: {self.child_command}")
         
         # Set up imports
         from mcp import ClientSession, StdioServerParameters
@@ -328,8 +387,8 @@ class MCPWrapperServer:
             
             # Create the client
             logger.info(f"Starting downstream server with command: {command_parts[0]} {' '.join(command_parts[1:])}")
-            self._client_context = stdio_client(server_params)
-            self.streams = await self._client_context.__aenter__()
+            self.client_context = stdio_client(server_params)
+            self.streams = await self.client_context.__aenter__()
             
             # Create the client session with a message handler to process notifications
             self.session = await ClientSession(
@@ -348,12 +407,44 @@ class MCPWrapperServer:
             self.tool_specs = self._convert_mcp_tools_to_specs(downstream_tools.tools)
                 
         except Exception as e:
-            logger.error(f"Error connecting to downstream server: {e}")
+            logger.error(f"Error connecting to downstream server via stdio: {e}")
+            raise
+            
+    async def _connect_via_http(self):
+        """Connect to a downstream server via SSE (Server-Sent Events)."""
+        logger.info(f"Connecting to downstream server via SSE: {self.server_url}")
+        
+        # Set up imports
+        from mcp import ClientSession
+        from mcp.client.sse import sse_client
 
-        # Create server configuration
-        self.current_config = self._create_server_config()
-        if self.saved_config == self.current_config:
-            self.config_approved = True
+        try:
+            # No need to parse the URL, sse_client handles the full URL directly
+            logger.info(f"Connecting to SSE server at {self.server_url}")
+            
+            # Create the SSE client - it takes the full URL
+            self.client_context = sse_client(self.server_url)
+            self.streams = await self.client_context.__aenter__()
+            
+            # Create the client session with a message handler to process notifications
+            self.session = await ClientSession(
+                self.streams[0], 
+                self.streams[1],
+                message_handler=self._handle_client_message
+            ).__aenter__()
+            
+            await self.session.initialize()
+            
+            # Get tool specifications from the downstream server
+            downstream_tools = await self.session.list_tools()
+            assert downstream_tools.tools
+
+            # Convert MCP tools to our internal format
+            self.tool_specs = self._convert_mcp_tools_to_specs(downstream_tools.tools)
+                
+        except Exception as e:
+            logger.error(f"Error connecting to downstream server via SSE: {e}")
+            raise
 
     def _create_server_config(self) -> MCPServerConfig:
         """Create a server configuration from the tool specs."""
@@ -416,13 +507,15 @@ class MCPWrapperServer:
     async def stop_child_process(self):
         """Close connections to the downstream server."""
         # Clean up the client context if it exists
-        if hasattr(self, '_client_context') and self._client_context:
+        if self.client_context:
             try:
-                await self._client_context.__aexit__(None, None, None)
-                self._client_context = None
+                # The cleanup is the same regardless of connection type
+                await self.client_context.__aexit__(None, None, None)
+                self.client_context = None
                 self.session = None
                 self.streams = None
-                logger.info("Closed MCP client connection")
+                self.child_process = None
+                logger.info(f"Closed MCP client connection (type: {self.connection_type})")
             except Exception as e:
                 logger.error(f"Error closing MCP client: {e}")
 
@@ -523,12 +616,25 @@ class MCPWrapperServer:
 
 async def main():
     parser = argparse.ArgumentParser(description="MCP Wrapper Server")
-    parser.add_argument("command", help="The command to run as a child process")
-    parser.add_argument("config_file", nargs='?', help="The path to the wrapper config file", default="")
+    
+    # Create mutually exclusive group for command and URL
+    source_group = parser.add_mutually_exclusive_group(required=True)
+    source_group.add_argument("--command", help="The command to run as a child process")
+    source_group.add_argument("--url", help="The URL to connect to for a remote MCP server")
+    
+    # Add config file argument with new name
+    parser.add_argument("--config-file", help="The path to the wrapper config file", default="")
 
     args = parser.parse_args()
 
-    wrapper = MCPWrapperServer(args.command, args.config_file)
+    # Determine which source was provided and create appropriate wrapper
+    if args.command:
+        wrapper = MCPWrapperServer.wrap_stdio(args.command, args.config_file)
+    elif args.url:
+        wrapper = MCPWrapperServer.wrap_http(args.url, args.config_file)
+    else:
+        raise ValueError("Either --command or --url must be provided")
+    
     try:
         await wrapper.run()
     except KeyboardInterrupt:

@@ -2,3 +2,4 @@ pytest>=7.0.0
 pytest-asyncio>=0.20.0
 mcp[stdio]>=0.1.0
 ruff>=0.0.270
+psutil>=7.0.0

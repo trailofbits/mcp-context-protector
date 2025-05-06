@@ -20,8 +20,8 @@ async def run_with_wrapper_session(callback, config_path=None):
         command="python",  # Executable
         args=[
             str(Path(__file__).resolve().parent.parent.joinpath("mcp_wrapper.py")),
-            f"python {str(dir.joinpath('simple_downstream_server.py'))}",
-            str(config_path)
+            "--command", f"python {str(dir.joinpath('simple_downstream_server.py'))}",
+            "--config-file", str(config_path)
         ],  # Wrapper command + downstream server
         env=None,  # Optional environment variables
     )

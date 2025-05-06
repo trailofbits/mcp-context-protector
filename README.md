@@ -14,10 +14,9 @@ Context Protector currently compares tool descriptions and input schemas to dete
 
 The database of server configurations is stored in a JSON-encoded file at `~/.context-protector/config`. If a server configuration is in that file, it's approved and will run without tool blocking and without requiring user approval. The wrapper server checks downstream server configurations as soon as the connection is initiated and again whenever the wrapper receives a notification that the downstream server's tools have changed (`notifications/tools/list_changed`).
 
-
 ## Usage
 
-Context Protector currently supports only the stdio transport, meaning that it does not accept incoming HTTP connections or downstream servers that use streamable HTTP.
+Context Protector currently supports the stdio and SSE transports. It does not yet fully support the current streamable HTTP transport, but it will as soon as an official release of the Python SDK adds support for streamable HTTP.
 
 To start using Context Protector, first set up a virtual environment and install dependencies:
 
@@ -29,11 +28,14 @@ uv venv && uv pip install -r requirements.txt
 uv run pytest -v
 ```
 
-To start the server through the Context Protector wrapper, run `mcp_wrapper.py` with the command to start your downstream server as the first argument:
+To start the server through the Context Protector wrapper, run `mcp_wrapper.py` with either the `--command <COMMAND>` or `--url <URL>` argument:
 
 ```
-# Start the wrapper pointing to the downstream server
-uv run mcp_wrapper.py DOWNSTREAM_SERVER_COMMAND
+# Start the wrapper with an stdio server
+uv run mcp_wrapper.py --command DOWNSTREAM_SERVER_COMMAND
+
+# Start the wrapper with an HTTP server
+uv run mcp_wrapper.py --url DOWNSTREAM_SERVER_URL
 ```
 
 Configure your host app to run the command above using full paths to `uv`. In the case of Claude Desktop, your `claude_config.json` file should look something like this:
@@ -43,7 +45,7 @@ Configure your host app to run the command above using full paths to `uv`. In th
   "mcpServers": {
     "wrapped_weather": {
       "command": "/Users/user/.local/bin/uv",
-      "args": ["--directory", "/path/to/context-protector", "run", "/path/to/node /path/to/downstream/server.js"]
+      "args": ["--directory", "/path/to/context-protector", "run", "--command", "/path/to/node /path/to/downstream/server.js"]
     }
   }
 }
@@ -95,7 +97,6 @@ ruff format .
 
 # To do
 
-* Add support for downstream servers over streamable HTTP
 * Add server instructions to server configs
 * Add support for resources
 * Add built-in detection for prompt injection in tool descriptions
