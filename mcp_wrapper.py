@@ -15,6 +15,7 @@ from mcp_config import (
     MCPToolDefinition,
     MCPParameterDefinition,
     ParameterType,
+    MCPConfigDatabase,
 )
 
 logger = logging.getLogger("mcp_wrapper")
@@ -65,15 +66,17 @@ class MCPWrapperServer:
         self.child_command = None
         self.server_url = None
         self.connection_type = None
+        self.server_identifier = None  # Will be set after determining connection details
         self.child_process = None
         self.client_context = None
         self.streams = None
         self.session = None
         self.tool_specs = []
         self.config_approved = False
-        self.config_path = config_path or MCPServerConfig.get_default_config_path()
-        self.saved_config = MCPServerConfig.from_json(path=self.config_path)
-        self.current_config = MCPServerConfig.from_json(json_str="{}")
+        self.config_path = config_path
+        self.config_db = MCPConfigDatabase(config_path)
+        self.saved_config = None  # Will be loaded after server_identifier is set
+        self.current_config = MCPServerConfig()
         self.server = Server("mcp_wrapper")
         self._setup_server()
 
@@ -149,7 +152,7 @@ class MCPWrapperServer:
                 # Load the registry and configs
                 self.current_config = self._create_server_config()
 
-                # Create diff if both configs exist
+                # Create diff if we have a saved config to compare against
                 diff_text = "New server - no previous configuration to compare"
                 if self.saved_config:
                     diff = self.saved_config.compare(self.current_config)
@@ -296,19 +299,26 @@ class MCPWrapperServer:
         # Convert MCP tools to our internal format
         self.tool_specs = self._convert_mcp_tools_to_specs(tools)
         
-        # Update server configuration and reset approval if tools changed
+        # Temporarily reset approval while we check if the config has changed
         self.config_approved = False
         old_config = self.current_config
         self.current_config = self._create_server_config()
         
-        # If tools have changed, require re-approval
+        # If tools have changed, check against the saved config (if any)
         if old_config != self.current_config:
-            logger.warning("Tools changed, requiring re-approval")
+            logger.warning("Tools have changed from previous state")
             
             # Generate diff for logging
             diff = old_config.compare(self.current_config)
             if diff.has_differences():
                 logger.warning(f"Configuration differences: {diff}")
+            
+            # If we have a saved config, check if the current config matches it
+            if self.saved_config and self.saved_config == self.current_config:
+                logger.info("Tools changed but match saved approved configuration")
+                self.config_approved = True
+            else:
+                logger.warning("Tools changed, requiring re-approval")
         else:
             logger.info("Tools updated but configuration unchanged")
             self.config_approved = True
@@ -358,8 +368,16 @@ class MCPWrapperServer:
         
         # Create server configuration
         self.current_config = self._create_server_config()
-        if self.saved_config == self.current_config:
+        
+        # Check if we can auto-approve based on saved config
+        if self.saved_config and self.saved_config == self.current_config:
+            logger.info("Current configuration matches saved configuration - auto-approving")
             self.config_approved = True
+        else:
+            if not self.saved_config:
+                logger.info("No saved configuration found - approval required")
+            else:
+                logger.info("Configuration has changed since last approval - re-approval required")
             
     async def _connect_via_stdio(self):
         """Connect to a downstream server via stdio."""
@@ -374,6 +392,12 @@ class MCPWrapperServer:
             # Parse the command
             if self.child_command.startswith('"') and self.child_command.endswith('"'):
                 self.child_command = self.child_command[1:-1]
+                
+            # Set the server identifier for config lookup
+            self.server_identifier = self.child_command
+            
+            # Load the saved config if it exists in the database
+            self.saved_config = self.config_db.get_server_config("stdio", self.server_identifier)
                 
             command_parts = self.child_command.split()
             if not command_parts:
@@ -421,6 +445,12 @@ class MCPWrapperServer:
         try:
             # No need to parse the URL, sse_client handles the full URL directly
             logger.info(f"Connecting to SSE server at {self.server_url}")
+            
+            # Set the server identifier for config lookup
+            self.server_identifier = self.server_url
+            
+            # Load the saved config if it exists in the database
+            self.saved_config = self.config_db.get_server_config("sse", self.server_identifier)
             
             # Create the SSE client - it takes the full URL
             self.client_context = sse_client(self.server_url)
@@ -568,8 +598,19 @@ class MCPWrapperServer:
             # Configs match, so approve it
             logger.info("Submitted config matches server config - approving")
 
+            # Save the config to the database
+            if self.connection_type and self.server_identifier:
+                self.config_db.save_server_config(
+                    self.connection_type, 
+                    self.server_identifier, 
+                    current_config
+                )
+                logger.info(f"Saved {self.connection_type} server config for {self.server_identifier}")
+            else:
+                logger.warning("Connection type or server identifier not set, config not saved to database")
+                
+            # Update the saved config
             self.saved_config = current_config
-            self.saved_config.to_json(path=self.config_path)
 
             # Set approved flag
             self.config_approved = True

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 import json
 import base64
+import os
+import threading
 from dataclasses import dataclass, field
 from enum import Enum
 import pathlib
-from typing import Any, Dict, List, Optional, Union, TextIO
+from typing import Any, Dict, List, Optional, Union, TextIO, Literal
 
 
 class ParameterType(str, Enum):
@@ -637,3 +639,182 @@ class MCPServerConfig:
             data = yaml.safe_load(yaml_str)
 
         return cls.from_dict(data)
+
+
+@dataclass
+class MCPServerEntry:
+    """Class representing a server entry in the config database."""
+    type: Literal["stdio", "sse"]
+    identifier: str  # URL for SSE servers, command for stdio servers
+    config: Optional[Dict[str, Any]] = None  # Serialized MCPServerConfig
+
+    @staticmethod
+    def create_key(server_type: str, identifier: str) -> str:
+        """Create a unique key for a server entry."""
+        return f"{server_type}:{identifier}"
+
+    @property
+    def key(self) -> str:
+        """Get the unique key for this server entry."""
+        return self.create_key(self.type, self.identifier)
+
+
+class MCPConfigDatabase:
+    """
+    Class for managing multiple server configurations in a single file.
+    
+    This database stores server configurations indexed by their type and identifier.
+    It provides thread-safe access to the configuration file to prevent race conditions.
+    """
+    
+    _file_lock = threading.RLock()  # Class-level lock for file operations
+    
+    def __init__(self, config_path: Optional[str] = None):
+        """
+        Initialize the config database.
+        
+        Args:
+            config_path: Path to the config file. If None, uses the default path.
+        """
+        self.config_path = config_path or self.get_default_config_path()
+        self.servers = {}  # Dict[str, MCPServerEntry]
+        self._load()
+        
+    @staticmethod
+    def get_default_config_path() -> str:
+        """
+        Get the default config database path (~/.context-protector/servers.json).
+        
+        Returns:
+            The default config path as a string
+        """
+        home_dir = pathlib.Path.home()
+        data_dir = home_dir / ".context-protector"
+        
+        # Create the directory if it doesn't exist
+        data_dir.mkdir(exist_ok=True)
+        
+        return str(data_dir / "servers.json")
+    
+    def _load(self) -> None:
+        """Load server configurations from the config file."""
+        with MCPConfigDatabase._file_lock:
+            try:
+                if os.path.exists(self.config_path):
+                    with open(self.config_path, 'r') as f:
+                        data = json.load(f)
+                        for server_data in data.get('servers', []):
+                            entry = MCPServerEntry(
+                                type=server_data.get('type'),
+                                identifier=server_data.get('identifier'),
+                                config=server_data.get('config')
+                            )
+                            self.servers[entry.key] = entry
+            except (json.JSONDecodeError, FileNotFoundError, ValueError):
+                # If the file doesn't exist or is invalid, start with an empty database
+                self.servers = {}
+    
+    def _save(self) -> None:
+        """Save server configurations to the config file."""
+        with MCPConfigDatabase._file_lock:
+            data = {
+                'servers': [
+                    {
+                        'type': entry.type,
+                        'identifier': entry.identifier,
+                        'config': entry.config
+                    }
+                    for entry in self.servers.values()
+                ]
+            }
+            
+            # Ensure the directory exists
+            os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
+            
+            # Write to a temporary file first, then rename
+            temp_path = f"{self.config_path}.tmp"
+            with open(temp_path, 'w') as f:
+                json.dump(data, f, indent=2)
+            
+            # Atomically replace the old file with the new one
+            os.replace(temp_path, self.config_path)
+    
+    def get_server_config(self, server_type: str, identifier: str) -> Optional[MCPServerConfig]:
+        """
+        Get a server configuration by type and identifier.
+        
+        Args:
+            server_type: The server type ('stdio' or 'sse')
+            identifier: The server identifier (command or URL)
+            
+        Returns:
+            The server configuration, or None if not found
+        """
+        key = MCPServerEntry.create_key(server_type, identifier)
+        entry = self.servers.get(key)
+        
+        if entry and entry.config:
+            return MCPServerConfig.from_dict(entry.config)
+        
+        return None
+    
+    def save_server_config(self, server_type: str, identifier: str, config: MCPServerConfig) -> None:
+        """
+        Save a server configuration to the database.
+        
+        Args:
+            server_type: The server type ('stdio' or 'sse')
+            identifier: The server identifier (command or URL)
+            config: The server configuration
+        """
+        # Reload the database first to avoid overwriting other changes
+        self._load()
+        
+        # Update the server entry
+        key = MCPServerEntry.create_key(server_type, identifier)
+        self.servers[key] = MCPServerEntry(
+            type=server_type,
+            identifier=identifier,
+            config=config.to_dict()
+        )
+        
+        # Save the database
+        self._save()
+    
+    def remove_server_config(self, server_type: str, identifier: str) -> bool:
+        """
+        Remove a server configuration from the database.
+        
+        Args:
+            server_type: The server type ('stdio' or 'sse')
+            identifier: The server identifier (command or URL)
+            
+        Returns:
+            True if the server was removed, False if it wasn't found
+        """
+        # Reload the database first to avoid overwriting other changes
+        self._load()
+        
+        key = MCPServerEntry.create_key(server_type, identifier)
+        if key in self.servers:
+            del self.servers[key]
+            self._save()
+            return True
+        
+        return False
+    
+    def list_servers(self) -> List[Dict[str, Any]]:
+        """
+        List all server entries in the database.
+        
+        Returns:
+            A list of server entries
+        """
+        return [
+            {
+                'type': entry.type,
+                'identifier': entry.identifier,
+                'has_config': entry.config is not None
+            }
+            for entry in self.servers.values()
+        ]

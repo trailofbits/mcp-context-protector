@@ -36,7 +36,7 @@ def get_ports_by_pid(pid):
     """
     try:
         process = psutil.Process(pid)
-        connections = process.connections()
+        connections = process.net_connections()
         ports = []
         for conn in connections:
             if conn.status == 'LISTEN':
