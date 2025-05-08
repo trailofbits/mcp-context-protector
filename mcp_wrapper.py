@@ -94,11 +94,24 @@ class MCPWrapperServer:
         self.use_guardrails = guardrail_provider is not None  # Enable guardrails if provider is specified
         self.guardrail_alert = None  # Will hold GuardrailAlert if a guardrail is triggered
         self.visualize_ansi_codes = visualize_ansi_codes  # Whether to make ANSI escape codes visible
+        self.prompts = []  # Will store prompts from the downstream server
         self._setup_server()
 
     def _setup_server(self):
         """Setup MCP server handlers"""
 
+        @self.server.list_prompts()
+        async def list_prompts() -> List[types.Prompt]:
+            """
+            Return prompts from the downstream server, or an empty list if server config is not approved.
+            When config isn't approved, we don't reveal any prompts to clients.
+            """
+            if not self.config_approved:
+                logger.warning("Blocking list_prompts - server configuration not approved")
+                return []
+            
+            return self.prompts
+        
         @self.server.list_tools()
         async def list_tools() -> List[types.Tool]:
             """Return tool specs from the child MCP server and add wrapper-specific tools."""
@@ -170,6 +183,48 @@ class MCPWrapperServer:
 
             return all_tools
 
+        @self.server.get_prompt()
+        async def get_prompt(name: str, arguments: dict) -> List[types.TextContent]:
+            """
+            Handle prompt dispatch requests - proxy to downstream server if config is approved.
+            If the server config isn't approved, return an empty message list.
+            """
+            logger.info(f"Prompt dispatch with name {name} and config_approved {self.config_approved}")
+            
+            # For prompt dispatch, check if config is approved
+            if not self.config_approved:
+                logger.warning(f"Blocking prompt '{name}' - server configuration not approved")
+                
+                # Return an empty result with no messages instead of raising an error
+                return types.GetPromptResult(
+                    description="Server configuration not approved",
+                    messages=[]  # Empty message list
+                )
+            
+            # If we get here, config is approved, so proxy the prompt call
+            logger.info(f"Proxying prompt dispatch: {name}")
+            try:
+                # Use the session to dispatch the prompt to the downstream server
+                result = await self.session.get_prompt(name, arguments)
+                
+                # Extract the text content from the result
+                text_parts = []
+                for content in result.messages:
+                    if content.content:
+                        # Apply ANSI escape code processing if enabled
+                        processed_text = self._make_ansi_escape_codes_visible(content.content)
+                        text_parts.append(processed_text)
+                
+                # Return the results
+                return types.GetPromptResult(
+                    description=result.description,
+                    messages=[types.PromptMessage(role="user", content=text) for text in text_parts]
+                )
+                
+            except Exception as e:
+                logger.error(f"Error from downstream server during prompt dispatch:\n\n---\n\n{e}\n\n---\n\n")
+                raise ValueError(f"Error from downstream server: {str(e)}")
+                
         @self.server.call_tool()
         async def call_tool(name: str, arguments: dict) -> List[types.TextContent]:
             """
@@ -438,14 +493,44 @@ class MCPWrapperServer:
         # Check if it's a notification
         if isinstance(message, types.ServerNotification):
             if message.root.method == "notifications/tools/list_changed":
+                # Tool changes require re-approval of the configuration
                 self.config_approved = False
                 asyncio.create_task(self.update_tools())
+            elif message.root.method == "notifications/prompts/list_changed":
+                # Prompt changes do NOT affect the config approval status
+                logger.info("Received notification that prompts have changed (not affecting approval status)")
+                asyncio.create_task(self.update_prompts())
             else:
                 logger.info(f"Received notification: {message.method}")
         else:
             logger.info(f"Received non-notification message: {type(message)}")
 
+    async def update_prompts(self):
+        """
+        Update prompts from the downstream server.
+        
+        Important: This method updates the available prompts but does NOT affect
+        the server configuration approval status. Prompts are not considered part
+        of the server configuration for approval purposes.
+        """
+        try:
+            # Get updated prompts from the downstream server
+            downstream_prompts = await self.session.list_prompts()
+            
+            if downstream_prompts and downstream_prompts.prompts:
+                old_prompt_count = len(self.prompts)
+                self.prompts = downstream_prompts.prompts
+                new_prompt_count = len(self.prompts)
+                logger.info(f"Updated prompts from downstream server (old: {old_prompt_count}, new: {new_prompt_count})")
+                logger.info("Note: Prompt changes do not affect server configuration approval status")
+            else:
+                logger.info("No prompts available from downstream server")
+                self.prompts = []
+        except Exception as e:
+            logger.warning(f"Error updating prompts from downstream server: {e}")
+            
     async def update_tools(self):
+        """Update tools from the downstream server."""
         try:
             # Get updated tools from the downstream server
             downstream_tools = await self.session.list_tools()
@@ -454,8 +539,11 @@ class MCPWrapperServer:
             logger.info(f"Received {len(downstream_tools.tools)} tools after update notification")
             
             # Process the updated tools
-            logger.info(f"Handling tool update with f{downstream_tools.tools}")
+            logger.info("Processing tool update notification")
             await self._handle_tool_updates(downstream_tools.tools)
+            
+            # Also update prompts whenever tools are updated
+            await self.update_prompts()
         except Exception as e:
             logger.warning(f"Error handling tool update notification: {e}")
 
@@ -543,6 +631,16 @@ class MCPWrapperServer:
 
             # Convert MCP tools to our internal format
             self.tool_specs = self._convert_mcp_tools_to_specs(downstream_tools.tools)
+            
+            # Get prompts from the downstream server if available
+            self.prompts = []
+            try:
+                downstream_prompts = await self.session.list_prompts()
+                if downstream_prompts and downstream_prompts.prompts:
+                    self.prompts = downstream_prompts.prompts
+                    logger.info(f"Received {len(self.prompts)} prompts during stdio initialization")
+            except Exception as e:
+                logger.info(f"Downstream stdio server does not support prompts: {e}")
                 
             # Check guardrails if provider is available
             if self.use_guardrails and self.guardrail_provider:
@@ -597,6 +695,16 @@ class MCPWrapperServer:
 
             # Convert MCP tools to our internal format
             self.tool_specs = self._convert_mcp_tools_to_specs(downstream_tools.tools)
+            
+            # Get prompts from the downstream server if available
+            self.prompts = []
+            try:
+                downstream_prompts = await self.session.list_prompts()
+                if downstream_prompts and downstream_prompts.prompts:
+                    self.prompts = downstream_prompts.prompts
+                    logger.info(f"Received {len(self.prompts)} prompts during stdio initialization")
+            except Exception as e:
+                logger.info(f"Downstream stdio server does not support prompts: {e}")
                 
             # Check guardrails if provider is available
             if self.use_guardrails and self.guardrail_provider:
@@ -826,7 +934,10 @@ class MCPWrapperServer:
                         server_name="mcp_wrapper",
                         server_version="0.1.0",
                         capabilities=self.server.get_capabilities(
-                            notification_options=NotificationOptions(tools_changed=True),
+                            notification_options=NotificationOptions(
+                                tools_changed=True,
+                                prompts_changed=True
+                            ),
                             experimental_capabilities={},
                         ),
                     ),
