@@ -99,5 +99,5 @@ ruff format .
 
 # To do
 
-* Add support for resources
-* Add built-in detection for prompt injection in tool descriptions
+* Add support for proxying resources
+* Add "strict mode" where approval must take place outside the host app (e.g., CLI)
