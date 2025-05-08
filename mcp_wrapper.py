@@ -3,6 +3,7 @@ import argparse
 import asyncio
 import logging
 import json
+import re
 import sys
 from typing import List, Optional
 
@@ -24,7 +25,8 @@ logger = logging.getLogger("mcp_wrapper")
 
 class MCPWrapperServer:
     @classmethod
-    def wrap_stdio(cls, command: str, config_path: str = None, guardrail_provider: Optional[GuardrailProvider] = None):
+    def wrap_stdio(cls, command: str, config_path: str = None, guardrail_provider: Optional[GuardrailProvider] = None, 
+                  visualize_ansi_codes: bool = False):
         """
         Create a wrapper server that connects to a child process via stdio.
         
@@ -32,17 +34,19 @@ class MCPWrapperServer:
             command: The command to run as a child process
             config_path: Optional path to the wrapper config file
             guardrail_provider: Optional guardrail provider object to use
+            visualize_ansi_codes: Whether to make ANSI escape codes visible in tool outputs
             
         Returns:
             An instance of MCPWrapperServer configured for stdio
         """
-        instance = cls(config_path, guardrail_provider)
+        instance = cls(config_path, guardrail_provider, visualize_ansi_codes)
         instance.connection_type = "stdio"
         instance.child_command = command
         return instance
         
     @classmethod
-    def wrap_http(cls, url: str, config_path: str = None, guardrail_provider: Optional[GuardrailProvider] = None):
+    def wrap_http(cls, url: str, config_path: str = None, guardrail_provider: Optional[GuardrailProvider] = None,
+                 visualize_ansi_codes: bool = False):
         """
         Create a wrapper server that connects to a remote MCP server via HTTP.
         
@@ -50,16 +54,17 @@ class MCPWrapperServer:
             url: The URL to connect to for a remote MCP server
             config_path: Optional path to the wrapper config file
             guardrail_provider: Optional guardrail provider object to use
+            visualize_ansi_codes: Whether to make ANSI escape codes visible in tool outputs
             
         Returns:
             An instance of MCPWrapperServer configured for HTTP
         """
-        instance = cls(config_path, guardrail_provider)
+        instance = cls(config_path, guardrail_provider, visualize_ansi_codes)
         instance.connection_type = "http"
         instance.server_url = url
         return instance
     
-    def __init__(self, config_path: str = None, guardrail_provider: Optional[GuardrailProvider] = None):
+    def __init__(self, config_path: str = None, guardrail_provider: Optional[GuardrailProvider] = None, visualize_ansi_codes: bool = False):
         """
         Initialize the wrapper server with common attributes.
         Use wrap_stdio or wrap_http class methods instead of calling this directly.
@@ -67,6 +72,7 @@ class MCPWrapperServer:
         Args:
             config_path: Optional path to the wrapper config file
             guardrail_provider: Optional guardrail provider object to use for checking configs
+            visualize_ansi_codes: Whether to make ANSI escape codes visible in tool outputs
         """
         self.child_command = None
         self.server_url = None
@@ -87,6 +93,7 @@ class MCPWrapperServer:
         self.guardrail_provider = guardrail_provider  # Store the provider object
         self.use_guardrails = guardrail_provider is not None  # Enable guardrails if provider is specified
         self.guardrail_alert = None  # Will hold GuardrailAlert if a guardrail is triggered
+        self.visualize_ansi_codes = visualize_ansi_codes  # Whether to make ANSI escape codes visible
         self._setup_server()
 
     def _setup_server(self):
@@ -295,7 +302,9 @@ class MCPWrapperServer:
                 text_parts = []
                 for content in result.content:
                     if content.type == "text" and content.text:
-                        text_parts.append(content.text)
+                        # Apply ANSI escape code processing if enabled
+                        processed_text = self._make_ansi_escape_codes_visible(content.text)
+                        text_parts.append(processed_text)
                 
                 if text_parts:
                     return " ".join(text_parts)
@@ -654,6 +663,26 @@ class MCPWrapperServer:
 
         return config
 
+    def _make_ansi_escape_codes_visible(self, text: str) -> str:
+        """
+        Convert ANSI escape sequences to visible text by replacing escape character with "ESC".
+        This makes ANSI color codes and other terminal control sequences visible in the text
+        instead of being interpreted by the terminal.
+        
+        Args:
+            text: The text that may contain ANSI escape sequences
+            
+        Returns:
+            Text with ANSI escape sequences made visible
+        """
+        if not self.visualize_ansi_codes:
+            return text
+
+        # Replace the escape character (ASCII 27, typically \x1b or \033) with "ESC"
+        # This will convert escape sequences like "\x1b[31m" (red text) to "ESC[31m"
+        # making them visible instead of changing the terminal colors
+        return re.sub(r'\x1b', 'ESC', text)
+    
     def _print_server_config(self, config: MCPServerConfig):
         """Print the server configuration to stdout."""
         # Convert to JSON and print to stdout
@@ -821,6 +850,10 @@ async def main():
     
     # Add guardrail provider argument
     parser.add_argument("--guardrail-provider", help="The guardrail provider to use for checking server configurations")
+    
+    # Add ANSI escape code visualization argument
+    parser.add_argument("--visualize-ansi-codes", action="store_true", 
+                      help="Make ANSI escape codes visible by replacing escape characters with 'ESC'")
 
     args = parser.parse_args()
 
@@ -854,9 +887,19 @@ async def main():
     
     # Determine which source was provided and create appropriate wrapper
     if args.command:
-        wrapper = MCPWrapperServer.wrap_stdio(args.command, args.config_file, guardrail_provider)
+        wrapper = MCPWrapperServer.wrap_stdio(
+            args.command, 
+            args.config_file, 
+            guardrail_provider,
+            args.visualize_ansi_codes
+        )
     elif args.url:
-        wrapper = MCPWrapperServer.wrap_http(args.url, args.config_file, guardrail_provider)
+        wrapper = MCPWrapperServer.wrap_http(
+            args.url, 
+            args.config_file, 
+            guardrail_provider,
+            args.visualize_ansi_codes
+        )
     else:
         # This should never happen due to the mutually exclusive group being required
         # But we'll keep it as a fallback error message
