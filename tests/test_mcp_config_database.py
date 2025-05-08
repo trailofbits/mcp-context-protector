@@ -4,7 +4,6 @@ Tests for the MCPConfigDatabase class.
 import os
 import tempfile
 import json
-import pytest
 from pathlib import Path
 
 from ..mcp_config import (

@@ -3,7 +3,8 @@ import argparse
 import asyncio
 import logging
 import json
-from typing import List
+import sys
+from typing import List, Optional
 
 import mcp.types as types
 from mcp.server.lowlevel import Server, NotificationOptions
@@ -17,51 +18,55 @@ from mcp_config import (
     ParameterType,
     MCPConfigDatabase,
 )
+from guardrails import get_provider_names, get_provider, GuardrailProvider, GuardrailAlert
 
 logger = logging.getLogger("mcp_wrapper")
 
 class MCPWrapperServer:
     @classmethod
-    def wrap_stdio(cls, command: str, config_path: str = None):
+    def wrap_stdio(cls, command: str, config_path: str = None, guardrail_provider: Optional[GuardrailProvider] = None):
         """
         Create a wrapper server that connects to a child process via stdio.
         
         Args:
             command: The command to run as a child process
             config_path: Optional path to the wrapper config file
+            guardrail_provider: Optional guardrail provider object to use
             
         Returns:
             An instance of MCPWrapperServer configured for stdio
         """
-        instance = cls(config_path)
+        instance = cls(config_path, guardrail_provider)
         instance.connection_type = "stdio"
         instance.child_command = command
         return instance
         
     @classmethod
-    def wrap_http(cls, url: str, config_path: str = None):
+    def wrap_http(cls, url: str, config_path: str = None, guardrail_provider: Optional[GuardrailProvider] = None):
         """
         Create a wrapper server that connects to a remote MCP server via HTTP.
         
         Args:
             url: The URL to connect to for a remote MCP server
             config_path: Optional path to the wrapper config file
+            guardrail_provider: Optional guardrail provider object to use
             
         Returns:
             An instance of MCPWrapperServer configured for HTTP
         """
-        instance = cls(config_path)
+        instance = cls(config_path, guardrail_provider)
         instance.connection_type = "http"
         instance.server_url = url
         return instance
     
-    def __init__(self, config_path: str = None):
+    def __init__(self, config_path: str = None, guardrail_provider: Optional[GuardrailProvider] = None):
         """
         Initialize the wrapper server with common attributes.
         Use wrap_stdio or wrap_http class methods instead of calling this directly.
         
         Args:
             config_path: Optional path to the wrapper config file
+            guardrail_provider: Optional guardrail provider object to use for checking configs
         """
         self.child_command = None
         self.server_url = None
@@ -79,6 +84,9 @@ class MCPWrapperServer:
         self.saved_config = None  # Will be loaded after server_identifier is set
         self.current_config = MCPServerConfig()
         self.server = Server("mcp_wrapper")
+        self.guardrail_provider = guardrail_provider  # Store the provider object
+        self.use_guardrails = guardrail_provider is not None  # Enable guardrails if provider is specified
+        self.guardrail_alert = None  # Will hold GuardrailAlert if a guardrail is triggered
         self._setup_server()
 
     def _setup_server(self):
@@ -128,6 +136,30 @@ class MCPWrapperServer:
 
             # Add our tool to the list
             all_tools.append(approve_tool)
+            
+            # Add the ignore_guardrail_alert tool if guardrails are enabled
+            if self.use_guardrails:
+                ignore_guardrail_tool = types.Tool(
+                    name="ignore_guardrail_alert",
+                    description="""
+                        Use this tool if the server configuration triggers a guardrail. ONLY trigger this tool if the user 
+                        explicitly asks to ignore the guardrail alert and specifically says "I understand the risks".
+                        You must provide the full explanation text from the guardrail alert to confirm you understand
+                        what guardrail is being bypassed.
+                        Do not use this tool proactively or without clear user instruction to bypass the guardrail.
+                        """,
+                    inputSchema={
+                        "type": "object",
+                        "required": ["alert_text"],
+                        "properties": {
+                            "alert_text": {
+                                "type": "string",
+                                "description": "The exact explanation text from the guardrail alert you want to ignore"
+                            }
+                        },
+                    },
+                )
+                all_tools.append(ignore_guardrail_tool)
 
             return all_tools
 
@@ -138,13 +170,55 @@ class MCPWrapperServer:
             or block if config not approved.
             """
             logger.info(f"Tool call with name {name} and config_approved {self.config_approved}")
-            if not self.session and name != "approve_server_config":
+            if not self.session and name not in ["approve_server_config", "ignore_guardrail_alert"]:
                 raise ValueError("Child MCP server not connected")
 
             # Special handling for our approve_server_config tool
             if name == "approve_server_config":
                 result = await self._handle_approve_config(arguments.get("config", ""))
                 return [types.TextContent(type="text", text=result)]
+                
+            # Special handling for our ignore_guardrail_alert tool
+            if name == "ignore_guardrail_alert" and self.use_guardrails:
+                logger.info("Processing ignore_guardrail_alert request")
+                
+                # Check if there's an active guardrail alert
+                if not self.guardrail_alert:
+                    logger.warning("No active guardrail alert to ignore")
+                    return [types.TextContent(type="text", text=json.dumps({
+                        "status": "failed",
+                        "reason": "No active guardrail alert to ignore"
+                    }))]
+                
+                # Get the alert_text parameter
+                alert_text = arguments.get("alert_text", "")
+                if not alert_text:
+                    logger.warning("No alert_text provided for ignore_guardrail_alert")
+                    return [types.TextContent(type="text", text=json.dumps({
+                        "status": "failed",
+                        "reason": "You must provide the full alert_text to ignore the guardrail alert",
+                        "current_alert": self.guardrail_alert.explanation
+                    }))]
+                
+                # Verify the alert text matches
+                actual_explanation = self.guardrail_alert.explanation
+                if alert_text.strip() != actual_explanation.strip():
+                    logger.warning(f"Alert text mismatch. Expected: '{actual_explanation}', Got: '{alert_text}'")
+                    return [types.TextContent(type="text", text=json.dumps({
+                        "status": "failed",
+                        "reason": "The provided alert text does not match the actual guardrail alert",
+                        "current_alert": actual_explanation,
+                        "provided_alert": alert_text
+                    }))]
+                
+                # Alert text matches, clear the guardrail alert
+                logger.info("User explicitly chose to ignore guardrail alert with correct alert text")
+                self.guardrail_alert = None
+                
+                return [types.TextContent(type="text", text=json.dumps({
+                    "status": "success",
+                    "reason": "Guardrail alert successfully ignored at user's explicit request"
+                }))]
 
             # For all other tools, check if config is approved
             if not self.config_approved:
@@ -165,13 +239,21 @@ class MCPWrapperServer:
                 # Serialize the server config (use current config)
                 serialized_config = self.current_config.to_json()
 
-                # Create blocked response with diff
+                # Create blocked response with diff and guardrail alert if any
                 blocked_response = {
                     "status": "blocked",
                     "server_config": serialized_config,
                     "diff": diff_text,
                     "reason": "Server configuration not approved - all tools blocked",
                 }
+                
+                # Add guardrail alert information if available
+                if self.guardrail_alert:
+                    blocked_response["guardrail_alert"] = {
+                        "provider": self.guardrail_provider.name,
+                        "explanation": self.guardrail_alert.explanation,
+                        "data": self.guardrail_alert.data
+                    }
 
                 # Return a formatted error with the blocked response
                 error_json = json.dumps(blocked_response)
@@ -302,6 +384,9 @@ class MCPWrapperServer:
         
         # Temporarily reset approval while we check if the config has changed
         self.config_approved = False
+        # Reset any guardrail alert
+        self.guardrail_alert = None
+        
         old_config = self.current_config
         self.current_config = self._create_server_config()
         
@@ -320,6 +405,13 @@ class MCPWrapperServer:
                 self.config_approved = True
             else:
                 logger.warning("Tools changed, requiring re-approval")
+                
+                # Check with guardrail provider if configured
+                if self.use_guardrails and self.guardrail_provider:
+                    logger.info(f"Checking config with guardrail provider: {self.guardrail_provider.name}")
+                    self.guardrail_alert = self.guardrail_provider.check_server_config(self.current_config)
+                    if self.guardrail_alert:
+                        logger.warning(f"Guardrail alert triggered: {self.guardrail_alert.explanation}")
         else:
             logger.info("Tools updated but configuration unchanged")
             self.config_approved = True
@@ -370,8 +462,20 @@ class MCPWrapperServer:
         # Create server configuration
         self.current_config = self._create_server_config()
         
+        # Check if we need to evaluate guardrails (already done in _connect_via_* methods)
+        # but set here if no alert was set for some reason
+        if self.use_guardrails and self.guardrail_provider and self.guardrail_alert is None:
+            logger.info(f"Checking config with guardrail provider in start_child_process: {self.guardrail_provider.name}")
+            self.guardrail_alert = self.guardrail_provider.check_server_config(self.current_config)
+            if self.guardrail_alert:
+                logger.warning(f"Guardrail alert triggered: {self.guardrail_alert.explanation}")
+        
         # Check if we can auto-approve based on saved config
-        if self.saved_config and self.saved_config == self.current_config:
+        # Don't auto-approve if there's a guardrail alert
+        if self.guardrail_alert is not None:
+            logger.warning("Cannot auto-approve config due to active guardrail alert")
+            self.config_approved = False
+        elif self.saved_config and self.saved_config == self.current_config:
             logger.info("Current configuration matches saved configuration - auto-approving")
             self.config_approved = True
         else:
@@ -431,6 +535,17 @@ class MCPWrapperServer:
             # Convert MCP tools to our internal format
             self.tool_specs = self._convert_mcp_tools_to_specs(downstream_tools.tools)
                 
+            # Check guardrails if provider is available
+            if self.use_guardrails and self.guardrail_provider:
+                # Create the server config to check against guardrails
+                self.current_config = self._create_server_config()
+                logger.info(f"Checking initial config with guardrail provider in stdio: {self.guardrail_provider.name}")
+                self.guardrail_alert = self.guardrail_provider.check_server_config(self.current_config)
+                if self.guardrail_alert:
+                    logger.warning(f"Guardrail alert triggered during stdio initialization: {self.guardrail_alert.explanation}")
+                    # We don't auto-approve configs with guardrail alerts
+                    self.config_approved = False
+                
         except Exception as e:
             logger.error(f"Error connecting to downstream server via stdio: {e}")
             raise
@@ -473,6 +588,17 @@ class MCPWrapperServer:
 
             # Convert MCP tools to our internal format
             self.tool_specs = self._convert_mcp_tools_to_specs(downstream_tools.tools)
+                
+            # Check guardrails if provider is available
+            if self.use_guardrails and self.guardrail_provider:
+                # Create the server config to check against guardrails
+                self.current_config = self._create_server_config()
+                logger.info(f"Checking initial config with guardrail provider in http: {self.guardrail_provider.name}")
+                self.guardrail_alert = self.guardrail_provider.check_server_config(self.current_config)
+                if self.guardrail_alert:
+                    logger.warning(f"Guardrail alert triggered during http initialization: {self.guardrail_alert.explanation}")
+                    # We don't auto-approve configs with guardrail alerts
+                    self.config_approved = False
                 
         except Exception as e:
             logger.error(f"Error connecting to downstream server via SSE: {e}")
@@ -568,6 +694,24 @@ class MCPWrapperServer:
         logger.info("Processing approve_server_config request")
 
         try:
+            # Check if there's an active guardrail alert
+            if self.guardrail_alert:
+                logger.warning("Cannot approve config while guardrail alert is active")
+                
+                # Create failure response with guardrail information
+                failure_response = {
+                    "status": "failed",
+                    "reason": "Cannot approve server configuration while guardrail alert is active",
+                    "guardrail_alert": {
+                        "provider": self.guardrail_provider.name,
+                        "explanation": self.guardrail_alert.explanation,
+                        "data": self.guardrail_alert.data
+                    },
+                    "message": "You must first clear the guardrail alert using the ignore_guardrail_alert tool"
+                }
+                
+                return json.dumps(failure_response)
+                
             # Get the submitted config
             submitted_config_json = config_json
             if not submitted_config_json:
@@ -618,8 +762,9 @@ class MCPWrapperServer:
             # Update the saved config
             self.saved_config = current_config
 
-            # Set approved flag
+            # Set approved flag and clear any guardrail alert
             self.config_approved = True
+            self.guardrail_alert = None
 
             # Create success response
             success_response = {
@@ -664,23 +809,59 @@ class MCPWrapperServer:
 async def main():
     parser = argparse.ArgumentParser(description="MCP Wrapper Server")
     
-    # Create mutually exclusive group for command and URL
+    # Create mutually exclusive group for command, URL, and list-guardrail-providers
     source_group = parser.add_mutually_exclusive_group(required=True)
     source_group.add_argument("--command", help="The command to run as a child process")
     source_group.add_argument("--url", help="The URL to connect to for a remote MCP server")
+    source_group.add_argument("--list-guardrail-providers", action="store_true", 
+                             help="List available guardrail providers and exit")
     
     # Add config file argument with new name
     parser.add_argument("--config-file", help="The path to the wrapper config file", default="")
+    
+    # Add guardrail provider argument
+    parser.add_argument("--guardrail-provider", help="The guardrail provider to use for checking server configurations")
 
     args = parser.parse_args()
 
+    # Check if we should just list guardrail providers and exit
+    if args.list_guardrail_providers:
+        provider_names = get_provider_names()
+        if provider_names:
+            print("Available guardrail providers:")
+            for provider in provider_names:
+                print(f"  - {provider}")
+        else:
+            print("No guardrail providers found.")
+        return
+    
+    # Get guardrail provider object if specified
+    guardrail_provider = None
+    if args.guardrail_provider:
+        provider_names = get_provider_names()
+        if args.guardrail_provider not in provider_names:
+            print(f"Error: Unknown guardrail provider '{args.guardrail_provider}'", file=sys.stderr)
+            print("Available providers: " + ", ".join(provider_names), file=sys.stderr)
+            sys.exit(1)
+        
+        # Get the provider object
+        guardrail_provider = get_provider(args.guardrail_provider)
+        if not guardrail_provider:
+            print(f"Error: Failed to initialize guardrail provider '{args.guardrail_provider}'", file=sys.stderr)
+            sys.exit(1)
+        
+        logger.info(f"Using guardrail provider: {guardrail_provider.name}")
+    
     # Determine which source was provided and create appropriate wrapper
     if args.command:
-        wrapper = MCPWrapperServer.wrap_stdio(args.command, args.config_file)
+        wrapper = MCPWrapperServer.wrap_stdio(args.command, args.config_file, guardrail_provider)
     elif args.url:
-        wrapper = MCPWrapperServer.wrap_http(args.url, args.config_file)
+        wrapper = MCPWrapperServer.wrap_http(args.url, args.config_file, guardrail_provider)
     else:
-        raise ValueError("Either --command or --url must be provided")
+        # This should never happen due to the mutually exclusive group being required
+        # But we'll keep it as a fallback error message
+        print("Error: Either --command, --url, or --list-guardrail-providers must be provided", file=sys.stderr)
+        sys.exit(1)
     
     try:
         await wrapper.run()

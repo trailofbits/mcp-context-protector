@@ -66,6 +66,34 @@ class MCPToolDefinition:
     description: str
     parameters: List[MCPParameterDefinition]
 
+    def __str__(self) -> str:
+        """
+        Generate a string representation of the tool with its parameters.
+        Format is compact with parameters on a single line each.
+        """
+        lines = [f"Tool: {self.name}"]
+        lines.append(f"Description: {self.description}")
+        
+        if self.parameters:
+            lines.append("Parameters:")
+            for param in self.parameters:
+                required = "(required)" if param.required else "(optional)"
+                param_line = f"  - {param.name} ({param.type.value}) {required}: {param.description}"
+                
+                # Add enum values if present
+                if param.enum:
+                    param_line += f" [Values: {', '.join(str(v) for v in param.enum)}]"
+                
+                # Add default if present
+                if param.default is not None:
+                    param_line += f" [Default: {param.default}]"
+                
+                lines.append(param_line)
+        else:
+            lines.append("Parameters: None")
+            
+        return "\n".join(lines)
+
     def __eq__(self, other):
         if not isinstance(other, MCPToolDefinition):
             return False
