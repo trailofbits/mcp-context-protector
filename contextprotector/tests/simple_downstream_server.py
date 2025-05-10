@@ -2,6 +2,7 @@
 Simple downstream MCP server with an echo tool.
 Uses fastmcp from the official Python SDK for MCP.
 """
+
 from typing import Dict, Any
 
 from mcp.server.fastmcp import FastMCP
@@ -14,28 +15,27 @@ echo_tool = Tool(
     inputSchema={
         "type": "object",
         "properties": {
-            "message": {
-                "type": "string",
-                "description": "The message to echo back"
-            }
+            "message": {"type": "string", "description": "The message to echo back"}
         },
-        "required": ["message"]
-    }
+        "required": ["message"],
+    },
 )
+
 
 # Echo handler function
 async def echo_handler(message: str) -> Dict[str, Any]:
     """
     Echo handler function that returns the input message.
-    
+
     Args:
         params: A dictionary containing the parameters from the request.
             Expected to have a 'message' key with a string value.
-            
+
     Returns:
         A dictionary with the 'echo_message' key containing the input message.
     """
     return {"echo_message": message}
+
 
 # Create the server
 app = FastMCP()

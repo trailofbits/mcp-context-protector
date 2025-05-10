@@ -2,6 +2,7 @@
 Simple downstream MCP server with an echo tool.
 Uses fastmcp with SSE transport from the official Python SDK for MCP.
 """
+
 import argparse
 import os
 from typing import Dict, Any
@@ -16,28 +17,27 @@ echo_tool = Tool(
     inputSchema={
         "type": "object",
         "properties": {
-            "message": {
-                "type": "string",
-                "description": "The message to echo back"
-            }
+            "message": {"type": "string", "description": "The message to echo back"}
         },
-        "required": ["message"]
-    }
+        "required": ["message"],
+    },
 )
+
 
 # Echo handler function
 async def echo_handler(message: str) -> Dict[str, Any]:
     """
     Echo handler function that returns the input message.
-    
+
     Args:
         params: A dictionary containing the parameters from the request.
             Expected to have a 'message' key with a string value.
-            
+
     Returns:
         A dictionary with the 'echo_message' key containing the input message.
     """
     return {"echo_message": message}
+
 
 # Create the server
 app = FastMCP()
@@ -45,24 +45,26 @@ app = FastMCP()
 # Register the tool
 app.add_tool(echo_handler, "echo")
 
+
 # Function to write PID to file
 def write_pidfile(pidfile_path):
     """Write the current process ID to the specified file."""
     if pidfile_path:
-        with open(pidfile_path, 'w') as f:
+        with open(pidfile_path, "w") as f:
             f.write(str(os.getpid()))
         print(f"PID {os.getpid()} written to {pidfile_path}")
+
 
 # Run the server if executed directly
 if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Simple SSE MCP Server")
     parser.add_argument("--pidfile", help="File to write the server's PID to")
-    
+
     args = parser.parse_args()
-    
+
     # Write PID to file if specified
     write_pidfile(args.pidfile)
-    
-    app.settings.host = '127.0.0.1'
+
+    app.settings.host = "127.0.0.1"
     app.run(transport="sse")
