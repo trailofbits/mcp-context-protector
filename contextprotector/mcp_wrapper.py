@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 import asyncio
+import base64
 import logging
 import json
 import re
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict, Any
 
 import mcp.types as types
 from mcp.server.lowlevel import Server, NotificationOptions
+from mcp.server.lowlevel.helper_types import ReadResourceContents
 from mcp.server.models import InitializationOptions
 
 # Import guardrail types for type hints
@@ -119,6 +121,7 @@ class MCPWrapperServer:
             visualize_ansi_codes  # Whether to make ANSI escape codes visible
         )
         self.prompts = []  # Will store prompts from the downstream server
+        self.resources = []  # Will store resources from the downstream server
         self._setup_server()
 
     def _setup_server(self):
@@ -137,6 +140,52 @@ class MCPWrapperServer:
                 return []
 
             return self.prompts
+
+        @self.server.list_resources()
+        async def list_resources() -> List[types.Resource]:
+            """
+            Return resources from the downstream server.
+            Unlike prompts and tools, resources are always available regardless of config approval.
+            """
+            logger.info(f"Returning {len(self.resources)} resources to upstream client")
+            return self.resources
+
+        @self.server.read_resource()
+        async def read_resource(name: str) -> types.ReadResourceResult:
+            """
+            Handle resource content requests - proxy directly to downstream server.
+            Resources are always accessible regardless of server config approval status.
+
+            Args:
+                name: The name/id of the resource
+
+            Returns:
+                The resource content from the downstream server
+            """
+            logger.info(f"Proxying resource request: {name}")
+
+            if not self.session:
+                raise ValueError("Child MCP server not connected")
+
+            try:
+                # Directly proxy the resource request to the downstream server
+                result = await self.session.read_resource(name)
+                contents = []
+                for content_item in result.contents:
+                    content = getattr(content_item, "blob", None)
+                    if content is not None:
+                        content = base64.b64decode(content)
+                        contents.append(ReadResourceContents(content=content, mime_type=content_item.mimeType))
+                        assert type(contents[-1].content) is bytes, f"type {type(contents[-1].content)} value {content} is not bytes"
+                    else:
+                        contents.append(ReadResourceContents(content=content_item.text, mime_type=content_item.mimeType))
+                    
+                logger.error(f"result {result} type {type(result)}")
+                logger.info(f"Successfully fetched resource {name} from downstream server")
+                return contents
+            except Exception as e:
+                logger.error(f"Error fetching resource {name} from downstream server: {e}")
+                raise ValueError(f"Error fetching resource from downstream server: {str(e)}")
 
         @self.server.list_tools()
         async def list_tools() -> List[types.Tool]:
@@ -534,6 +583,12 @@ class MCPWrapperServer:
                     "Received notification that prompts have changed (not affecting approval status)"
                 )
                 asyncio.create_task(self.update_prompts())
+            elif message.root.method == "notifications/resources/list_changed":
+                # Resource changes do NOT affect the config approval status
+                logger.info(
+                    "Received notification that resources have changed (not affecting approval status)"
+                )
+                asyncio.create_task(self.update_resources())
             else:
                 logger.info(f"Received notification: {message.method}")
         else:
@@ -567,6 +622,37 @@ class MCPWrapperServer:
         except Exception as e:
             logger.warning(f"Error updating prompts from downstream server: {e}")
 
+    async def update_resources(self):
+        """
+        Update resources from the downstream server.
+
+        Important: This method updates the available resources but does NOT affect
+        the server configuration approval status. Resources are not considered part
+        of the server configuration for approval purposes.
+        """
+        try:
+            # Get updated resources from the downstream server
+            downstream_resources = await self.session.list_resources()
+
+            if downstream_resources and downstream_resources.resources:
+                old_resource_count = len(self.resources)
+                self.resources = downstream_resources.resources
+                new_resource_count = len(self.resources)
+                logger.info(
+                    f"Updated resources from downstream server (old: {old_resource_count}, new: {new_resource_count})"
+                )
+                logger.info(
+                    "Note: Resource changes do not affect server configuration approval status"
+                )
+
+                # Forward the resource change notification to upstream clients
+                await self.server.send_resource_list_changed()
+            else:
+                logger.info("No resources available from downstream server")
+                self.resources = []
+        except Exception as e:
+            logger.warning(f"Error updating resources from downstream server: {e}")
+
     async def update_tools(self):
         """Update tools from the downstream server."""
         try:
@@ -582,8 +668,9 @@ class MCPWrapperServer:
             logger.info("Processing tool update notification")
             await self._handle_tool_updates(downstream_tools.tools)
 
-            # Also update prompts whenever tools are updated
+            # Also update prompts and resources whenever tools are updated
             await self.update_prompts()
+            await self.update_resources()
         except Exception as e:
             logger.warning(f"Error handling tool update notification: {e}")
 
@@ -702,6 +789,18 @@ class MCPWrapperServer:
             except Exception as e:
                 logger.info(f"Downstream stdio server does not support prompts: {e}")
 
+            # Get resources from the downstream server if available
+            self.resources = []
+            try:
+                downstream_resources = await self.session.list_resources()
+                if downstream_resources and downstream_resources.resources:
+                    self.resources = downstream_resources.resources
+                    logger.info(
+                        f"Received {len(self.resources)} resources during stdio initialization"
+                    )
+            except Exception as e:
+                logger.info(f"Downstream stdio server does not support resources: {e}")
+
             # Check guardrails if provider is available
             if self.use_guardrails and self.guardrail_provider:
                 # Create the server config to check against guardrails
@@ -775,6 +874,18 @@ class MCPWrapperServer:
                     )
             except Exception as e:
                 logger.info(f"Downstream stdio server does not support prompts: {e}")
+
+            # Get resources from the downstream server if available
+            self.resources = []
+            try:
+                downstream_resources = await self.session.list_resources()
+                if downstream_resources and downstream_resources.resources:
+                    self.resources = downstream_resources.resources
+                    logger.info(
+                        f"Received {len(self.resources)} resources during http initialization"
+                    )
+            except Exception as e:
+                logger.info(f"Downstream http server does not support resources: {e}")
 
             # Check guardrails if provider is available
             if self.use_guardrails and self.guardrail_provider:
@@ -1015,7 +1126,7 @@ class MCPWrapperServer:
                         server_version="0.1.0",
                         capabilities=self.server.get_capabilities(
                             notification_options=NotificationOptions(
-                                tools_changed=True, prompts_changed=True
+                                tools_changed=True, prompts_changed=True, resources_changed=True
                             ),
                             experimental_capabilities={},
                         ),
