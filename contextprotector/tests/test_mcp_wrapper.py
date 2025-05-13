@@ -16,7 +16,7 @@ from ..mcp_config import MCPServerConfig
 
 async def approve_server_config_using_review(command, config_path):
     """
-    Run the --review process to approve a server configuration.
+    Run the --review-server process to approve a server configuration.
 
     Args:
         server_config: The server configuration to approve
@@ -30,7 +30,7 @@ async def approve_server_config_using_review(command, config_path):
         [
             "python",
             main_py,
-            "--review",
+            "--review-server",
             "--command",
             command,
             "--config-file",

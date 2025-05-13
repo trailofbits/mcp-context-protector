@@ -66,7 +66,7 @@ def create_approved_config(server_cmd):
         "python", main_path,
         "--command", server_cmd,
         "--config-file", TEMP_CONFIG_FILE,
-        "--review", "yes"
+        "--review-server", "yes"
     ], check=True)
     
     return TEMP_CONFIG_FILE

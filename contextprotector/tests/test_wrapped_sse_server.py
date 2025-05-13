@@ -16,8 +16,7 @@ import psutil
 import subprocess
 from pathlib import Path
 
-from mcp import ClientSession, StdioServerParameters, types
-from mcp.client.stdio import stdio_client
+from mcp import types
 from ..mcp_config import MCPServerConfig
 from .test_utils import approve_server_config_using_review as _approve_config
 
@@ -25,7 +24,7 @@ from .test_utils import approve_server_config_using_review as _approve_config
 # Local helper function for backward compatibility
 async def approve_server_config_using_review(url, config_path):
     """
-    Run the --review process to approve a server configuration.
+    Run the --review-server process to approve a server configuration.
 
     Args:
         url: The URL of the downstream server
@@ -67,8 +66,6 @@ def get_ports_by_pid(pid):
 
 async def start_sse_server():
     """Start the SSE downstream server in a separate process."""
-    import subprocess
-
     global SERVER_PROCESS, SERVER_PORT, SERVER_PID
 
     # Create a temporary file for the PID

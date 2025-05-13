@@ -4,13 +4,14 @@ import logging
 import sys
 from contextprotector.guardrails import get_provider, get_provider_names
 from contextprotector.mcp_wrapper import MCPWrapperServer, review_server_config
+from contextprotector.quarantine_cli import review_quarantine
 
 logger = logging.getLogger("mcp_wrapper")
 
 async def main():
     parser = argparse.ArgumentParser(description="MCP Wrapper Server")
 
-    # Create mutually exclusive group for command, URL, and list-guardrail-providers
+    # Create mutually exclusive group for command, URL, list-guardrail-providers, and review-quarantine
     source_group = parser.add_mutually_exclusive_group(required=True)
     source_group.add_argument("--command", help="The command to run as a child process")
     source_group.add_argument(
@@ -20,6 +21,11 @@ async def main():
         "--list-guardrail-providers",
         action="store_true",
         help="List available guardrail providers and exit",
+    )
+    source_group.add_argument(
+        "--review-quarantine",
+        action="store_true",
+        help="Review and manage quarantined tool responses",
     )
 
     # Add config file argument with new name
@@ -42,9 +48,21 @@ async def main():
 
     # Add review mode flag
     parser.add_argument(
-        "--review",
+        "--review-server",
         action="store_true",
         help="Review and approve server configuration before starting",
+    )
+
+    # Add quarantine-id argument
+    parser.add_argument(
+        "--quarantine-id",
+        help="The ID of a specific quarantined response to review",
+    )
+
+    # Add quarantine-path argument
+    parser.add_argument(
+        "--quarantine-path",
+        help="The path to the quarantine database file",
     )
 
     args = parser.parse_args()
@@ -88,16 +106,21 @@ async def main():
 
         logger.info(f"Using guardrail provider: {guardrail_provider.name}")
 
-    # Check if we're in review mode
-    if args.review:
+    # Check if we're in quarantine review mode
+    if args.review_quarantine:
+        await review_quarantine(args.quarantine_path, args.quarantine_id)
+        return
+
+    # Check if we're in server review mode
+    if args.review_server:
         # For review mode, we need either command or url
         if args.command:
             await review_server_config(
-                "stdio", args.command, args.config_file, guardrail_provider
+                "stdio", args.command, args.config_file, guardrail_provider, args.quarantine_path
             )
         elif args.url:
             await review_server_config(
-                "http", args.url, args.config_file, guardrail_provider
+                "http", args.url, args.config_file, guardrail_provider, args.quarantine_path
             )
         return
 
@@ -109,10 +132,15 @@ async def main():
             args.config_file,
             guardrail_provider,
             args.visualize_ansi_codes,
+            args.quarantine_path,
         )
     elif args.url:
         wrapper = MCPWrapperServer.wrap_http(
-            args.url, args.config_file, guardrail_provider, args.visualize_ansi_codes
+            args.url,
+            args.config_file,
+            guardrail_provider,
+            args.visualize_ansi_codes,
+            args.quarantine_path,
         )
     else:
         # This should never happen due to the validation above

@@ -5,7 +5,6 @@ Utility functions for MCP wrapper tests.
 
 import asyncio
 import subprocess
-import sys
 from pathlib import Path
 from typing import Callable, Awaitable, Literal, Optional
 from mcp import ClientSession, StdioServerParameters
@@ -17,7 +16,7 @@ async def approve_server_config_using_review(
     config_path: str,
 ) -> None:
     """
-    Run the --review process to approve a server configuration.
+    Run the --review-server process to approve a server configuration.
 
     Args:
         connection_type: Type of connection ("stdio" or "http")
@@ -31,7 +30,7 @@ async def approve_server_config_using_review(
     cmd = [
         "python",
         main_py,
-        "--review",
+        "--review-server",
         "--config-file",
         config_path
     ]

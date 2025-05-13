@@ -12,7 +12,10 @@ from mcp.server.lowlevel.helper_types import ReadResourceContents
 from mcp.server.models import InitializationOptions
 
 # Import guardrail types for type hints
-from .guardrail_types import GuardrailProvider
+from .guardrail_types import GuardrailProvider, GuardrailAlert
+
+# Import quarantine functionality
+from .quarantine import ToolResponseQuarantine
 
 from .mcp_config import (
     MCPServerConfig,
@@ -34,6 +37,7 @@ class MCPWrapperServer:
         config_path: str = None,
         guardrail_provider: Optional[GuardrailProvider] = None,
         visualize_ansi_codes: bool = False,
+        quarantine_path: str = None,
     ):
         """
         Create a wrapper server that connects to a child process via stdio.
@@ -47,7 +51,7 @@ class MCPWrapperServer:
         Returns:
             An instance of MCPWrapperServer configured for stdio
         """
-        instance = cls(config_path, guardrail_provider, visualize_ansi_codes)
+        instance = cls(config_path, guardrail_provider, visualize_ansi_codes, quarantine_path)
         instance.connection_type = "stdio"
         instance.child_command = command
         return instance
@@ -59,6 +63,7 @@ class MCPWrapperServer:
         config_path: str = None,
         guardrail_provider: Optional[GuardrailProvider] = None,
         visualize_ansi_codes: bool = False,
+        quarantine_path: str = None,
     ):
         """
         Create a wrapper server that connects to a remote MCP server via HTTP.
@@ -72,7 +77,7 @@ class MCPWrapperServer:
         Returns:
             An instance of MCPWrapperServer configured for HTTP
         """
-        instance = cls(config_path, guardrail_provider, visualize_ansi_codes)
+        instance = cls(config_path, guardrail_provider, visualize_ansi_codes, quarantine_path)
         instance.connection_type = "http"
         instance.server_url = url
         return instance
@@ -82,6 +87,7 @@ class MCPWrapperServer:
         config_path: str = None,
         guardrail_provider: Optional[GuardrailProvider] = None,
         visualize_ansi_codes: bool = False,
+        quarantine_path: str = None,
     ):
         """
         Initialize the wrapper server with common attributes.
@@ -91,13 +97,12 @@ class MCPWrapperServer:
             config_path: Optional path to the wrapper config file
             guardrail_provider: Optional guardrail provider object to use for checking configs
             visualize_ansi_codes: Whether to make ANSI escape codes visible in tool outputs
+            quarantine_path: Optional path to the quarantine database file
         """
         self.child_command = None
         self.server_url = None
         self.connection_type = None
-        self.server_identifier = (
-            None  # Will be set after determining connection details
-        )
+        self.server_identifier = None  # Will be set after determining connection details
         self.child_process = None
         self.client_context = None
         self.streams = None
@@ -111,17 +116,15 @@ class MCPWrapperServer:
         self.current_config = MCPServerConfig()
         self.server = Server("mcp_wrapper")
         self.guardrail_provider = guardrail_provider  # Store the provider object
-        self.use_guardrails = (
-            guardrail_provider is not None
-        )  # Enable guardrails if provider is specified
-        self.visualize_ansi_codes = (
-            visualize_ansi_codes  # Whether to make ANSI escape codes visible
-        )
+        self.use_guardrails = guardrail_provider is not None # Enable guardrails if provider is specified
+        self.visualize_ansi_codes = visualize_ansi_codes  # Whether to make ANSI escape codes visible
         self.prompts = []  # Will store prompts from the downstream server
         self.resources = []  # Will store resources from the downstream server
-        self._setup_server()
+        # Initialize quarantine if guardrails are enabled
+        self.quarantine = ToolResponseQuarantine(quarantine_path) if self.use_guardrails else None
+        self._setup_handlers()
 
-    def _setup_server(self):
+    def _setup_handlers(self):
         """Setup MCP server handlers"""
 
         @self.server.list_prompts()
@@ -173,7 +176,7 @@ class MCPWrapperServer:
                     if content is not None:
                         content = base64.b64decode(content)
                         contents.append(ReadResourceContents(content=content, mime_type=content_item.mimeType))
-                        assert type(contents[-1].content) is bytes, f"type {type(contents[-1].content)} value {content} is not bytes"
+                        assert isinstance(contents[-1].content, bytes), f"type {type(contents[-1].content)} value {content} is not bytes"
                     else:
                         contents.append(ReadResourceContents(content=content_item.text, mime_type=content_item.mimeType))
                     
@@ -199,6 +202,24 @@ class MCPWrapperServer:
                     ),
                 )
                 all_tools.append(tool)
+
+            # Add quarantine_release tool if quarantine is enabled
+            if self.use_guardrails and self.quarantine:
+                quarantine_release_tool = types.Tool(
+                    name="quarantine_release",
+                    description="Release a quarantined tool response for review",
+                    inputSchema={
+                        "type": "object",
+                        "required": ["uuid"],
+                        "properties": {
+                            "uuid": {
+                                "type": "string",
+                                "description": "UUID of the quarantined tool response to release"
+                            }
+                        }
+                    }
+                )
+                all_tools.append(quarantine_release_tool)
 
             return all_tools
 
@@ -258,11 +279,16 @@ class MCPWrapperServer:
         async def call_tool(name: str, arguments: dict) -> List[types.TextContent]:
             """
             Handle tool use requests - either approve config, proxy to downstream server,
-            or block if config not approved.
+            handle quarantine release, or block if config not approved.
             """
             logger.info(
                 f"Tool call with name {name} and config_approved {self.config_approved}"
             )
+
+            # Handle quarantine_release tool specifically
+            if name == "quarantine_release" and self.use_guardrails and self.quarantine:
+                return await self._handle_quarantine_release(arguments)
+
             if not self.session:
                 raise ValueError("Child MCP server not connected")
 
@@ -315,6 +341,60 @@ class MCPWrapperServer:
                 logger.error(f"Error from child MCP server: {e}")
                 raise ValueError(f"Error from child MCP server: {str(e)}")
 
+    async def _handle_quarantine_release(self, arguments: Dict[str, Any]) -> List[types.TextContent]:
+        """
+        Handle the quarantine_release tool call.
+
+        Args:
+            arguments: The tool arguments containing the UUID of the quarantined response
+
+        Returns:
+            The original tool response if found and available for release
+
+        Raises:
+            ValueError: If the UUID is invalid or not found, or if the response is not available for release
+        """
+        # Validate arguments
+        if "uuid" not in arguments:
+            raise ValueError(
+                "Missing required parameter 'uuid' for quarantine_release tool"
+            )
+
+        response_id = arguments["uuid"]
+        logger.info(f"Processing quarantine_release request for UUID: {response_id}")
+
+        # Get the response from the quarantine
+        quarantined_response = self.quarantine.get_response(response_id)
+
+        if not quarantined_response:
+            raise ValueError(f"No quarantined response found with UUID: {response_id}")
+
+        if quarantined_response.released:
+            # Create a JSON response with the original tool call details
+            original_tool_info = {
+                "tool_name": quarantined_response.tool_name,
+                "tool_input": quarantined_response.tool_input,
+                "tool_output": quarantined_response.tool_output,
+                "quarantine_reason": quarantined_response.reason,
+                "quarantine_id": quarantined_response.id,
+            }
+
+            # Delete the response from the quarantine
+            self.quarantine.delete_response(response_id)
+            logger.info(f"Released response {response_id} from quarantine and deleted it")
+
+            # Return the result
+            json_response = json.dumps(original_tool_info)
+            wrapped_response = {"status": "completed", "response": json_response}
+            final_response = json.dumps(wrapped_response)
+            return [types.TextContent(type="text", text=final_response)]
+        else:
+            raise ValueError(
+                f"Response {response_id} is not marked for release. "
+                f"Please use the CLI to review and release it first: "
+                f"python main.py --review-quarantine --quarantine-id {response_id}"
+            )
+
     async def _proxy_tool_to_downstream(self, name: str, arguments: dict) -> str:
         """Proxy a tool call to the downstream server using MCP client"""
         if not self.session:
@@ -328,6 +408,7 @@ class MCPWrapperServer:
             result = await self.session.call_tool(name, arguments)
 
             # Extract the text content from the result
+            response_text = ""
             if result and len(result.content) > 0:
                 # The client call returns a list of content objects, we'll join all text content
                 text_parts = []
@@ -340,14 +421,50 @@ class MCPWrapperServer:
                         text_parts.append(processed_text)
 
                 if text_parts:
-                    return " ".join(text_parts)
+                    response_text = " ".join(text_parts)
 
-            # If we didn't get usable content, return a generic success message
-            return f"Tool call to '{name}' succeeded but returned no content"
+            # If we didn't get usable content, use a generic success message
+            if not response_text:
+                response_text = f"Tool call to '{name}' succeeded but returned no content"
+
+            # Scan the tool response with guardrail provider if configured
+            if self.use_guardrails and self.guardrail_provider is not None:
+                guardrail_alert = self._scan_tool_response(name, arguments, response_text)
+                if guardrail_alert:
+                    # Log the alert but don't block the response yet
+                    logger.error(
+                        f"Guardrail alert triggered for tool '{name}': {guardrail_alert.explanation}"
+                    )
+                                    # Store in quarantine for future reference (when quarantine system is integrated)
+                    quarantine_id = None
+                    if self.quarantine:
+                        quarantine_id = self.quarantine.quarantine_response(
+                            tool_name=name,
+                            tool_input=arguments,
+                            tool_output=response_text,
+                            reason=guardrail_alert.explanation
+                        )
+                    
+                    return self._guardrail_tool_response(name, arguments, response_text, guardrail_alert, quarantine_id)
+
+            return response_text
 
         except Exception as e:
             logger.error(f"Error calling downstream tool '{name}': {e}")
             raise ValueError(f"Error calling downstream tool: {str(e)}")
+
+    def _guardrail_tool_response(self, tool_name: str, arguments: dict, response_text: str, guardrail_alert: GuardrailAlert, quarantine_id: Optional[str]) -> str:
+        """Generates the response message sent to the client when a tool response is blocked by a guardrail."""
+
+        return f"""
+        This tool call was quarantined because it appears to contain a prompt injection attack.
+
+        Tool name: {tool_name}
+        Arguments: {json.dumps(arguments, indent=2)}
+        Alert explanation: {guardrail_alert.explanation}
+
+        To review this response and release it from the quarantein, run contextprotector with the arguments `--review-quarantine{" --quarantine-id " + quarantine_id if quarantine_id else ""}`.
+        """
 
     def _convert_parameters_to_schema(
         self, parameters: dict, required: List[str]
@@ -544,17 +661,10 @@ class MCPWrapperServer:
             downstream_tools = await self.session.list_tools()
 
             assert downstream_tools.tools
-            logger.info(
-                f"Received {len(downstream_tools.tools)} tools after update notification"
-            )
+            logger.info(f"Received {len(downstream_tools.tools)} tools after update notification")
 
             # Process the updated tools
-            logger.info("Processing tool update notification")
             await self._handle_tool_updates(downstream_tools.tools)
-
-            # Also update prompts and resources whenever tools are updated
-            await self.update_prompts()
-            await self.update_resources()
         except Exception as e:
             logger.warning(f"Error handling tool update notification: {e}")
 
@@ -787,6 +897,59 @@ class MCPWrapperServer:
         print(json_str)
         print("=============================\n")
 
+    def _scan_tool_response(self, tool_name: str, tool_input: Dict[str, Any], tool_output: str) -> Optional[GuardrailAlert]:
+        """
+        Scan a tool response with the configured guardrail provider.
+
+        Args:
+            tool_name: The name of the tool that was called
+            tool_input: The input parameters to the tool
+            tool_output: The output returned by the tool
+
+        Returns:
+            Optional GuardrailAlert if the guardrail is triggered, None otherwise
+        """
+        if not self.use_guardrails or self.guardrail_provider is None:
+            return None
+
+        try:
+            # Create a representation of the tool call for scanning
+            # We're using a format similar to JSON-RPC for consistency
+            tool_call_json = {
+                "tool": tool_name,
+                "params": tool_input,
+                "result": tool_output
+            }
+
+            # Convert to string for scanning
+            tool_call_str = json.dumps(tool_call_json, indent=2)
+
+            # For the initial implementation, we're using check_server_config as it's the
+            # existing interface for all guardrail providers. In the future, we might want
+            # to add a dedicated method for scanning tool responses.
+            logger.info(f"Scanning tool response for '{tool_name}' with {self.guardrail_provider.name}")
+
+            # Create a temporary MCPServerConfig that contains the tool call as a string
+            # This is a hack to use the existing interface
+            from .mcp_config import MCPServerConfig
+            temp_config = MCPServerConfig()
+            temp_config.instructions = f"Tool Response: {tool_call_str}"
+
+            # Scan with the guardrail provider
+            alert = self.guardrail_provider.check_server_config(temp_config)
+
+            if alert:
+                logger.warning(
+                    f"Guardrail alert triggered for tool '{tool_name}': {alert.explanation}"
+                )
+
+            return alert
+
+        except Exception as e:
+            logger.error(f"Error scanning tool response: {e}", exc_info=True)
+            # Return None instead of an alert for now - we're just logging errors
+            return None
+
     async def stop_child_process(self):
         """Close connections to the downstream server."""
         # Clean up the client context if it exists
@@ -836,6 +999,7 @@ async def review_server_config(
     identifier: str,
     config_path: Optional[str] = None,
     guardrail_provider: Optional[GuardrailProvider] = None,
+    quarantine_path: Optional[str] = None,
 ) -> None:
     """
     Review and approve server configuration for the given connection.
@@ -849,6 +1013,7 @@ async def review_server_config(
         identifier: The command or URL to connect to
         config_path: Optional path to config file
         guardrail_provider: Optional guardrail provider to use
+        quarantine_path: Optional path to the quarantine database file
     """
     # Create wrapper without starting it
     if connection_type == "stdio":
@@ -856,12 +1021,14 @@ async def review_server_config(
             command=identifier,
             config_path=config_path,
             guardrail_provider=guardrail_provider,
+            quarantine_path=quarantine_path,
         )
     else:  # http
         wrapper = MCPWrapperServer.wrap_http(
             url=identifier,
             config_path=config_path,
             guardrail_provider=guardrail_provider,
+            quarantine_path=quarantine_path,
         )
 
     # Start the child process to get the configuration
