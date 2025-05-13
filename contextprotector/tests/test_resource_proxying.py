@@ -11,21 +11,20 @@ import pytest
 import asyncio
 from pathlib import Path
 import sys
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
 import mcp.types as types
-from typing import Callable, Awaitable
 
 # Configure path for imports
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+# Import test utilities
+from .test_utils import approve_server_config_using_review, run_with_wrapper_session
 
 # Path to the resource test server script
 RESOURCE_TEST_SERVER_PATH = Path(__file__).resolve().parent / "resource_test_server.py"
 
 
-async def run_with_wrapper(
-    callback: Callable[[ClientSession], Awaitable[None]], config_path: str
-):
+# Local helper function for backward compatibility
+async def run_with_wrapper(callback, config_path: str):
     """
     Run a test with a wrapper connected to the resource test server.
 
@@ -33,22 +32,13 @@ async def run_with_wrapper(
         callback: Async function that will be called with the client session
         config_path: Path to the configuration file
     """
-    server_params = StdioServerParameters(
-        command="python",
-        args=[
-            str(Path(__file__).resolve().parent.parent.parent.joinpath("main.py")),
-            "--command",
-            f"python {str(RESOURCE_TEST_SERVER_PATH)}",
-            "--config-file",
-            str(config_path),
-        ],
+    command = f"python {str(RESOURCE_TEST_SERVER_PATH)}"
+    await run_with_wrapper_session(
+        callback,
+        "stdio",
+        command,
+        config_path
     )
-
-    async with stdio_client(server_params) as (read, write):
-        assert read is not None and write is not None
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            await callback(session)
 
 
 class TestResourceProxying:
@@ -108,16 +98,22 @@ class TestResourceProxying:
         the approval status of the server configuration.
         """
 
-        async def callback(session):
-            # First, approve the server config
-            blocked_result = await session.call_tool("test_tool", {"message": "test"})
-            blocked_response = json.loads(blocked_result.content[0].text)
-            approval_result = await session.call_tool(
-                "approve_server_config", {"config": blocked_response["server_config"]}
-            )
-            approval_json = json.loads(approval_result.content[0].text)
-            assert approval_json["status"] == "success"
+        # Create the test command
+        command = f"python {str(RESOURCE_TEST_SERVER_PATH)}"
 
+        # First do the approval process
+        await run_with_wrapper(
+            lambda session: asyncio.create_task(
+                session.call_tool("test_tool", {"message": "test"})
+            ),
+            self.config_path
+        )
+
+        # Use review process to approve the config
+        await approve_server_config_using_review("stdio", command, self.config_path)
+
+        # Now the main callback after approval
+        async def callback(session):
             # Initial resources check
             initial_resources = await session.list_resources()
             assert len(initial_resources.resources) == 2
@@ -157,6 +153,7 @@ class TestResourceProxying:
             content = json.loads(sample_data_result.contents[0].text)
             assert content["name"] == "Sample Data"
 
+        # Run the test with the approved config
         await run_with_wrapper(callback, self.config_path)
 
     @pytest.mark.asyncio

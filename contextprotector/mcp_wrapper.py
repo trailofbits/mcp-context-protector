@@ -114,9 +114,6 @@ class MCPWrapperServer:
         self.use_guardrails = (
             guardrail_provider is not None
         )  # Enable guardrails if provider is specified
-        self.guardrail_alert = (
-            None  # Will hold GuardrailAlert if a guardrail is triggered
-        )
         self.visualize_ansi_codes = (
             visualize_ansi_codes  # Whether to make ANSI escape codes visible
         )
@@ -180,7 +177,6 @@ class MCPWrapperServer:
                     else:
                         contents.append(ReadResourceContents(content=content_item.text, mime_type=content_item.mimeType))
                     
-                logger.error(f"result {result} type {type(result)}")
                 logger.info(f"Successfully fetched resource {name} from downstream server")
                 return contents
             except Exception as e:
@@ -229,7 +225,6 @@ class MCPWrapperServer:
                 )
 
             # If we get here, config is approved, so proxy the prompt call
-            logger.info(f"Proxying prompt dispatch: {name}")
             try:
                 # Use the session to dispatch the prompt to the downstream server
                 result = await self.session.get_prompt(name, arguments)
@@ -268,90 +263,8 @@ class MCPWrapperServer:
             logger.info(
                 f"Tool call with name {name} and config_approved {self.config_approved}"
             )
-            if not self.session and name not in [
-                "approve_server_config",
-                "ignore_guardrail_alert",
-            ]:
+            if not self.session:
                 raise ValueError("Child MCP server not connected")
-
-            # Special handling for our approve_server_config tool
-            if name == "approve_server_config":
-                result = await self._handle_approve_config(arguments.get("config", ""))
-                return [types.TextContent(type="text", text=result)]
-
-            # Special handling for our ignore_guardrail_alert tool
-            if name == "ignore_guardrail_alert" and self.use_guardrails:
-                logger.info("Processing ignore_guardrail_alert request")
-
-                # Check if there's an active guardrail alert
-                if not self.guardrail_alert:
-                    logger.warning("No active guardrail alert to ignore")
-                    return [
-                        types.TextContent(
-                            type="text",
-                            text=json.dumps(
-                                {
-                                    "status": "failed",
-                                    "reason": "No active guardrail alert to ignore",
-                                }
-                            ),
-                        )
-                    ]
-
-                # Get the alert_text parameter
-                alert_text = arguments.get("alert_text", "")
-                if not alert_text:
-                    logger.warning("No alert_text provided for ignore_guardrail_alert")
-                    return [
-                        types.TextContent(
-                            type="text",
-                            text=json.dumps(
-                                {
-                                    "status": "failed",
-                                    "reason": "You must provide the full alert_text to ignore the guardrail alert",
-                                    "current_alert": self.guardrail_alert.explanation,
-                                }
-                            ),
-                        )
-                    ]
-
-                # Verify the alert text matches
-                actual_explanation = self.guardrail_alert.explanation
-                if alert_text.strip() != actual_explanation.strip():
-                    logger.warning(
-                        f"Alert text mismatch. Expected: '{actual_explanation}', Got: '{alert_text}'"
-                    )
-                    return [
-                        types.TextContent(
-                            type="text",
-                            text=json.dumps(
-                                {
-                                    "status": "failed",
-                                    "reason": "The provided alert text does not match the actual guardrail alert",
-                                    "current_alert": actual_explanation,
-                                    "provided_alert": alert_text,
-                                }
-                            ),
-                        )
-                    ]
-
-                # Alert text matches, clear the guardrail alert
-                logger.info(
-                    "User explicitly chose to ignore guardrail alert with correct alert text"
-                )
-                self.guardrail_alert = None
-
-                return [
-                    types.TextContent(
-                        type="text",
-                        text=json.dumps(
-                            {
-                                "status": "success",
-                                "reason": "Guardrail alert successfully ignored at user's explicit request",
-                            }
-                        ),
-                    )
-                ]
 
             # For all other tools, check if config is approved
             if not self.config_approved:
@@ -382,32 +295,20 @@ class MCPWrapperServer:
                     "reason": "Server configuration not approved - all tools blocked",
                 }
 
-                # Add guardrail alert information if available
-                if self.guardrail_alert:
-                    blocked_response["guardrail_alert"] = {
-                        "provider": self.guardrail_provider.name,
-                        "explanation": self.guardrail_alert.explanation,
-                        "data": self.guardrail_alert.data,
-                    }
-
                 # Return a formatted error with the blocked response
                 error_json = json.dumps(blocked_response)
-                logger.debug(f"Returning error: {error_json}")
                 raise ValueError(error_json)
 
             # If we get here, config is approved, so proxy the tool call
-            logger.info(f"Proxying tool use: {name}")
             try:
                 # Convert to actual downstream call format using the new client
                 tool_result = await self._proxy_tool_to_downstream(name, arguments)
 
                 # Wrap the successful response
                 wrapped_response = {"status": "completed", "response": tool_result}
-                logger.info(f"Tool result response: {wrapped_response}")
 
                 # Create a new result with the wrapped response
                 json_response = json.dumps(wrapped_response)
-                logger.info(f"Returning JSON: {json_response}")
                 return [types.TextContent(type="text", text=json_response)]
 
             except Exception as e:
@@ -523,15 +424,12 @@ class MCPWrapperServer:
 
         # Temporarily reset approval while we check if the config has changed
         self.config_approved = False
-        # Reset any guardrail alert
-        self.guardrail_alert = None
 
         old_config = self.current_config
         self.current_config = self._create_server_config()
 
         # If tools have changed, check against the saved config (if any)
         if old_config != self.current_config:
-            logger.warning("Tools have changed from previous state")
 
             # Generate diff for logging
             diff = old_config.compare(self.current_config)
@@ -545,18 +443,6 @@ class MCPWrapperServer:
             else:
                 logger.warning("Tools changed, requiring re-approval")
 
-                # Check with guardrail provider if configured
-                if self.use_guardrails and self.guardrail_provider:
-                    logger.info(
-                        f"Checking config with guardrail provider: {self.guardrail_provider.name}"
-                    )
-                    self.guardrail_alert = self.guardrail_provider.check_server_config(
-                        self.current_config
-                    )
-                    if self.guardrail_alert:
-                        logger.warning(
-                            f"Guardrail alert triggered: {self.guardrail_alert.explanation}"
-                        )
         else:
             logger.info("Tools updated but configuration unchanged")
             self.config_approved = True
@@ -569,8 +455,6 @@ class MCPWrapperServer:
         Args:
             message: The message from the server, can be a notification or other message type
         """
-        logger.info(f"Received message: {type(message)}")
-
         # Check if it's a notification
         if isinstance(message, types.ServerNotification):
             if message.root.method == "notifications/tools/list_changed":
@@ -674,7 +558,7 @@ class MCPWrapperServer:
         except Exception as e:
             logger.warning(f"Error handling tool update notification: {e}")
 
-    async def start_child_process(self):
+    async def connect(self):
         """Initialize the connection to the downstream server."""
         if self.connection_type == "stdio":
             await self._connect_via_stdio()
@@ -682,34 +566,48 @@ class MCPWrapperServer:
             await self._connect_via_http()
         else:
             raise ValueError(f"Unknown connection type: {self.connection_type}")
+        await self._initialize_config()
 
-        # Create server configuration
-        self.current_config = self._create_server_config()
+    async def _initialize_config(self):
+        """Setup tasks after connecting to a downstream server"""
+        # Initialize the session and store the result
+        self.initialize_result = await self.session.initialize()
 
-        # Check if we need to evaluate guardrails (already done in _connect_via_* methods)
-        # but set here if no alert was set for some reason
-        if (
-            self.use_guardrails
-            and self.guardrail_provider
-            and self.guardrail_alert is None
-        ):
-            logger.info(
-                f"Checking config with guardrail provider in start_child_process: {self.guardrail_provider.name}"
-            )
-            self.guardrail_alert = self.guardrail_provider.check_server_config(
-                self.current_config
-            )
-            if self.guardrail_alert:
-                logger.warning(
-                    f"Guardrail alert triggered: {self.guardrail_alert.explanation}"
+        # Get tool specifications from the downstream server
+        downstream_tools = await self.session.list_tools()
+        assert downstream_tools.tools
+
+        # Convert MCP tools to our internal format
+        self.tool_specs = self._convert_mcp_tools_to_specs(downstream_tools.tools)
+
+        # Get prompts from the downstream server if available
+        self.prompts = []
+        try:
+            downstream_prompts = await self.session.list_prompts()
+            if downstream_prompts and downstream_prompts.prompts:
+                self.prompts = downstream_prompts.prompts
+                logger.info(
+                    f"Received {len(self.prompts)} prompts during initialization"
                 )
+        except Exception as e:
+            logger.info(f"Downstream server does not support prompts: {e}")
 
+        # Get resources from the downstream server if available
+        self.resources = []
+        try:
+            downstream_resources = await self.session.list_resources()
+            if downstream_resources and downstream_resources.resources:
+                self.resources = downstream_resources.resources
+                logger.info(
+                    f"Received {len(self.resources)} resources during initialization"
+                )
+        except Exception as e:
+            logger.info(f"Downstream server does not support resources: {e}")
+
+        self.current_config = self._create_server_config()
+        
         # Check if we can auto-approve based on saved config
-        # Don't auto-approve if there's a guardrail alert
-        if self.guardrail_alert is not None:
-            logger.warning("Cannot auto-approve config due to active guardrail alert")
-            self.config_approved = False
-        elif self.saved_config and self.saved_config == self.current_config:
+        if self.saved_config and self.saved_config == self.current_config:
             logger.info(
                 "Current configuration matches saved configuration - auto-approving"
             )
@@ -768,56 +666,6 @@ class MCPWrapperServer:
                 message_handler=self._handle_client_message,
             ).__aenter__()
 
-            self.initialize_result = await self.session.initialize()
-
-            # Get tool specifications from the downstream server
-            downstream_tools = await self.session.list_tools()
-            assert downstream_tools.tools
-
-            # Convert MCP tools to our internal format
-            self.tool_specs = self._convert_mcp_tools_to_specs(downstream_tools.tools)
-
-            # Get prompts from the downstream server if available
-            self.prompts = []
-            try:
-                downstream_prompts = await self.session.list_prompts()
-                if downstream_prompts and downstream_prompts.prompts:
-                    self.prompts = downstream_prompts.prompts
-                    logger.info(
-                        f"Received {len(self.prompts)} prompts during stdio initialization"
-                    )
-            except Exception as e:
-                logger.info(f"Downstream stdio server does not support prompts: {e}")
-
-            # Get resources from the downstream server if available
-            self.resources = []
-            try:
-                downstream_resources = await self.session.list_resources()
-                if downstream_resources and downstream_resources.resources:
-                    self.resources = downstream_resources.resources
-                    logger.info(
-                        f"Received {len(self.resources)} resources during stdio initialization"
-                    )
-            except Exception as e:
-                logger.info(f"Downstream stdio server does not support resources: {e}")
-
-            # Check guardrails if provider is available
-            if self.use_guardrails and self.guardrail_provider:
-                # Create the server config to check against guardrails
-                self.current_config = self._create_server_config()
-                logger.info(
-                    f"Checking initial config with guardrail provider in stdio: {self.guardrail_provider.name}"
-                )
-                self.guardrail_alert = self.guardrail_provider.check_server_config(
-                    self.current_config
-                )
-                if self.guardrail_alert:
-                    logger.warning(
-                        f"Guardrail alert triggered during stdio initialization: {self.guardrail_alert.explanation}"
-                    )
-                    # We don't auto-approve configs with guardrail alerts
-                    self.config_approved = False
-
         except Exception as e:
             logger.error(f"Error connecting to downstream server via stdio: {e}")
             raise
@@ -852,57 +700,6 @@ class MCPWrapperServer:
                 self.streams[1],
                 message_handler=self._handle_client_message,
             ).__aenter__()
-
-            # Initialize the session and store the result
-            self.initialize_result = await self.session.initialize()
-
-            # Get tool specifications from the downstream server
-            downstream_tools = await self.session.list_tools()
-            assert downstream_tools.tools
-
-            # Convert MCP tools to our internal format
-            self.tool_specs = self._convert_mcp_tools_to_specs(downstream_tools.tools)
-
-            # Get prompts from the downstream server if available
-            self.prompts = []
-            try:
-                downstream_prompts = await self.session.list_prompts()
-                if downstream_prompts and downstream_prompts.prompts:
-                    self.prompts = downstream_prompts.prompts
-                    logger.info(
-                        f"Received {len(self.prompts)} prompts during stdio initialization"
-                    )
-            except Exception as e:
-                logger.info(f"Downstream stdio server does not support prompts: {e}")
-
-            # Get resources from the downstream server if available
-            self.resources = []
-            try:
-                downstream_resources = await self.session.list_resources()
-                if downstream_resources and downstream_resources.resources:
-                    self.resources = downstream_resources.resources
-                    logger.info(
-                        f"Received {len(self.resources)} resources during http initialization"
-                    )
-            except Exception as e:
-                logger.info(f"Downstream http server does not support resources: {e}")
-
-            # Check guardrails if provider is available
-            if self.use_guardrails and self.guardrail_provider:
-                # Create the server config to check against guardrails
-                self.current_config = self._create_server_config()
-                logger.info(
-                    f"Checking initial config with guardrail provider in http: {self.guardrail_provider.name}"
-                )
-                self.guardrail_alert = self.guardrail_provider.check_server_config(
-                    self.current_config
-                )
-                if self.guardrail_alert:
-                    logger.warning(
-                        f"Guardrail alert triggered during http initialization: {self.guardrail_alert.explanation}"
-                    )
-                    # We don't auto-approve configs with guardrail alerts
-                    self.config_approved = False
 
         except Exception as e:
             logger.error(f"Error connecting to downstream server via SSE: {e}")
@@ -1007,111 +804,9 @@ class MCPWrapperServer:
             except Exception as e:
                 logger.error(f"Error closing MCP client: {e}")
 
-    async def _handle_approve_config(self, config_json: str) -> str:
-        """
-        Handle the approve_server_config tool.
-
-        Args:
-            config_json: The serialized configuration
-
-        Returns:
-            JSON string with success or failure result
-        """
-        logger.info("Processing approve_server_config request")
-
-        try:
-            # Check if there's an active guardrail alert
-            if self.guardrail_alert:
-                logger.warning("Cannot approve config while guardrail alert is active")
-
-                # Create failure response with guardrail information
-                failure_response = {
-                    "status": "failed",
-                    "reason": "Cannot approve server configuration while guardrail alert is active",
-                    "guardrail_alert": {
-                        "provider": self.guardrail_provider.name,
-                        "explanation": self.guardrail_alert.explanation,
-                        "data": self.guardrail_alert.data,
-                    },
-                    "message": "You must first clear the guardrail alert using the ignore_guardrail_alert tool",
-                }
-
-                return json.dumps(failure_response)
-
-            # Get the submitted config
-            submitted_config_json = config_json
-            if not submitted_config_json:
-                raise ValueError("No configuration provided")
-
-            # Deserialize the submitted config
-            try:
-                submitted_config = MCPServerConfig.from_json(
-                    json_str=submitted_config_json
-                )
-            except Exception as e:
-                raise ValueError(f"Invalid configuration format: {str(e)}")
-
-            # Get the current server config
-            current_config = self._create_server_config()
-
-            # Compare the configs
-            diff = current_config.compare(submitted_config)
-
-            if diff.has_differences():
-                logger.warning("Submitted config does not match server config")
-                logger.warning(f"Differences: {diff}")
-
-                # Create failure response
-                failure_response = {
-                    "status": "failed",
-                    "reason": "Config did not match current server configuration",
-                    "server_config": current_config.to_json(),
-                    "diff": str(diff),
-                }
-
-                return json.dumps(failure_response)
-
-            # Configs match, so approve it
-            logger.info("Submitted config matches server config - approving")
-
-            # Save the config to the database
-            if self.connection_type and self.server_identifier:
-                self.config_db.save_server_config(
-                    self.connection_type, self.server_identifier, current_config
-                )
-                logger.info(
-                    f"Saved {self.connection_type} server config for {self.server_identifier}"
-                )
-            else:
-                logger.warning(
-                    "Connection type or server identifier not set, config not saved to database"
-                )
-
-            # Update the saved config
-            self.saved_config = current_config
-
-            # Set approved flag and clear any guardrail alert
-            self.config_approved = True
-            self.guardrail_alert = None
-
-            # Create success response
-            success_response = {
-                "status": "success",
-                "reason": "Server configuration approved",
-            }
-
-            return json.dumps(success_response)
-
-        except Exception as e:
-            logger.error(f"Error processing approve_server_config: {e}")
-
-            error_response = {"status": "error", "reason": str(e)}
-
-            return json.dumps(error_response)
-
     async def run(self):
         """Run the MCP wrapper server using stdio."""
-        await self.start_child_process()
+        await self.connect()
 
         try:
             # Run the server using stdio transport
@@ -1171,7 +866,7 @@ async def review_server_config(
 
     # Start the child process to get the configuration
     try:
-        await wrapper.start_child_process()
+        await wrapper.connect()
 
         # Check if config is already trusted
         if wrapper.config_approved:
@@ -1203,11 +898,16 @@ async def review_server_config(
             print(f"• {tool_spec.name}: {tool_spec.description}")
         print("=====================\n")
 
+        guardrail_alert = None
+        if wrapper.guardrail_provider is not None:
+            guardrail_alert = wrapper.guardrail_provider.check_server_config(
+                wrapper.current_config
+            )
         # Show guardrail alert if present
-        if wrapper.guardrail_alert:
+        if guardrail_alert:
             print("\n⚠️  ==== GUARDRAIL CHECK: ALERT ==== ⚠️")
-            print(f"Provider: {guardrail_provider.name}")
-            print(f"Alert: {wrapper.guardrail_alert.explanation}")
+            print(f"Provider: {wrapper.guardrail_provider.name}")
+            print(f"Alert: {guardrail_alert.explanation}")
             print("==================================\n")
 
         # Prompt for user approval
@@ -1233,5 +933,4 @@ async def review_server_config(
 
     finally:
         # Clean up
-        logger.error(f"wrapper: {wrapper} {wrapper.stop_child_process}")
         await wrapper.stop_child_process()

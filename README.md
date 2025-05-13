@@ -99,5 +99,4 @@ ruff format .
 
 # To do
 
-* Add support for proxying resources
-* Add "strict mode" where approval must take place outside the host app (e.g., CLI)
+* Add support for quarantined tool responses using guardrail providers

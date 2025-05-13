@@ -19,51 +19,19 @@ from pathlib import Path
 from mcp import ClientSession, StdioServerParameters, types
 from mcp.client.stdio import stdio_client
 from ..mcp_config import MCPServerConfig
+from .test_utils import approve_server_config_using_review as _approve_config
 
 
+# Local helper function for backward compatibility
 async def approve_server_config_using_review(url, config_path):
     """
     Run the --review process to approve a server configuration.
 
     Args:
-        server_config: The server configuration to approve
         url: The URL of the downstream server
+        config_path: Path to the configuration file
     """
-    root_dir = Path(__file__).resolve().parent.parent.parent
-    main_py = str(root_dir.joinpath("main.py"))
-
-    # Run the review process
-    review_process = subprocess.Popen(
-        [
-            "python",
-            main_py,
-            "--review",
-            "--url",
-            url,
-            "--config-file",
-            config_path
-        ],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True
-    )
-
-    # Wait for the review process to start
-    await asyncio.sleep(1.5)
-
-    # Send 'y' to approve the configuration
-    review_process.stdin.write("y\n")
-    review_process.stdin.flush()
-
-    # Wait for the review process to complete
-    stdout, stderr = review_process.communicate(timeout=5)
-
-    # Verify the review process output
-    assert review_process.returncode == 0, f"Review process failed with return code {review_process.returncode}: {stderr}"
-
-    # Check for expected output in the review process
-    assert "has been trusted and saved" in stdout, f"Missing expected approval message in output: {stdout}"
+    await _approve_config("http", url, config_path)
 
 # Global variables to track server process and dynamic port
 SERVER_PROCESS = None
@@ -183,6 +151,7 @@ async def run_with_wrapper_session(callback, config_path=None):
         config_path: Path to the wrapper config file
     """
     global SERVER_PORT
+    from .test_utils import run_with_wrapper_session as _run_with_wrapper_session
 
     # Make sure we have a valid port
     assert SERVER_PORT is not None, "Server port must be detected before connecting"
@@ -193,25 +162,13 @@ async def run_with_wrapper_session(callback, config_path=None):
     sse_url = f"http://localhost:{SERVER_PORT}/sse"
     logging.warning(f"Connecting wrapper to SSE server at: {sse_url}")
 
-    # Construct the wrapper server parameters
-    server_params = StdioServerParameters(
-        command="python",  # Executable
-        args=[
-            str(Path(__file__).resolve().parent.parent.parent.joinpath("main.py")),
-            "--url",
-            sse_url,
-            "--config-file",
-            str(config_path),
-        ],  # Wrapper command + downstream server URL
-        env=None,  # Optional environment variables
+    # Use the shared utility function
+    await _run_with_wrapper_session(
+        callback,
+        "http",
+        sse_url,
+        config_path
     )
-    logging.warning(f"args: {server_params}")
-    async with stdio_client(server_params) as (read, write):
-        assert read is not None and write is not None
-        async with ClientSession(read, write) as session:
-            assert session is not None
-            await session.initialize()
-            await callback(session)
 
 
 @pytest_asyncio.fixture
@@ -359,24 +316,4 @@ async def test_invalid_tool_through_wrapper(sse_server_fixture):
     # Run the review process to approve this config
     await approve_server_config_using_review(sse_url, temp_file.name)
     await run_with_wrapper_session(callback2, temp_file.name)
-    os.unlink(temp_file.name)
-
-
-# This test is no longer needed since the server config approval process has changed
-# and is now handled internally by the wrapper
-@pytest.mark.skip(reason="Server config approval is now handled internally")
-@pytest.mark.asyncio
-async def test_server_config_difference(sse_server_fixture):
-    """This test was for the old approval mechanism and is now skipped."""
-
-    async def callback(session):
-        # The echo tool should work directly now
-        message = "Test message"
-        result = await session.call_tool(name="echo", arguments={"message": message})
-        response_json = json.loads(result.content[0].text)
-        assert response_json["status"] == "completed"
-
-    # Run the test with a temporary config file
-    temp_file = tempfile.NamedTemporaryFile(delete=False)
-    await run_with_wrapper_session(callback, temp_file.name)
     os.unlink(temp_file.name)

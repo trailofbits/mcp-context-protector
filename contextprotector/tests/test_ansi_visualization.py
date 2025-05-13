@@ -9,19 +9,20 @@ import tempfile
 import pytest
 from pathlib import Path
 import sys
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
-from typing import Callable, Awaitable
 
 # Configure path for imports
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+# Import test utilities
+from .test_utils import approve_server_config_using_review, run_with_wrapper_session
 
 # Path to a test server script that returns ANSI-colored output
 TEST_SERVER_PATH = Path(__file__).resolve().parent / "ansi_test_server.py"
 
 
+# Local helper function for backward compatibility
 async def run_with_ansi_visualization(
-    callback: Callable[[ClientSession], Awaitable[None]],
+    callback,
     config_path: str,
     visualize_ansi: bool = False,
 ):
@@ -33,23 +34,14 @@ async def run_with_ansi_visualization(
         config_path: Path to the configuration file
         visualize_ansi: Whether to visualize ANSI escape codes
     """
-    server_params = StdioServerParameters(
-        command="python",
-        args=[
-            str(Path(__file__).resolve().parent.parent.parent.joinpath("main.py")),
-            "--command",
-            f"python {str(TEST_SERVER_PATH)}",
-            "--config-file",
-            str(config_path),
-            *(["--visualize-ansi-codes"] if visualize_ansi else []),
-        ],
+    command = f"python {str(TEST_SERVER_PATH)}"
+    await run_with_wrapper_session(
+        callback, 
+        "stdio", 
+        command, 
+        config_path, 
+        visualize_ansi
     )
-    print(server_params, file=sys.stderr)
-    async with stdio_client(server_params) as (read, write):
-        assert read is not None and write is not None
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            await callback(session)
 
 
 class TestAnsiVisualization:
@@ -68,7 +60,11 @@ class TestAnsiVisualization:
     async def test_ansi_passthrough_default(self):
         """Test that ANSI escape codes are let through by default."""
 
-        async def callback(session):
+        # Create the test command
+        command = f"python {str(TEST_SERVER_PATH)}"
+
+        # First test stage - get blocked
+        async def callback1(session):
             # List available tools
             tools = await session.list_tools()
 
@@ -87,13 +83,8 @@ class TestAnsiVisualization:
             blocked_response = json.loads(blocked_result.content[0].text)
             assert blocked_response["status"] == "blocked"
 
-            # Approve the server config
-            approval_result = await session.call_tool(
-                "approve_server_config", {"config": blocked_response["server_config"]}
-            )
-            approval_json = json.loads(approval_result.content[0].text)
-            assert approval_json["status"] == "success"
-
+        # Second test stage - after approval
+        async def callback2(session):
             # Now try calling the ansi_echo tool
             result = await session.call_tool("ansi_echo", {"message": "test"})
 
@@ -105,15 +96,28 @@ class TestAnsiVisualization:
             assert "ESC" not in response_json["response"]
             assert "\x1b[" in response_json["response"]
 
+        # Run first part of the test
         await run_with_ansi_visualization(
-            callback, self.config_path, visualize_ansi=False
+            callback1, self.config_path, visualize_ansi=False
+        )
+
+        # Use review to approve the config
+        await approve_server_config_using_review("stdio", command, self.config_path)
+
+        # Run second part of the test with the approved config
+        await run_with_ansi_visualization(
+            callback2, self.config_path, visualize_ansi=False
         )
 
     @pytest.mark.asyncio
     async def test_ansi_visualization_enabled(self):
         """Test that ANSI escape codes are visualized when enabled."""
 
-        async def callback(session):
+        # Create the test command
+        command = f"python {str(TEST_SERVER_PATH)}"
+
+        # First test stage - get blocked
+        async def callback1(session):
             # List available tools
             tools = await session.list_tools()
 
@@ -126,13 +130,8 @@ class TestAnsiVisualization:
             blocked_response = json.loads(blocked_result.content[0].text)
             assert blocked_response["status"] == "blocked"
 
-            # Approve the server config
-            approval_result = await session.call_tool(
-                "approve_server_config", {"config": blocked_response["server_config"]}
-            )
-            approval_json = json.loads(approval_result.content[0].text)
-            assert approval_json["status"] == "success"
-
+        # Second test stage - after approval
+        async def callback2(session):
             # Now call the ansi_echo tool
             result = await session.call_tool("ansi_echo", {"message": "test"})
 
@@ -144,6 +143,15 @@ class TestAnsiVisualization:
             assert "ESC[" in response_json["response"]
             assert "\x1b[" not in response_json["response"]
 
+        # Run first part of the test
         await run_with_ansi_visualization(
-            callback, self.config_path, visualize_ansi=True
+            callback1, self.config_path, visualize_ansi=True
+        )
+
+        # Use review to approve the config
+        await approve_server_config_using_review("stdio", command, self.config_path)
+
+        # Run second part of the test with the approved config
+        await run_with_ansi_visualization(
+            callback2, self.config_path, visualize_ansi=True
         )
