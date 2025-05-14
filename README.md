@@ -45,14 +45,14 @@ uv venv && uv pip install -r requirements.txt
 uv run pytest -v --timeout=10
 ```
 
-To start the server through the Context Protector wrapper, run `mcp_wrapper.py` with either the `--command <COMMAND>` or `--url <URL>` argument:
+To start the server through the Context Protector wrapper, run `main.py` with either the `--command <COMMAND>` or `--url <URL>` argument:
 
 ```
 # Start the wrapper with an stdio server
-uv run mcp_wrapper.py --command DOWNSTREAM_SERVER_COMMAND
+uv run main.py --command DOWNSTREAM_SERVER_COMMAND
 
 # Start the wrapper with an HTTP server
-uv run mcp_wrapper.py --url DOWNSTREAM_SERVER_URL
+uv run main.py --url DOWNSTREAM_SERVER_URL
 ```
 
 Configure your host app to run the command above using full paths to `uv`. In the case of Claude Desktop, your `claude_config.json` file should look something like this:
@@ -71,7 +71,14 @@ Configure your host app to run the command above using full paths to `uv`. In th
 To include support for tool response scanning, include the `--guardrail-provider` argument:
 
 ```
-uv run mcp_wrapper.py --command DOWNSTREAM_SERVER_COMMAND --guardrail-provider LlamaFirewall
+uv run main.py --command DOWNSTREAM_SERVER_COMMAND --guardrail-provider LlamaFirewall
+```
+
+Review functions:
+
+```
+uv run main.py --review-server
+uv run main.py --review-quarantine --quarantine-id <ID>
 ```
 
 ## Development
