@@ -4,6 +4,7 @@ Tests for MCP wrapper with dynamic downstream server.
 Tests the behavior of the dynamic server with tool count configuration.
 """
 
+import sys
 import asyncio
 import json
 import os
@@ -61,13 +62,12 @@ def create_approved_config(server_cmd):
         TEMP_CONFIG_FILE = tmp.name
     
     # Use the review command to pre-approve the server config
-    main_path = str(Path(__file__).resolve().parent.parent.parent.joinpath("main.py"))
     subprocess.run([
-        "python", main_path,
+        sys.executable, "-m", "contextprotector",
         "--command", server_cmd,
         "--config-file", TEMP_CONFIG_FILE,
         "--review-server", "yes"
-    ], check=True)
+    ], cwd=Path(__file__).parent.parent.parent.resolve(), check=True)
     
     return TEMP_CONFIG_FILE
 

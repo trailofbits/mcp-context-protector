@@ -3,6 +3,7 @@
 Utility functions for MCP wrapper tests.
 """
 
+import sys
 import asyncio
 import subprocess
 from pathlib import Path
@@ -23,13 +24,11 @@ async def approve_server_config_using_review(
         identifier: The command or URL to connect to
         config_path: Path to configuration file
     """
-    root_dir = Path(__file__).resolve().parent.parent.parent
-    main_py = str(root_dir.joinpath("main.py"))
-
     # Prepare the command based on connection type
     cmd = [
-        "python",
-        main_py,
+        sys.executable,
+        "-m",
+        "contextprotector",
         "--review-server",
         "--config-file",
         config_path
@@ -45,6 +44,7 @@ async def approve_server_config_using_review(
     # Run the review process
     review_process = subprocess.Popen(
         cmd,
+        cwd=Path(__file__).parent.parent.parent.resolve(),
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -87,12 +87,10 @@ async def run_with_wrapper_session(
         visualize_ansi: Whether to visualize ANSI escape codes
         guardrail_provider: Optional guardrail provider to use
     """
-    # Build the main.py path
-    main_py = str(Path(__file__).resolve().parent.parent.parent.joinpath("main.py"))
-    
     # Base arguments
     args = [
-        main_py,
+        "-m",
+        "contextprotector",
         "--config-file",
         str(config_path),
     ]
@@ -116,6 +114,7 @@ async def run_with_wrapper_session(
     server_params = StdioServerParameters(
         command="python",
         args=args,
+        cwd=Path(__file__).parent.parent.parent.resolve(),
     )
     
     # Connect to the wrapper

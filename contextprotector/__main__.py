@@ -2,9 +2,9 @@ import argparse
 import asyncio
 import logging
 import sys
-from contextprotector.guardrails import get_provider, get_provider_names
-from contextprotector.mcp_wrapper import MCPWrapperServer, review_server_config
-from contextprotector.quarantine_cli import review_quarantine
+from .guardrails import get_provider, get_provider_names
+from .mcp_wrapper import MCPWrapperServer, review_server_config
+from .quarantine_cli import review_quarantine
 
 logger = logging.getLogger("mcp_wrapper")
 

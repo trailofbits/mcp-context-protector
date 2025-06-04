@@ -392,7 +392,7 @@ class MCPWrapperServer:
             raise ValueError(
                 f"Response {response_id} is not marked for release. "
                 f"Please use the CLI to review and release it first: "
-                f"python main.py --review-quarantine --quarantine-id {response_id}"
+                f"python -m contextprotector --review-quarantine --quarantine-id {response_id}"
             )
 
     async def _proxy_tool_to_downstream(self, name: str, arguments: dict) -> str:
@@ -463,7 +463,7 @@ class MCPWrapperServer:
         Arguments: {json.dumps(arguments, indent=2)}
         Alert explanation: {guardrail_alert.explanation}
 
-        To review this response and release it from the quarantein, run contextprotector with the arguments `--review-quarantine{" --quarantine-id " + quarantine_id if quarantine_id else ""}`.
+        To review this response and release it from the quarantine, run contextprotector with the arguments `--review-quarantine{" --quarantine-id " + quarantine_id if quarantine_id else ""}`.
         """
 
     def _convert_parameters_to_schema(

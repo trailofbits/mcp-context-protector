@@ -22,14 +22,12 @@ async def approve_server_config_using_review(command, config_path):
         server_config: The server configuration to approve
         command: The command to run the downstream server
     """
-    root_dir = Path(__file__).resolve().parent.parent.parent
-    main_py = str(root_dir.joinpath("main.py"))
-
     # Run the review process
     review_process = subprocess.Popen(
         [
             "python",
-            main_py,
+            "-m",
+            "contextprotector",
             "--review-server",
             "--command",
             command,
@@ -39,6 +37,7 @@ async def approve_server_config_using_review(command, config_path):
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        cwd=Path(__file__).parent.parent.parent.resolve(),
         text=True
     )
 
@@ -68,12 +67,14 @@ async def run_with_wrapper_session(callback, config_path=None):
     server_params = StdioServerParameters(
         command="python",  # Executable
         args=[
-            str(Path(__file__).resolve().parent.parent.parent.joinpath("main.py")),
+            "-m",
+            "contextprotector",
             "--command",
             f"python {str(dir.joinpath('simple_downstream_server.py'))}",
             "--config-file",
             str(config_path),
         ],  # Wrapper command + downstream server
+        cwd=Path(__file__).parent.parent.parent.resolve(),
         env=None,  # Optional environment variables
     )
     async with stdio_client(server_params) as (read, write):
