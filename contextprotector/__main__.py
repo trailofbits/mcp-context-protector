@@ -8,7 +8,7 @@ from .quarantine_cli import review_quarantine
 
 logger = logging.getLogger("mcp_wrapper")
 
-async def main():
+async def main_async():
     parser = argparse.ArgumentParser(description="MCP Wrapper Server")
 
     # Create mutually exclusive group for command, URL, list-guardrail-providers, and review-quarantine
@@ -158,6 +158,8 @@ async def main():
     finally:
         await wrapper.stop_child_process()
 
+def main():
+    asyncio.run(main_async())
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
