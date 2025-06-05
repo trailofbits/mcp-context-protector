@@ -94,7 +94,7 @@ Review functions:
 /path/to/context-protector/.venv/bin/context-protector --review-quarantine --quarantine-id <ID>
 ```
 
-## Full usage
+## Usage
 
 ```
 usage: context-protector [-h] (--command COMMAND | --url URL | --list-guardrail-providers | --review-quarantine) [--config-file CONFIG_FILE]
