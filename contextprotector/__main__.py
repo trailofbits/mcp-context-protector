@@ -9,13 +9,13 @@ from .quarantine_cli import review_quarantine
 logger = logging.getLogger("mcp_wrapper")
 
 async def main_async():
-    parser = argparse.ArgumentParser(description="MCP Wrapper Server")
+    parser = argparse.ArgumentParser()
 
     # Create mutually exclusive group for command, URL, list-guardrail-providers, and review-quarantine
     source_group = parser.add_mutually_exclusive_group(required=True)
-    source_group.add_argument("--command", help="The command to run as a child process")
+    source_group.add_argument("--command", help="Start a wrapped server over the stdio transport using the specified command")
     source_group.add_argument(
-        "--url", help="The URL to connect to for a remote MCP server"
+        "--url", help="Connect to a remote MCP server over SSE at the specified URL"
     )
     source_group.add_argument(
         "--list-guardrail-providers",
