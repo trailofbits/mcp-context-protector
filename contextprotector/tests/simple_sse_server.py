@@ -5,6 +5,7 @@ Uses fastmcp with SSE transport from the official Python SDK for MCP.
 
 import argparse
 import os
+import sys
 from typing import Dict, Any
 
 from mcp.server.fastmcp import FastMCP
@@ -67,4 +68,20 @@ if __name__ == "__main__":
     write_pidfile(args.pidfile)
 
     app.settings.host = "127.0.0.1"
-    app.run(transport="sse")
+
+    # The default port for FastMCP's SSE transport is 8000, but just in case that port number is in
+    # use, we will attempt fifty ports to try to find one that is available. uvicorn raises
+    # SystemExit when it fails due to a port conflict, so that's how we detect this failure case.
+    class PortException(Exception):
+        pass
+
+    for port in range(8000, 8050):
+        try:
+            app.settings.port = port
+            app.run(transport="sse")
+            break
+        except SystemExit:
+            print(f"Warning: port {port} in use", file=sys.stderr)
+            pass
+        except KeyboardInterrupt:
+            sys.exit(0)

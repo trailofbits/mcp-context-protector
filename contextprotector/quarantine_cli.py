@@ -7,6 +7,7 @@ import json
 import logging
 from typing import Optional, List, Dict, Any
 
+from .mcp_wrapper import make_ansi_escape_codes_visible
 from .quarantine import ToolResponseQuarantine, QuarantinedToolResponse
 
 # Set up logging
@@ -111,7 +112,7 @@ def review_response(quarantine: ToolResponseQuarantine, response: QuarantinedToo
     print("\nTool Input:")
     print(json.dumps(response.tool_input, indent=2))
     print("\nTool Output:")
-    print(f"{response.tool_output}")
+    print(f"{make_ansi_escape_codes_visible(str(response.tool_output))}")
     print("=======================================\n")
     
     # Prompt for release

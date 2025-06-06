@@ -12,7 +12,7 @@ async def main_async():
     parser = argparse.ArgumentParser()
 
     # Create mutually exclusive group for command, URL, list-guardrail-providers, and review-quarantine
-    source_group = parser.add_mutually_exclusive_group(required=True)
+    source_group = parser.add_argument_group()
     source_group.add_argument("--command", help="Start a wrapped server over the stdio transport using the specified command")
     source_group.add_argument(
         "--url", help="Connect to a remote MCP server over SSE at the specified URL"
@@ -21,6 +21,11 @@ async def main_async():
         "--list-guardrail-providers",
         action="store_true",
         help="List available guardrail providers and exit",
+    )
+    source_group.add_argument(
+        "--review-server",
+        action="store_true",
+        help="Review and approve server configuration before starting",
     )
     source_group.add_argument(
         "--review-quarantine",
@@ -44,13 +49,6 @@ async def main_async():
         "--visualize-ansi-codes",
         action="store_true",
         help="Make ANSI escape codes visible by replacing escape characters with 'ESC'",
-    )
-
-    # Add review mode flag
-    parser.add_argument(
-        "--review-server",
-        action="store_true",
-        help="Review and approve server configuration before starting",
     )
 
     # Add quarantine-id argument
@@ -77,11 +75,6 @@ async def main_async():
         else:
             print("No guardrail providers found.")
         return
-
-    # Validate that we have either command or URL for non-list operations
-    if not args.list_guardrail_providers and not args.command and not args.url:
-        print("Error: Either --command or --url must be provided", file=sys.stderr)
-        sys.exit(1)
 
     # Get guardrail provider object if specified
     guardrail_provider = None

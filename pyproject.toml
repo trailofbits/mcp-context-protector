@@ -11,6 +11,15 @@ authors = [
 description = "context-protector MCP security wrapper"
 readme = "README.md"
 requires-python = ">=3.9"
+dependencies = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.20.0",
+    "pytest-timeout>=2.4.0",
+    "mcp[stdio]>=0.1.0",
+    "ruff>=0.0.270",
+    "psutil>=7.0.0",
+    "llamafirewall>=1.0.3"
+]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",

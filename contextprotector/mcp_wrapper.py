@@ -880,10 +880,7 @@ class MCPWrapperServer:
         if not self.visualize_ansi_codes:
             return text
 
-        # Replace the escape character (ASCII 27, typically \x1b or \033) with "ESC"
-        # This will convert escape sequences like "\x1b[31m" (red text) to "ESC[31m"
-        # making them visible instead of changing the terminal colors
-        return re.sub(r"\x1b", "ESC", text)
+        return make_ansi_escape_codes_visible(text)
 
     def _print_server_config(self, config: MCPServerConfig):
         """Print the server configuration to stdout."""
@@ -1052,7 +1049,7 @@ async def review_server_config(
             diff = wrapper.saved_config.compare(wrapper.current_config)
             if diff.has_differences():
                 print("\n===== CONFIGURATION DIFFERENCES =====")
-                print(str(diff))
+                print(make_ansi_escape_codes_visible(str(diff)))
                 print("====================================\n")
             else:
                 print("No differences found (configs are identical)")
@@ -1062,7 +1059,7 @@ async def review_server_config(
         # Display tool list
         print("\n===== TOOL LIST =====")
         for tool_spec in wrapper.tool_specs:
-            print(f"• {tool_spec.name}: {tool_spec.description}")
+            print(f"• {tool_spec.name}: {make_ansi_escape_codes_visible(tool_spec.description)}")
         print("=====================\n")
 
         guardrail_alert = None
@@ -1101,3 +1098,9 @@ async def review_server_config(
     finally:
         # Clean up
         await wrapper.stop_child_process()
+
+def make_ansi_escape_codes_visible(text: str) -> str:
+    # Replace the escape character (ASCII 27, typically \x1b or \033) with "ESC"
+    # This will convert escape sequences like "\x1b[31m" (red text) to "ESC[31m"
+    # making them visible instead of changing the terminal colors
+    return re.sub(r"\x1b", "ESC", text)
