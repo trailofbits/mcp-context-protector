@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import json
-import base64
 import os
 import threading
 from dataclasses import dataclass, field
@@ -125,6 +124,7 @@ class MCPToolDefinition:
 class ConfigDiff:
     """Class representing differences between two MCP server configurations."""
 
+    old_instructions: Optional[str] = field(default=None)
     new_instructions: Optional[str] = field(default=None)
     added_tools: List[str] = field(default_factory=list)
     removed_tools: List[str] = field(default_factory=list)
@@ -133,7 +133,8 @@ class ConfigDiff:
     def has_differences(self) -> bool:
         """Check if there are any differences."""
         return bool(
-            self.new_instructions is not None
+            self.old_instructions is not None
+            or self.new_instructions is not None
             or self.added_tools
             or self.removed_tools
             or self.modified_tools
@@ -147,9 +148,12 @@ class ConfigDiff:
         lines = []
 
         # Show instruction changes first since they're important
-        if self.new_instructions is not None:
+        if self.old_instructions is not None or self.new_instructions is not None:
             lines.append("Instructions changed:")
-            lines.append(f"  New: {self.new_instructions}")
+            if self.old_instructions is not None:
+                lines.append(f"  Old: {self.old_instructions}")
+            if self.new_instructions is not None:
+                lines.append(f"  New: {self.new_instructions}")
             lines.append("")
 
         if self.added_tools:
@@ -320,46 +324,6 @@ class MCPServerConfig:
             data = json.loads(json_str)
         return cls.from_dict(data)
 
-    def to_binary(self, path: str) -> None:
-        """
-        Serialize the configuration to a binary file using JSON and base64 encoding.
-        This is a secure alternative to pickle serialization.
-
-        Args:
-            path: File path to write the binary data to
-        """
-        # Convert to JSON first
-        config_dict = self.to_dict()
-        json_str = json.dumps(config_dict)
-
-        # Encode using base64 for binary storage
-        encoded_data = base64.b64encode(json_str.encode("utf-8"))
-
-        with open(path, "wb") as f:
-            f.write(encoded_data)
-
-    @classmethod
-    def from_binary(cls, path: str) -> "MCPServerConfig":
-        """
-        Deserialize the configuration from a binary file using base64 decoding and JSON.
-
-        Args:
-            path: File path to read the binary data from
-
-        Returns:
-            MCPServerConfig instance
-        """
-        with open(path, "rb") as f:
-            encoded_data = f.read()
-
-        # Decode from base64
-        json_str = base64.b64decode(encoded_data).decode("utf-8")
-
-        # Parse JSON
-        config_dict = json.loads(json_str)
-
-        return cls.from_dict(config_dict)
-
     def to_dict(self) -> Dict[str, Any]:
         """Convert the server configuration to a dictionary."""
         return {
@@ -434,42 +398,6 @@ class MCPServerConfig:
 
         return config
 
-    def to_json_schema(self) -> Dict[str, Any]:
-        """Convert the tool parameters to JSON Schema format."""
-        schema = {
-            "$schema": "http://json-schema.org/draft-07/schema#",
-            "type": "object",
-            "properties": {},
-            "required": [],
-        }
-
-        for tool in self.tools:
-            tool_schema = {"type": "object", "properties": {}, "required": []}
-
-            for param in tool.parameters:
-                param_schema = {
-                    "type": param.type.value,
-                    "description": param.description,
-                }
-
-                if param.enum is not None:
-                    param_schema["enum"] = param.enum
-
-                if param.type == ParameterType.ARRAY and param.items is not None:
-                    param_schema["items"] = param.items
-
-                if param.type == ParameterType.OBJECT and param.properties is not None:
-                    param_schema["properties"] = param.properties
-
-                tool_schema["properties"][param.name] = param_schema
-
-                if param.required:
-                    tool_schema["required"].append(param.name)
-
-            schema["properties"][tool.name] = tool_schema
-
-        return schema
-
     def __eq__(self, other) -> bool:
         """Compare two server configurations semantically."""
         if not isinstance(other, MCPServerConfig):
@@ -500,6 +428,7 @@ class MCPServerConfig:
         diff = ConfigDiff()
 
         if self.instructions != other.instructions:
+            diff.old_instructions = self.instructions
             diff.new_instructions = other.instructions
 
         # Create tool maps by name for easier comparison
@@ -566,48 +495,26 @@ class MCPServerConfig:
                 # Initialize changes for this parameter
                 param_changes = {}
 
+                attrs = [
+                    "description",
+                    "type",
+                    "required",
+                    "default",
+                    "enum",
+                    "items",
+                    "properties"
+                ]
+
                 # Check for parameter changes
-                if self_param.description != other_param.description:
-                    param_changes["description"] = {
-                        "old": self_param.description,
-                        "new": other_param.description,
-                    }
-
-                if self_param.type != other_param.type:
-                    param_changes["type"] = {
-                        "old": self_param.type.value,
-                        "new": other_param.type.value,
-                    }
-
-                if self_param.required != other_param.required:
-                    param_changes["required"] = {
-                        "old": self_param.required,
-                        "new": other_param.required,
-                    }
-
-                if self_param.default != other_param.default:
-                    param_changes["default"] = {
-                        "old": self_param.default,
-                        "new": other_param.default,
-                    }
-
-                if self_param.enum != other_param.enum:
-                    param_changes["enum"] = {
-                        "old": self_param.enum,
-                        "new": other_param.enum,
-                    }
-
-                if self_param.items != other_param.items:
-                    param_changes["items"] = {
-                        "old": self_param.items,
-                        "new": other_param.items,
-                    }
-
-                if self_param.properties != other_param.properties:
-                    param_changes["properties"] = {
-                        "old": self_param.properties,
-                        "new": other_param.properties,
-                    }
+                for attr_name in attrs:
+                    self_val = getattr(self_param, attr_name, None)
+                    other_val = getattr(other_param, attr_name, None)
+                    
+                    if self_val != other_val:
+                        param_changes[attr_name] = {
+                            "old": self_val,
+                            "new": other_val,
+                        }
 
                 if param_changes:
                     modified_params[param_name] = param_changes
@@ -619,78 +526,6 @@ class MCPServerConfig:
                 diff.modified_tools[tool_name] = tool_changes
 
         return diff
-
-    def to_yaml(self, path: str = None, fp: TextIO = None) -> Optional[str]:
-        """
-        Serialize the configuration to YAML.
-
-        Args:
-            path: Optional file path to write the YAML to
-            fp: Optional file-like object to write the YAML to
-
-        Returns:
-            YAML string if neither path nor fp is provided, None otherwise
-
-        Raises:
-            ImportError: If PyYAML is not installed
-        """
-        try:
-            import yaml
-        except ImportError:
-            raise ImportError(
-                "PyYAML is required for YAML serialization. Install it with 'pip install pyyaml'."
-            )
-
-        config_dict = self.to_dict()
-
-        if path:
-            with open(path, "w") as f:
-                yaml.dump(config_dict, f, default_flow_style=False)
-            return None
-        elif fp:
-            yaml.dump(config_dict, fp, default_flow_style=False)
-            return None
-        else:
-            return yaml.dump(config_dict, default_flow_style=False)
-
-    @classmethod
-    def from_yaml(
-        cls, yaml_str: str = None, path: str = None, fp: TextIO = None
-    ) -> "MCPServerConfig":
-        """
-        Deserialize the configuration from YAML.
-
-        Args:
-            yaml_str: YAML string to parse
-            path: Optional file path to read the YAML from
-            fp: Optional file-like object to read the YAML from
-
-        Returns:
-            MCPServerConfig instance
-
-        Raises:
-            ImportError: If PyYAML is not installed
-            ValueError: If no source is provided or multiple sources are provided
-        """
-        try:
-            import yaml
-        except ImportError:
-            raise ImportError(
-                "PyYAML is required for YAML deserialization. Install it with 'pip install pyyaml'."
-            )
-
-        if sum(x is not None for x in (yaml_str, path, fp)) != 1:
-            raise ValueError("Exactly one of yaml_str, path, or fp must be provided")
-
-        if path:
-            with open(path, "r") as f:
-                data = yaml.safe_load(f)
-        elif fp:
-            data = yaml.safe_load(fp)
-        else:
-            data = yaml.safe_load(yaml_str)
-
-        return cls.from_dict(data)
 
 
 @dataclass

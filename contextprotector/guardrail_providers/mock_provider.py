@@ -7,7 +7,7 @@ import logging
 from typing import Optional
 
 from ..mcp_config import MCPServerConfig
-from ..guardrail_types import GuardrailProvider, GuardrailAlert
+from ..guardrail_types import GuardrailProvider, GuardrailAlert, ToolResponse
 
 # Set up logger
 logger = logging.getLogger("mock_guardrail_provider")
@@ -83,6 +83,37 @@ class MockGuardrailProvider(GuardrailProvider):
         logger.info("No alert triggered")
         return None
 
+    def check_tool_response(
+        self, tool_response: ToolResponse
+    ) -> Optional[GuardrailAlert]:
+        """
+        Check the tool response based on the current trigger setting.
+
+        Args:
+            tool_response: The tool response to check
+
+        Returns:
+            GuardrailAlert if trigger is set, None otherwise
+        """
+        logger.info(f"Checking tool response for tool: {tool_response.tool_name}")
+        logger.info(f"Trigger alert is set to: {self._trigger_alert}")
+
+        if self._trigger_alert:
+            logger.info(f"Triggering alert with text: {self._alert_text}")
+            return GuardrailAlert(
+                explanation=self._alert_text,
+                data={
+                    "mock_data": "This is mock data for testing tool responses",
+                    "tool_name": tool_response.tool_name,
+                    "tool_input": tool_response.tool_input,
+                    "tool_output_length": len(tool_response.tool_output),
+                    "is_test": True,
+                },
+            )
+
+        logger.info("No alert triggered")
+        return None
+
 
 class AlwaysAlertGuardrailProvider(GuardrailProvider):
     """
@@ -122,6 +153,28 @@ class AlwaysAlertGuardrailProvider(GuardrailProvider):
             data={
                 "mock_data": "This is mock data for always-alert testing",
                 "config_tools_count": len(config.tools),
+                "is_always_alert": True,
+            },
+        )
+
+    def check_tool_response(self, tool_response: ToolResponse) -> GuardrailAlert:
+        """
+        Always returns a guardrail alert regardless of the tool response.
+
+        Args:
+            tool_response: The tool response to check
+
+        Returns:
+            GuardrailAlert with the configured text
+        """
+        logger.info(f"Always triggering alert for tool: {tool_response.tool_name}")
+        return GuardrailAlert(
+            explanation=self._alert_text,
+            data={
+                "mock_data": "This is mock data for always-alert testing tool responses",
+                "tool_name": tool_response.tool_name,
+                "tool_input": tool_response.tool_input,
+                "tool_output_length": len(tool_response.tool_output),
                 "is_always_alert": True,
             },
         )

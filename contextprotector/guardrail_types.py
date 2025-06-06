@@ -12,6 +12,24 @@ logger = logging.getLogger("guardrail_types")
 
 
 @dataclass
+class ToolResponse:
+    """
+    Class representing a tool call and its response for guardrail analysis.
+
+    Attributes:
+        tool_name: Name of the tool that was called
+        tool_input: Input arguments passed to the tool
+        tool_output: Output returned by the tool
+        context: Optional additional context about the tool call
+    """
+
+    tool_name: str
+    tool_input: Dict[str, Any]
+    tool_output: str
+    context: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class GuardrailAlert:
     """
     Class representing an alert triggered by a guardrail provider.
@@ -48,3 +66,18 @@ class GuardrailProvider:
         raise NotImplementedError(
             "Guardrail providers must implement check_server_config method"
         )
+
+    def check_tool_response(
+        self, tool_response: ToolResponse
+    ) -> Optional[GuardrailAlert]:
+        """
+        Check a tool response against the guardrail.
+
+        Args:
+            tool_response: The tool response to check
+
+        Returns:
+            Optional GuardrailAlert if guardrail is triggered, or None if the response is safe
+        """
+        # Default implementation: no checking
+        return None

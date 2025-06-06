@@ -29,20 +29,20 @@ async def review_quarantine(quarantine_path: Optional[str] = None, quarantine_id
     # Check if there are any quarantined responses
     responses = quarantine.list_responses(include_released=False)
     if not responses:
-        print("\n⚠️ No quarantined tool responses found.")
+        print("\nNo quarantined tool responses found.")
         return
 
-    print(f"\n🔍 Found {len(responses)} quarantined tool response(s).")
+    print(f"\nFound {len(responses)} quarantined tool response(s).")
     
     # If a specific quarantine ID was provided, review just that one
     if quarantine_id:
         response = quarantine.get_response(quarantine_id)
         if not response:
-            print(f"\n❌ No quarantined response found with ID: {quarantine_id}")
+            print(f"\nNo quarantined response found with ID: {quarantine_id}")
             return
         
         if response.released:
-            print(f"\n⚠️ Response with ID {quarantine_id} has already been released.")
+            print(f"\nResponse with ID {quarantine_id} has already been released.")
             return
             
         review_response(quarantine, response)
@@ -65,7 +65,7 @@ def review_response_list(quarantine: ToolResponseQuarantine, responses: List[Dic
         # Format the timestamp for better readability
         timestamp = response_data["timestamp"].split("T")[0]
         print(f"{i+1}. [{timestamp}] {response_data['tool_name']} - {response_data['reason'][:50]}...")
-    print("=====================================\n")
+    print("========================================\n")
     
     # Prompt user to select a response to review
     while True:
@@ -83,16 +83,16 @@ def review_response_list(quarantine: ToolResponseQuarantine, responses: List[Dic
                     # After reviewing, show the list again with updated data
                     responses = quarantine.list_responses(include_released=False)
                     if not responses:
-                        print("\n✅ No more quarantined responses to review.")
+                        print("\nNo more quarantined responses to review.")
                         return
                     review_response_list(quarantine, responses)
                     return
                 else:
-                    print("\n❌ Error retrieving response from quarantine.")
+                    print("\nError retrieving response from quarantine.")
             else:
-                print(f"\n❌ Invalid choice. Please enter a number between 1 and {len(responses)}.")
+                print(f"\nInvalid choice. Please enter a number between 1 and {len(responses)}.")
         except ValueError:
-            print("\n❌ Please enter a valid number.")
+            print("\nPlease enter a valid number.")
 
 
 def review_response(quarantine: ToolResponseQuarantine, response: QuarantinedToolResponse) -> None:
@@ -120,10 +120,10 @@ def review_response(quarantine: ToolResponseQuarantine, response: QuarantinedToo
         choice = input("Do you want to release this response from quarantine? [y/n]: ").lower()
         if choice in ('y', 'yes'):
             quarantine.release_response(response.id)
-            print(f"\n✅ Response {response.id} has been released from quarantine.")
+            print(f"\nResponse {response.id} has been released from quarantine.")
             break
         elif choice in ('n', 'no'):
-            print("\n❌ Response remains in quarantine.")
+            print("\nResponse remains in quarantine.")
             break
         else:
-            print("\n❌ Invalid choice. Please enter 'y' or 'n'.")
+            print("\nInvalid choice. Please enter 'y' or 'n'.")
