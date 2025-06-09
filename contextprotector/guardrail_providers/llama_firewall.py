@@ -17,7 +17,6 @@ from typing import Optional
 from ..mcp_config import MCPServerConfig
 from ..guardrail_types import GuardrailAlert, GuardrailProvider, ToolResponse
 
-# Set up logger
 logger = logging.getLogger("llama_firewall_provider")
 
 
@@ -59,31 +58,25 @@ class LlamaFirewallProvider(GuardrailProvider):
                 }
             )
 
-            # Convert config to string and log the size
             config_str = str(config)
             logger.info(f"Config string length: {len(config_str)} characters")
 
-            # Create message
             message = UserMessage(content=config_str)
             logger.info("Created UserMessage for scanning")
 
-            # Scan the message
             logger.info("Scanning config with Llama Firewall...")
             result = lf.scan(message)
 
-            # Log the scan result details
             logger.info(f"Scan result decision: {result.decision}")
             if hasattr(result, "reason") and result.reason:
                 logger.info(f"Scan result reason: {result.reason}")
             else:
                 logger.info("No reason provided in scan result")
 
-            # Process the result
             if result.decision == ScanDecision.ALLOW:
                 logger.info("Scan decision is ALLOW - no guardrail alert triggered")
                 return None
 
-            # Create and return alert
             logger.warning(f"Guardrail alert triggered: {result.reason}")
             alert = GuardrailAlert(
                 explanation=result.reason.split("\n")[0]
@@ -103,7 +96,6 @@ class LlamaFirewallProvider(GuardrailProvider):
                 f"Error in LlamaFirewallProvider.check_server_config: {e}",
                 exc_info=True,
             )
-            # Return an alert about the error
             return GuardrailAlert(
                 explanation=f"Error checking configuration: {str(e)}",
                 data={"error": str(e)},
@@ -133,33 +125,27 @@ class LlamaFirewallProvider(GuardrailProvider):
                 }
             )
 
-            # Convert tool response to a string for scanning
             tool_response_str = f"Tool: {tool_response.tool_name}\nInput: {tool_response.tool_input}\nOutput: {tool_response.tool_output}"
             logger.info(
                 f"Tool response string length: {len(tool_response_str)} characters"
             )
 
-            # Create message
             message = UserMessage(content=tool_response_str)
             logger.info("Created UserMessage for tool response scanning")
 
-            # Scan the message
             logger.info("Scanning tool response with Llama Firewall...")
             result = lf.scan(message)
 
-            # Log the scan result details
             logger.info(f"Scan result decision: {result.decision}")
             if hasattr(result, "reason") and result.reason:
                 logger.info(f"Scan result reason: {result.reason}")
             else:
                 logger.info("No reason provided in scan result")
 
-            # Process the result
             if result.decision == ScanDecision.ALLOW:
                 logger.info("Scan decision is ALLOW - no guardrail alert triggered")
                 return None
 
-            # Create and return alert
             logger.warning(f"Tool response guardrail alert triggered: {result.reason}")
             alert = GuardrailAlert(
                 explanation=result.reason.split("\n")[0]
@@ -184,7 +170,6 @@ class LlamaFirewallProvider(GuardrailProvider):
                 f"Error in LlamaFirewallProvider.check_tool_response: {e}",
                 exc_info=True,
             )
-            # Return an alert about the error
             return GuardrailAlert(
                 explanation=f"Error checking tool response: {str(e)}",
                 data={

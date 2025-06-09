@@ -47,7 +47,6 @@ class QuarantinedToolResponse:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to a dictionary representation for storage."""
         data = asdict(self)
-        # Convert datetime objects to ISO format strings for JSON serialization
         data['timestamp'] = self.timestamp.isoformat()
         if self.released_at:
             data['released_at'] = self.released_at.isoformat()
@@ -56,7 +55,6 @@ class QuarantinedToolResponse:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'QuarantinedToolResponse':
         """Create a QuarantinedToolResponse from a dictionary."""
-        # Convert ISO format strings back to datetime objects
         if 'timestamp' in data and isinstance(data['timestamp'], str):
             data['timestamp'] = datetime.datetime.fromisoformat(data['timestamp'])
         if 'released_at' in data and isinstance(data['released_at'], str) and data['released_at']:
@@ -96,7 +94,6 @@ class ToolResponseQuarantine:
         home_dir = pathlib.Path.home()
         data_dir = home_dir / ".context-protector"
         
-        # Create the directory if it doesn't exist
         data_dir.mkdir(exist_ok=True)
         
         return str(data_dir / "quarantine.json")
@@ -125,7 +122,6 @@ class ToolResponseQuarantine:
                 ]
             }
             
-            # Ensure the directory exists
             os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
             
             # Write to a temporary file first, then rename
@@ -158,10 +154,8 @@ class ToolResponseQuarantine:
         # Reload the database first to avoid overwriting other changes
         self._load()
         
-        # Generate a unique ID for the quarantined response
         response_id = str(uuid.uuid4())
         
-        # Create and store the quarantined response
         response = QuarantinedToolResponse(
             id=response_id,
             tool_name=tool_name,
@@ -172,7 +166,6 @@ class ToolResponseQuarantine:
         
         self.quarantined_responses[response_id] = response
         
-        # Save the database
         self._save()
         
         return response_id
@@ -291,19 +284,15 @@ class ToolResponseQuarantine:
         original_count = len(self.quarantined_responses)
         
         if only_released:
-            # Filter out released responses
             self.quarantined_responses = {
                 k: v for k, v in self.quarantined_responses.items() 
                 if not v.released
             }
         else:
-            # Clear all responses
             self.quarantined_responses = {}
         
-        # Calculate how many were removed
         removed_count = original_count - len(self.quarantined_responses)
         
-        # Save the database if changes were made
         if removed_count > 0:
             self._save()
         

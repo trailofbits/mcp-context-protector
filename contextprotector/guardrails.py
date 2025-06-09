@@ -20,7 +20,11 @@ logger = logging.getLogger("guardrails")
 IS_TEST = "pytest" in sys.modules or any("test" in arg.lower() for arg in sys.argv)
 
 # List of test-only providers that should be excluded from production
-TEST_ONLY_PROVIDERS = {"Mock Guardrail Provider", "Always Alert Provider", "Never Alert Provider"}
+TEST_ONLY_PROVIDERS = {
+    "Mock Guardrail Provider",
+    "Always Alert Provider",
+    "Never Alert Provider",
+}
 
 
 def _is_provider_class(obj) -> bool:
@@ -37,7 +41,6 @@ def _is_provider_class(obj) -> bool:
         return False
     if obj.__name__ == "GuardrailProvider":
         return False
-    # Check for required attributes and methods
     has_name = hasattr(obj, "name") and isinstance(getattr(obj, "name"), property)
     has_check = hasattr(obj, "check_server_config") and callable(
         getattr(obj, "check_server_config")
@@ -59,8 +62,6 @@ def load_guardrail_providers() -> Dict[str, Type[GuardrailProvider]]:
     """
     providers = {}
 
-    # guardrail_providers is already imported
-
     # Find all modules in the guardrail_providers package
     for _, name, is_pkg in pkgutil.iter_modules(guardrail_providers.__path__):
         if is_pkg:
@@ -72,33 +73,10 @@ def load_guardrail_providers() -> Dict[str, Type[GuardrailProvider]]:
             path = f"{current_package}.guardrail_providers.{name}"
             module = importlib.import_module(path)
 
-            # Fix inheritance for any placeholder GuardrailProvider classes
-            # This ensures that classes defined before GuardrailProvider was available
-            # will still inherit from the real GuardrailProvider class
-            for obj_name in dir(module):
-                obj = getattr(module, obj_name)
-                if (
-                    inspect.isclass(obj)
-                    and obj.__module__ == module.__name__
-                    and hasattr(obj, "__bases__")
-                ):
-                    # Check if the class inherits from a placeholder GuardrailProvider
-                    bases = list(obj.__bases__)
-                    for i, base in enumerate(bases):
-                        if (
-                            base.__name__ == "GuardrailProvider"
-                            and base.__module__ == module.__name__
-                        ):
-                            # Replace with the real GuardrailProvider
-                            bases[i] = GuardrailProvider
-                            obj.__bases__ = tuple(bases)
-                            logger.debug(f"Fixed inheritance for {obj.__name__}")
-
             # Find all provider classes in the module
             for obj_name in dir(module):
                 obj = getattr(module, obj_name)
                 if _is_provider_class(obj):
-                    # Create an instance to get the name
                     provider_instance = obj()
                     provider_name = provider_instance.name
 
@@ -107,7 +85,9 @@ def load_guardrail_providers() -> Dict[str, Type[GuardrailProvider]]:
                         providers[provider_name] = obj
                         logger.info(f"Loaded guardrail provider: {provider_name}")
                     else:
-                        logger.debug(f"Skipped test-only guardrail provider: {provider_name}")
+                        logger.debug(
+                            f"Skipped test-only guardrail provider: {provider_name}"
+                        )
 
         except Exception as e:
             logger.error(f"Error loading guardrail provider module {name}: {e}")

@@ -247,7 +247,7 @@ def test_config_instructions_comparison():
     assert diff.new_instructions == "New instructions"
 
     # No tool differences
-    assert not diff.added_tools
+    assert not diff.added_tool_names
     assert not diff.removed_tools
     assert not diff.modified_tools
 

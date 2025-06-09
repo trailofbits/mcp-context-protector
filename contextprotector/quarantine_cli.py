@@ -10,7 +10,6 @@ from typing import Optional, List, Dict, Any
 from .mcp_wrapper import make_ansi_escape_codes_visible
 from .quarantine import ToolResponseQuarantine, QuarantinedToolResponse
 
-# Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("quarantine_cli")
 
@@ -23,10 +22,8 @@ async def review_quarantine(quarantine_path: Optional[str] = None, quarantine_id
         quarantine_path: Optional path to the quarantine database file
         quarantine_id: Optional ID of a specific quarantined response to review
     """
-    # Open the quarantine database
     quarantine = ToolResponseQuarantine(quarantine_path)
     
-    # Check if there are any quarantined responses
     responses = quarantine.list_responses(include_released=False)
     if not responses:
         print("\nNo quarantined tool responses found.")
@@ -59,10 +56,8 @@ def review_response_list(quarantine: ToolResponseQuarantine, responses: List[Dic
         quarantine: The quarantine database instance
         responses: List of quarantined responses
     """
-    # Display the list of quarantined responses
     print("\n===== QUARANTINED TOOL RESPONSES =====")
     for i, response_data in enumerate(responses):
-        # Format the timestamp for better readability
         timestamp = response_data["timestamp"].split("T")[0]
         print(f"{i+1}. [{timestamp}] {response_data['tool_name']} - {response_data['reason'][:50]}...")
     print("========================================\n")
@@ -103,7 +98,6 @@ def review_response(quarantine: ToolResponseQuarantine, response: QuarantinedToo
         quarantine: The quarantine database instance
         response: The quarantined response to review
     """
-    # Display the full response details
     print("\n===== QUARANTINED RESPONSE DETAILS =====")
     print(f"ID: {response.id}")
     print(f"Tool: {response.tool_name}")
@@ -115,7 +109,6 @@ def review_response(quarantine: ToolResponseQuarantine, response: QuarantinedToo
     print(f"{make_ansi_escape_codes_visible(str(response.tool_output))}")
     print("=======================================\n")
     
-    # Prompt for release
     while True:
         choice = input("Do you want to release this response from quarantine? [y/n]: ").lower()
         if choice in ('y', 'yes'):

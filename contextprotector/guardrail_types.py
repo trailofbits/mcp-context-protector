@@ -63,9 +63,7 @@ class GuardrailProvider:
         Returns:
             Optional GuardrailAlert if guardrail is triggered, or None if the configuration is safe
         """
-        raise NotImplementedError(
-            "Guardrail providers must implement check_server_config method"
-        )
+        return None
 
     def check_tool_response(
         self, tool_response: ToolResponse

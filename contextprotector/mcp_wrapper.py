@@ -114,18 +114,15 @@ class MCPWrapperServer:
         self.initialize_result = None
         self.tool_specs = []
         self.config_approved = False
-        self.config_path = config_path
         self.config_db = MCPConfigDatabase(config_path)
         self.saved_config = None  # Will be loaded after server_identifier is set
         self.current_config = MCPServerConfig()
         self.server = Server("mcp_wrapper")
-        self.guardrail_provider = guardrail_provider  # Store the provider object
-        # Enable guardrails if provider is specified
+        self.guardrail_provider = guardrail_provider
         self.use_guardrails = guardrail_provider is not None
         self.visualize_ansi_codes = visualize_ansi_codes
-        self.prompts = []  # Will store prompts from the downstream server
-        self.resources = []  # Will store resources from the downstream server
-        # Initialize quarantine if guardrails are enabled
+        self.prompts = []
+        self.resources = []
         self.quarantine = (
             ToolResponseQuarantine(quarantine_path) if self.use_guardrails else None
         )
@@ -207,10 +204,8 @@ class MCPWrapperServer:
         @self.server.list_tools()
         async def list_tools() -> List[types.Tool]:
             """Return tool specs from the child MCP server and add wrapper-specific tools."""
-            # Create a list with the downstream server tools
             all_tools = []
 
-            # Add downstream tools
             for spec in self.tool_specs:
                 tool = types.Tool(
                     name=spec.name,
@@ -251,33 +246,27 @@ class MCPWrapperServer:
                 f"Prompt dispatch with name {name} and config_approved {self.config_approved}"
             )
 
-            # For prompt dispatch, check if config is approved
             if not self.config_approved:
                 logger.warning(f"Blocking prompt '{name}' - server configuration not approved")
 
-                # Return an empty result with no messages instead of raising an error
                 return types.GetPromptResult(
                     description="Server configuration not approved",
                     messages=[],  # Empty message list
                 )
 
-            # If we get here, config is approved, so proxy the prompt call
             try:
-                # Use the session to dispatch the prompt to the downstream server
                 result = await self.session.get_prompt(name, arguments)
 
                 # Extract the text content from the result
                 text_parts = []
                 for content in result.messages:
                     if content.content:
-                        # Apply ANSI escape code processing if enabled
                         if self.visualize_ansi_codes:
                             content.content = make_ansi_escape_codes_visible(
                                 content.content
                             )
                         text_parts.append(content.content)
 
-                # Return the results
                 return types.GetPromptResult(
                     description=result.description,
                     messages=[
@@ -302,20 +291,17 @@ class MCPWrapperServer:
                 f"Tool call with name {name} and config_approved {self.config_approved}"
             )
 
-            # Handle quarantine_release tool specifically
             if name == "quarantine_release" and self.use_guardrails and self.quarantine:
                 return await self._handle_quarantine_release(arguments)
 
             if not self.session:
                 raise ValueError("Child MCP server not connected")
 
-            # For all other tools, check if config is approved
             if not self.config_approved:
                 logger.warning(
                     f"Blocking tool '{name}' - server configuration not approved"
                 )
 
-                # Load the registry and configs
                 self.current_config = self._create_server_config()
 
                 # Create diff if we have a saved config to compare against
@@ -327,10 +313,8 @@ class MCPWrapperServer:
                     else:
                         diff_text = "No differences found (configs are identical)"
 
-                # Serialize the server config (use current config)
                 serialized_config = self.current_config.to_json()
 
-                # Create blocked response with diff and guardrail alert if any
                 blocked_response = {
                     "status": "blocked",
                     "server_config": serialized_config,
@@ -338,19 +322,15 @@ class MCPWrapperServer:
                     "reason": "Server configuration not approved - all tools blocked",
                 }
 
-                # Return a formatted error with the blocked response
                 error_json = json.dumps(blocked_response)
                 raise ValueError(error_json)
 
             # If we get here, config is approved, so proxy the tool call
             try:
-                # Convert to actual downstream call format using the new client
                 tool_result = await self._proxy_tool_to_downstream(name, arguments)
 
-                # Wrap the successful response
                 wrapped_response = {"status": "completed", "response": tool_result}
 
-                # Create a new result with the wrapped response
                 json_response = json.dumps(wrapped_response)
                 return [types.TextContent(type="text", text=json_response)]
 
@@ -373,7 +353,6 @@ class MCPWrapperServer:
         Raises:
             ValueError: If the UUID is invalid or not found, or if the response is not available for release
         """
-        # Validate arguments
         if "uuid" not in arguments:
             raise ValueError(
                 "Missing required parameter 'uuid' for quarantine_release tool"
@@ -382,14 +361,12 @@ class MCPWrapperServer:
         response_id = arguments["uuid"]
         logger.info(f"Processing quarantine_release request for UUID: {response_id}")
 
-        # Get the response from the quarantine
         quarantined_response = self.quarantine.get_response(response_id)
 
         if not quarantined_response:
             raise ValueError(f"No quarantined response found with UUID: {response_id}")
 
         if quarantined_response.released:
-            # Create a JSON response with the original tool call details
             original_tool_info = {
                 "tool_name": quarantined_response.tool_name,
                 "tool_input": quarantined_response.tool_input,
@@ -398,13 +375,11 @@ class MCPWrapperServer:
                 "quarantine_id": quarantined_response.id,
             }
 
-            # Delete the response from the quarantine
             self.quarantine.delete_response(response_id)
             logger.info(
                 f"Released response {response_id} from quarantine and deleted it"
             )
 
-            # Return the result
             json_response = json.dumps(original_tool_info)
             wrapped_response = {"status": "completed", "response": json_response}
             final_response = json.dumps(wrapped_response)
@@ -422,7 +397,6 @@ class MCPWrapperServer:
             raise ValueError("No client connection to downstream server")
 
         try:
-            # Make the actual tool call to the downstream server
             logger.info(
                 f"Forwarding tool call to downstream: {name} with args {arguments}"
             )
@@ -543,15 +517,12 @@ class MCPWrapperServer:
                         "schema": {"type": prop_details.get("type", "string")},
                     }
 
-                    # Add enum values if present
                     if "enum" in prop_details:
                         parameters[prop_name]["schema"]["enum"] = prop_details["enum"]
 
-            # Extract required fields
             if tool.inputSchema and "required" in tool.inputSchema:
                 required = tool.inputSchema["required"]
 
-            # Create our tool spec
             tool_spec = MCPToolSpec(
                 name=tool.name,
                 description=tool.description,
@@ -570,7 +541,6 @@ class MCPWrapperServer:
         Args:
             tools: Updated list of tools from the downstream server
         """
-        # Convert MCP tools to our internal format
         self.tool_specs = self._convert_mcp_tools_to_specs(tools)
 
         # Temporarily reset approval while we check if the config has changed
@@ -581,12 +551,10 @@ class MCPWrapperServer:
 
         # If tools have changed, check against the saved config (if any)
         if old_config != self.current_config:
-            # Generate diff for logging
             diff = old_config.compare(self.current_config)
             if diff.has_differences():
                 logger.warning(f"Configuration differences: {diff}")
 
-            # If we have a saved config, check if the current config matches it
             if self.saved_config and self.saved_config == self.current_config:
                 logger.info("Tools changed but match saved approved configuration")
                 self.config_approved = True
@@ -605,10 +573,8 @@ class MCPWrapperServer:
         Args:
             message: The message from the server, can be a notification or other message type
         """
-        # Check if it's a notification
         if isinstance(message, types.ServerNotification):
             if message.root.method == "notifications/tools/list_changed":
-                # Tool changes require re-approval of the configuration
                 self.config_approved = False
                 asyncio.create_task(self.update_tools())
             elif message.root.method == "notifications/prompts/list_changed":
@@ -637,7 +603,6 @@ class MCPWrapperServer:
         of the server configuration for approval purposes.
         """
         try:
-            # Get updated prompts from the downstream server
             downstream_prompts = await self.session.list_prompts()
 
             if downstream_prompts and downstream_prompts.prompts:
@@ -665,7 +630,6 @@ class MCPWrapperServer:
         of the server configuration for approval purposes.
         """
         try:
-            # Get updated resources from the downstream server
             downstream_resources = await self.session.list_resources()
 
             if downstream_resources and downstream_resources.resources:
@@ -679,7 +643,6 @@ class MCPWrapperServer:
                     "Note: Resource changes do not affect server configuration approval status"
                 )
 
-                # Forward the resource change notification to upstream clients
                 await self.server.send_resource_list_changed()
             else:
                 logger.info("No resources available from downstream server")
@@ -690,7 +653,6 @@ class MCPWrapperServer:
     async def update_tools(self):
         """Update tools from the downstream server."""
         try:
-            # Get updated tools from the downstream server
             downstream_tools = await self.session.list_tools()
 
             assert downstream_tools.tools
@@ -698,7 +660,6 @@ class MCPWrapperServer:
                 f"Received {len(downstream_tools.tools)} tools after update notification"
             )
 
-            # Process the updated tools
             await self._handle_tool_updates(downstream_tools.tools)
         except Exception as e:
             logger.warning(f"Error handling tool update notification: {e}")
@@ -715,17 +676,13 @@ class MCPWrapperServer:
 
     async def _initialize_config(self):
         """Setup tasks after connecting to a downstream server"""
-        # Initialize the session and store the result
         self.initialize_result = await self.session.initialize()
 
-        # Get tool specifications from the downstream server
         downstream_tools = await self.session.list_tools()
         assert downstream_tools.tools
 
-        # Convert MCP tools to our internal format
         self.tool_specs = self._convert_mcp_tools_to_specs(downstream_tools.tools)
 
-        # Get prompts from the downstream server if available
         self.prompts = []
         try:
             downstream_prompts = await self.session.list_prompts()
@@ -737,7 +694,6 @@ class MCPWrapperServer:
         except Exception as e:
             logger.info(f"Downstream server does not support prompts: {e}")
 
-        # Get resources from the downstream server if available
         self.resources = []
         try:
             downstream_resources = await self.session.list_resources()
@@ -751,7 +707,6 @@ class MCPWrapperServer:
 
         self.current_config = self._create_server_config()
 
-        # Check if we can auto-approve based on saved config
         if self.saved_config and self.saved_config == self.current_config:
             logger.info(
                 "Current configuration matches saved configuration - auto-approving"
@@ -769,20 +724,15 @@ class MCPWrapperServer:
         """Connect to a downstream server via stdio."""
         logger.info(f"Connecting to downstream server via stdio: {self.child_command}")
 
-        # Set up imports
         from mcp import ClientSession, StdioServerParameters
         from mcp.client.stdio import stdio_client
 
         try:
-            # We'll use the MCP client to start the child process for us
-            # Parse the command
             if self.child_command.startswith('"') and self.child_command.endswith('"'):
                 self.child_command = self.child_command[1:-1]
 
-            # Set the server identifier for config lookup
             self.server_identifier = self.child_command
 
-            # Load the saved config if it exists in the database
             self.saved_config = self.config_db.get_server_config(
                 "stdio", self.server_identifier
             )
@@ -791,20 +741,17 @@ class MCPWrapperServer:
             if not command_parts:
                 raise ValueError("Invalid command")
 
-            # Create server parameters to pass to stdio_client
             server_params = StdioServerParameters(
                 command=command_parts[0],
                 args=command_parts[1:] if len(command_parts) > 1 else [],
             )
 
-            # Create the client
             logger.info(
                 f"Starting downstream server with command: {command_parts[0]} {' '.join(command_parts[1:])}"
             )
             self.client_context = stdio_client(server_params)
             self.streams = await self.client_context.__aenter__()
 
-            # Create the client session with a message handler to process notifications
             self.session = await ClientSession(
                 self.streams[0],
                 self.streams[1],
@@ -824,22 +771,17 @@ class MCPWrapperServer:
         from mcp.client.sse import sse_client
 
         try:
-            # No need to parse the URL, sse_client handles the full URL directly
             logger.info(f"Connecting to SSE server at {self.server_url}")
 
-            # Set the server identifier for config lookup
             self.server_identifier = self.server_url
 
-            # Load the saved config if it exists in the database
             self.saved_config = self.config_db.get_server_config(
                 "http", self.server_identifier
             )
 
-            # Create the SSE client - it takes the full URL
             self.client_context = sse_client(self.server_url)
             self.streams = await self.client_context.__aenter__()
 
-            # Create the client session with a message handler to process notifications
             self.session = await ClientSession(
                 self.streams[0],
                 self.streams[1],
@@ -854,14 +796,12 @@ class MCPWrapperServer:
         """Create a server configuration from the tool specs."""
         config = MCPServerConfig()
 
-        # Add server instructions if available
         if self.initialize_result and hasattr(self.initialize_result, "instructions"):
             config.instructions = self.initialize_result.instructions
 
         for spec in self.tool_specs:
             parameters = []
 
-            # Convert parameters to our format
             for param_name, param_info in spec.parameters.items():
                 param_type = ParameterType.STRING  # Default type
 
@@ -919,10 +859,8 @@ class MCPWrapperServer:
 
     def _print_server_config(self, config: MCPServerConfig):
         """Print the server configuration to stdout."""
-        # Convert to JSON and print to stdout
         json_str = config.to_json()
 
-        # Format approval status
         approval_status = "APPROVED" if self.config_approved else "NOT APPROVED"
 
         print(f"\n==== SERVER CONFIGURATION ({approval_status}) ====")
@@ -951,7 +889,6 @@ class MCPWrapperServer:
                 f"Scanning tool response for '{tool_name}' with {self.guardrail_provider.name}"
             )
 
-            # Create a ToolResponse object for the dedicated tool scanning interface
             tool_response = ToolResponse(
                 tool_name=tool_name,
                 tool_input=tool_input,
@@ -959,7 +896,6 @@ class MCPWrapperServer:
                 context={},  # Could be extended with additional context in the future
             )
 
-            # Use the dedicated check_tool_response method
             alert = self.guardrail_provider.check_tool_response(tool_response)
 
             if alert:
@@ -971,12 +907,10 @@ class MCPWrapperServer:
 
         except Exception as e:
             logger.error(f"Error scanning tool response: {e}", exc_info=True)
-            # Return None instead of an alert for now - we're just logging errors
             return None
 
     async def stop_child_process(self):
         """Close connections to the downstream server."""
-        # Clean up the client context if it exists
         if self.client_context:
             try:
                 # The cleanup is the same regardless of connection type
@@ -996,7 +930,6 @@ class MCPWrapperServer:
         await self.connect()
 
         try:
-            # Run the server using stdio transport
             from mcp.server.stdio import stdio_server
 
             async with stdio_server() as streams:
@@ -1041,7 +974,6 @@ async def review_server_config(
         guardrail_provider: Optional guardrail provider to use
         quarantine_path: Optional path to the quarantine database file
     """
-    # Create wrapper without starting it
     if connection_type == "stdio":
         wrapper = MCPWrapperServer.wrap_stdio(
             command=identifier,
@@ -1057,22 +989,18 @@ async def review_server_config(
             quarantine_path=quarantine_path,
         )
 
-    # Start the child process to get the configuration
     try:
         await wrapper.connect()
 
-        # Check if config is already trusted
         if wrapper.config_approved:
             print(f"\nServer configuration for {identifier} is already trusted.")
             return
 
         print(f"\nServer configuration for {identifier} is not trusted or has changed.")
 
-        # Display config information
         if wrapper.saved_config:
             print("\nPrevious configuration found. Checking for changes...")
 
-            # Generate diff for display
             diff = wrapper.saved_config.compare(wrapper.current_config)
             if diff.has_differences():
                 print("\n===== CONFIGURATION DIFFERENCES =====")
@@ -1083,7 +1011,6 @@ async def review_server_config(
         else:
             print("\nThis appears to be a new server.")
 
-        # Display tool list
         print("\n===== TOOL LIST =====")
         for tool_spec in wrapper.tool_specs:
             print(
@@ -1096,21 +1023,19 @@ async def review_server_config(
             guardrail_alert = wrapper.guardrail_provider.check_server_config(
                 wrapper.current_config
             )
-        # Show guardrail alert if present
+
         if guardrail_alert:
             print("\n==== GUARDRAIL CHECK: ALERT ====")
             print(f"Provider: {wrapper.guardrail_provider.name}")
             print(f"Alert: {guardrail_alert.explanation}")
             print("==================================\n")
 
-        # Prompt for user approval
         response = (
             input("Do you want to trust this server configuration? (yes/no): ")
             .strip()
             .lower()
         )
         if response in ("yes", "y"):
-            # Save to database
             wrapper.config_db.save_server_config(
                 wrapper.connection_type,
                 wrapper.server_identifier,

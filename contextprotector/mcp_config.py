@@ -81,11 +81,9 @@ class MCPToolDefinition:
                 required = "(required)" if param.required else "(optional)"
                 param_line = f"  - {param.name} ({param.type.value}) {required}: {param.description}"
 
-                # Add enum values if present
                 if param.enum:
                     param_line += f" [Values: {', '.join(str(v) for v in param.enum)}]"
 
-                # Add default if present
                 if param.default is not None:
                     param_line += f" [Default: {param.default}]"
 
@@ -102,11 +100,9 @@ class MCPToolDefinition:
         if self.name != other.name or self.description != other.description:
             return False
 
-        # Compare parameters regardless of order
         if len(self.parameters) != len(other.parameters):
             return False
 
-        # Create parameter maps by name for easier comparison
         self_params = {param.name: param for param in self.parameters}
         other_params = {param.name: param for param in other.parameters}
 
@@ -126,7 +122,8 @@ class ConfigDiff:
 
     old_instructions: Optional[str] = field(default=None)
     new_instructions: Optional[str] = field(default=None)
-    added_tools: List[str] = field(default_factory=list)
+    added_tools: Dict[str, MCPToolDefinition] = field(default_factory=dict)
+    added_tool_names: List[str] = field(default_factory=list)
     removed_tools: List[str] = field(default_factory=list)
     modified_tools: Dict[str, Dict[str, Any]] = field(default_factory=dict)
 
@@ -135,7 +132,7 @@ class ConfigDiff:
         return bool(
             self.old_instructions is not None
             or self.new_instructions is not None
-            or self.added_tools
+            or self.added_tool_names
             or self.removed_tools
             or self.modified_tools
         )
@@ -147,7 +144,6 @@ class ConfigDiff:
 
         lines = []
 
-        # Show instruction changes first since they're important
         if self.old_instructions is not None or self.new_instructions is not None:
             lines.append("Instructions changed:")
             if self.old_instructions is not None:
@@ -156,10 +152,13 @@ class ConfigDiff:
                 lines.append(f"  New: {self.new_instructions}")
             lines.append("")
 
-        if self.added_tools:
+        if self.added_tool_names:
             lines.append("Added tools:")
-            for tool_name in self.added_tools:
+            for tool_name in self.added_tool_names:
                 lines.append(f"  + {tool_name}")
+                lines.append("")
+                lines.append(str(self.added_tools[tool_name]))
+                lines.append("")
             lines.append("")
 
         if self.removed_tools:
@@ -207,6 +206,21 @@ class MCPServerConfig:
     tools: List[MCPToolDefinition] = field(default_factory=list)
     instructions: str = field(default="")
 
+    @classmethod
+    def get_default_config_path(cls) -> str:
+        """
+        Get the default config path (~/.context-protector/config).
+
+        Returns:
+            The default config path as a string
+        """
+        home_dir = pathlib.Path.home()
+        data_dir = home_dir / ".context-protector"
+
+        data_dir.mkdir(exist_ok=True)
+
+        return str(data_dir / "config")
+    
     def add_tool(self, tool: Union[MCPToolDefinition, Dict[str, Any]]) -> None:
         """Add a tool to the server configuration.
 
@@ -214,7 +228,6 @@ class MCPServerConfig:
             tool: Either a MCPToolDefinition object or a dictionary with tool properties
         """
         if isinstance(tool, dict):
-            # Convert dictionary to MCPToolDefinition
             parameters = []
             for param_data in tool.get("parameters", []):
                 if isinstance(param_data, dict):
@@ -273,22 +286,6 @@ class MCPServerConfig:
             return None
         else:
             return json_str
-
-    @classmethod
-    def get_default_config_path(cls) -> str:
-        """
-        Get the default config path (~/.context-protector/config).
-
-        Returns:
-            The default config path as a string
-        """
-        home_dir = pathlib.Path.home()
-        data_dir = home_dir / ".context-protector"
-
-        # Create the directory if it doesn't exist
-        data_dir.mkdir(exist_ok=True)
-
-        return str(data_dir / "config")
 
     @classmethod
     def from_json(
@@ -406,11 +403,9 @@ class MCPServerConfig:
         if self.instructions != other.instructions:
             return False
 
-        # Compare tools regardless of order
         if len(self.tools) != len(other.tools):
             return False
 
-        # Create tool maps by name for easier comparison
         self_tools = {tool.name: tool for tool in self.tools}
         other_tools = {tool.name: tool for tool in other.tools}
 
@@ -431,43 +426,38 @@ class MCPServerConfig:
             diff.old_instructions = self.instructions
             diff.new_instructions = other.instructions
 
-        # Create tool maps by name for easier comparison
         self_tools = {tool.name: tool for tool in self.tools}
         other_tools = {tool.name: tool for tool in other.tools}
 
-        # Find added and removed tools
         self_tool_names = set(self_tools.keys())
         other_tool_names = set(other_tools.keys())
 
-        diff.added_tools = list(other_tool_names - self_tool_names)
+        diff.added_tool_names = list(other_tool_names - self_tool_names)
+        diff.added_tools = {
+            name: tool for (name, tool) in other_tools.items() if name in diff.added_tool_names
+        }
         diff.removed_tools = list(self_tool_names - other_tool_names)
 
-        # Find modified tools
         common_tool_names = self_tool_names.intersection(other_tool_names)
 
         for tool_name in common_tool_names:
             self_tool = self_tools[tool_name]
             other_tool = other_tools[tool_name]
 
-            # Skip if the tools are identical
             if self_tool == other_tool:
                 continue
 
-            # Initialize changes for this tool
             tool_changes = {}
 
-            # Check for description changes
             if self_tool.description != other_tool.description:
                 tool_changes["description"] = {
                     "old": self_tool.description,
                     "new": other_tool.description,
                 }
 
-            # Create parameter maps by name for easier comparison
             self_params = {param.name: param for param in self_tool.parameters}
             other_params = {param.name: param for param in other_tool.parameters}
 
-            # Find added and removed parameters
             self_param_names = set(self_params.keys())
             other_param_names = set(other_params.keys())
 
@@ -488,11 +478,9 @@ class MCPServerConfig:
                 self_param = self_params[param_name]
                 other_param = other_params[param_name]
 
-                # Skip if the parameters are identical
                 if self_param == other_param:
                     continue
 
-                # Initialize changes for this parameter
                 param_changes = {}
 
                 attrs = [
@@ -579,7 +567,6 @@ class MCPConfigDatabase:
         home_dir = pathlib.Path.home()
         data_dir = home_dir / ".context-protector"
 
-        # Create the directory if it doesn't exist
         data_dir.mkdir(exist_ok=True)
 
         return str(data_dir / "servers.json")
@@ -616,7 +603,6 @@ class MCPConfigDatabase:
                 ]
             }
 
-            # Ensure the directory exists
             os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
 
             # Write to a temporary file first, then rename
@@ -662,13 +648,11 @@ class MCPConfigDatabase:
         # Reload the database first to avoid overwriting other changes
         self._load()
 
-        # Update the server entry
         key = MCPServerEntry.create_key(server_type, identifier)
         self.servers[key] = MCPServerEntry(
             type=server_type, identifier=identifier, config=config.to_dict()
         )
 
-        # Save the database
         self._save()
 
     def remove_server_config(self, server_type: str, identifier: str) -> bool:

@@ -16,7 +16,6 @@ from ..guardrail_providers.mock_provider import (
     AlwaysAlertGuardrailProvider,
 )
 
-# Set up logging
 logging.basicConfig(level=logging.INFO)
 
 
