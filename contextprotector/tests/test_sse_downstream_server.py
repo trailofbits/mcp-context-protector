@@ -8,8 +8,6 @@ import pytest
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 from mcp.types import CallToolResult, TextContent
-# Import global SERVER_PORT from sse_server_utils
-# Use the sse_server fixture from sse_server_utils
 from .sse_server_utils import sse_server
 
 

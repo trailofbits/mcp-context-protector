@@ -9,7 +9,6 @@ from typing import Optional
 from ..mcp_config import MCPServerConfig
 from ..guardrail_types import GuardrailProvider, GuardrailAlert, ToolResponse
 
-# Set up logger
 logger = logging.getLogger("mock_guardrail_provider")
 
 

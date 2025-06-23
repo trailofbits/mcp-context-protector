@@ -59,9 +59,6 @@ async def run_with_wrapper_session(callback, config_path=None):
     )
 
 
-# Use the sse_server_fixture from sse_server_utils
-
-
 @pytest.mark.asyncio
 async def test_echo_tool_through_wrapper(sse_server_fixture):
     """Test that the echo tool correctly works through the MCP wrapper using SSE transport."""

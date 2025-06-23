@@ -11,6 +11,7 @@ from llamafirewall import (
     ScanDecision,
     ScannerType,
     UserMessage,
+    ToolMessage
 )
 from typing import Optional
 
@@ -120,18 +121,11 @@ class LlamaFirewallProvider(GuardrailProvider):
         try:
             lf = LlamaFirewall(
                 scanners={
-                    Role.USER: [ScannerType.PROMPT_GUARD],
-                    Role.SYSTEM: [ScannerType.PROMPT_GUARD],
+                    Role.TOOL: [ScannerType.PROMPT_GUARD]
                 }
             )
 
-            tool_response_str = f"Tool: {tool_response.tool_name}\nInput: {tool_response.tool_input}\nOutput: {tool_response.tool_output}"
-            logger.info(
-                f"Tool response string length: {len(tool_response_str)} characters"
-            )
-
-            message = UserMessage(content=tool_response_str)
-            logger.info("Created UserMessage for tool response scanning")
+            message = ToolMessage(content=tool_response.tool_output)
 
             logger.info("Scanning tool response with Llama Firewall...")
             result = lf.scan(message)
