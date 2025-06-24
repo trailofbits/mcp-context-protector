@@ -207,13 +207,19 @@ class MCPWrapperServer:
             all_tools = []
 
             for spec in self.tool_specs:
-                tool = types.Tool(
-                    name=spec.name,
-                    description=spec.description,
-                    inputSchema=self._convert_parameters_to_schema(
+                tool_kwargs = {
+                    "name": spec.name,
+                    "description": spec.description,
+                    "inputSchema": self._convert_parameters_to_schema(
                         spec.parameters, spec.required
                     ),
-                )
+                }
+
+                # Add outputSchema if present
+                if spec.output_schema is not None:
+                    tool_kwargs["outputSchema"] = spec.output_schema
+
+                tool = types.Tool(**tool_kwargs)
                 all_tools.append(tool)
 
             # Add quarantine_release tool if quarantine is enabled
@@ -329,10 +335,42 @@ class MCPWrapperServer:
             try:
                 tool_result = await self._proxy_tool_to_downstream(name, arguments)
 
-                wrapped_response = {"status": "completed", "response": tool_result}
+                # If tool_result is a dict with structured content, handle it properly
+                if (
+                    isinstance(tool_result, dict)
+                    and "structured_content" in tool_result
+                ):
+                    # Check if we have non-text content that needs to be preserved
+                    has_non_text_content = False
+                    if "content_list" in tool_result and tool_result["content_list"]:
+                        has_non_text_content = any(c.type != "text" for c in tool_result["content_list"])
+                    
+                    if has_non_text_content:
+                        # Use the preserved content list to maintain resource links
+                        content = tool_result["content_list"]
+                    else:
+                        # Fallback to wrapped text response for backward compatibility
+                        wrapped_response = {
+                            "status": "completed",
+                            "response": tool_result["text"],
+                        }
+                        json_response = json.dumps(wrapped_response)
+                        content = [types.TextContent(type="text", text=json_response)]
 
-                json_response = json.dumps(wrapped_response)
-                return [types.TextContent(type="text", text=json_response)]
+                    # Return with all content types preserved
+                    if tool_result["structured_content"] is not None:
+                        return types.CallToolResult(
+                            content=content,
+                            structuredContent=tool_result["structured_content"],
+                        )
+                    else:
+                        # For backward compatibility, return content list or text
+                        return content if isinstance(content, list) else [content]
+                else:
+                    # Legacy text-only response (backward compatibility)
+                    wrapped_response = {"status": "completed", "response": tool_result}
+                    json_response = json.dumps(wrapped_response)
+                    return [types.TextContent(type="text", text=json_response)]
 
             except Exception as e:
                 logger.error(f"Error from child MCP server: {e}")
@@ -402,10 +440,13 @@ class MCPWrapperServer:
             )
             result = await self.session.call_tool(name, arguments)
 
-            # Extract the text content from the result
+            # Extract content, structured content, and preserve all content types
             response_text = ""
+            structured_content = None
+            processed_content = []
+
             if result and len(result.content) > 0:
-                # The client call returns a list of content objects, we'll join all text content
+                # Process all content types, preserving non-text content like EmbeddedResource
                 text_parts = []
                 for content in result.content:
                     if content.type == "text" and content.text:
@@ -414,15 +455,34 @@ class MCPWrapperServer:
                             content.text
                         )
                         text_parts.append(processed_text)
+                        # Create processed text content for the response
+                        processed_content.append(types.TextContent(type="text", text=processed_text))
+                    else:
+                        # Preserve non-text content (EmbeddedResource, ImageContent, etc.)
+                        processed_content.append(content)
 
                 if text_parts:
                     response_text = " ".join(text_parts)
+            else:
+                # No content from downstream, use default text
+                response_text = f"Tool call to '{name}' succeeded but returned no content"
+                processed_content = [types.TextContent(type="text", text=response_text)]
 
-            # If we didn't get usable content, use a generic success message
-            if not response_text:
-                response_text = (
-                    f"Tool call to '{name}' succeeded but returned no content"
-                )
+            # Extract structured content if present
+            if (
+                result
+                and hasattr(result, "structuredContent")
+                and result.structuredContent is not None
+            ):
+                structured_content = result.structuredContent
+
+            # Check if response_text is already valid JSON (from FastMCP tools)
+            # If so, we should not double-wrap it in our legacy format
+            try:
+                json.loads(response_text)
+                is_json_response = True
+            except (json.JSONDecodeError, TypeError):
+                is_json_response = False
 
             # Scan the tool response with guardrail provider if configured
             if self.use_guardrails and self.guardrail_provider is not None:
@@ -448,11 +508,29 @@ class MCPWrapperServer:
                         name, arguments, response_text, guardrail_alert, quarantine_id
                     )
 
-            return response_text
+            # Return both text and structured content, preserving all content types
+            return self._create_tool_response(
+                response_text, structured_content, processed_content, is_json_response
+            )
 
         except Exception as e:
             logger.error(f"Error calling downstream tool '{name}': {e}")
             raise ValueError(f"Error calling downstream tool: {str(e)}")
+
+    def _create_tool_response(
+        self,
+        response_text: str,
+        structured_content: Optional[Dict[str, Any]],
+        content_list: List[types.Content],
+        is_json_response: bool = False,
+    ) -> Dict[str, Any]:
+        """Create a tool response dict with text, structured content, and all content types."""
+        return {
+            "text": response_text,
+            "structured_content": structured_content,
+            "content_list": content_list,
+            "is_json_response": is_json_response,
+        }
 
     def _guardrail_tool_response(
         self,
@@ -523,11 +601,17 @@ class MCPWrapperServer:
             if tool.inputSchema and "required" in tool.inputSchema:
                 required = tool.inputSchema["required"]
 
+            # Extract output schema if present
+            output_schema = None
+            if hasattr(tool, "outputSchema") and tool.outputSchema is not None:
+                output_schema = tool.outputSchema
+
             tool_spec = MCPToolSpec(
                 name=tool.name,
                 description=tool.description,
                 parameters=parameters,
                 required=required,
+                output_schema=output_schema,
             )
 
             tool_specs.append(tool_spec)
@@ -779,7 +863,9 @@ class MCPWrapperServer:
                 "http", self.server_identifier
             )
 
-            self.client_context = sse_client(self.server_url)
+            # Add MCP-Protocol-Version header for SSE client
+            headers = {"MCP-Protocol-Version": "2025-06-18"}
+            self.client_context = sse_client(self.server_url, headers=headers)
             self.streams = await self.client_context.__aenter__()
 
             self.session = await ClientSession(
@@ -833,7 +919,10 @@ class MCPWrapperServer:
                 parameters.append(param)
 
             tool = MCPToolDefinition(
-                name=spec.name, description=spec.description, parameters=parameters
+                name=spec.name,
+                description=spec.description,
+                parameters=parameters,
+                output_schema=spec.output_schema,
             )
 
             config.add_tool(tool)

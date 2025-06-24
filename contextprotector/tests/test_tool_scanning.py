@@ -66,7 +66,8 @@ async def test_tool_scanning_no_alert():
     result = await wrapper._proxy_tool_to_downstream("test_tool", {"param": "value"})
 
     # Verify the result
-    assert result == "Safe result"
+    assert isinstance(result, dict)
+    assert result["text"] == "Safe result"
 
     # Verify that _scan_tool_response was called but no alert was triggered
     assert not provider._trigger_alert
@@ -129,7 +130,8 @@ async def test_tool_scanning_exception_handling():
     result = await wrapper._proxy_tool_to_downstream("test_tool", {"param": "value"})
 
     # Verify the result
-    assert result == "Test result"
+    assert isinstance(result, dict)
+    assert result["text"] == "Test result"
 
     # Verify that check_tool_response was called
     provider.check_tool_response.assert_called_once()
@@ -159,7 +161,8 @@ async def test_tool_vs_config_scanning_separation():
     result = await wrapper._proxy_tool_to_downstream("test_tool", {"param": "value"})
 
     # Verify the result
-    assert result == "Test result"
+    assert isinstance(result, dict)
+    assert result["text"] == "Test result"
 
     # Verify that only check_tool_response was called, not check_server_config
     provider.check_tool_response.assert_called_once()

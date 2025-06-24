@@ -107,8 +107,10 @@ async def test_quarantine_disabled_when_no_guardrails():
     # Call the tool
     response = await wrapper._proxy_tool_to_downstream("normal_tool", {"param": "value"})
     
-    # Verify that the original response is returned without modification
-    assert response == original_response
+    # Verify that the original response is returned in the structured format
+    assert isinstance(response, dict)
+    assert response["text"] == original_response
+    assert response["structured_content"] is None
     
     # Verify that no quarantine database was created
     assert wrapper.quarantine is None

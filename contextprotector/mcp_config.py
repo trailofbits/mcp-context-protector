@@ -24,15 +24,19 @@ class MCPToolSpec:
     description: str
     parameters: Dict[str, Any]
     required: List[str]
+    output_schema: Optional[Dict[str, Any]] = None
 
     def model_dump(self) -> Dict[str, Any]:
         """Convert to a dictionary representation."""
-        return {
+        result = {
             "name": self.name,
             "description": self.description,
             "parameters": self.parameters,
             "required": self.required,
         }
+        if self.output_schema is not None:
+            result["output_schema"] = self.output_schema
+        return result
 
 
 @dataclass
@@ -66,6 +70,7 @@ class MCPToolDefinition:
     name: str
     description: str
     parameters: List[MCPParameterDefinition]
+    output_schema: Optional[Dict[str, Any]] = None
 
     def __str__(self) -> str:
         """
@@ -91,6 +96,9 @@ class MCPToolDefinition:
         else:
             lines.append("Parameters: None")
 
+        if self.output_schema is not None:
+            lines.append(f"Output Schema: {json.dumps(self.output_schema, indent=2)}")
+
         return "\n".join(lines)
 
     def __eq__(self, other):
@@ -98,6 +106,9 @@ class MCPToolDefinition:
             return False
 
         if self.name != other.name or self.description != other.description:
+            return False
+
+        if self.output_schema != other.output_schema:
             return False
 
         if len(self.parameters) != len(other.parameters):
@@ -434,7 +445,9 @@ class MCPServerConfig:
 
         diff.added_tool_names = list(other_tool_names - self_tool_names)
         diff.added_tools = {
-            name: tool for (name, tool) in other_tools.items() if name in diff.added_tool_names
+            name: tool
+            for (name, tool) in other_tools.items()
+            if name in diff.added_tool_names
         }
         diff.removed_tools = list(self_tool_names - other_tool_names)
 
