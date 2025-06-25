@@ -15,7 +15,10 @@ async def main_async():
     source_group = parser.add_argument_group()
     source_group.add_argument("--command", help="Start a wrapped server over the stdio transport using the specified command")
     source_group.add_argument(
-        "--url", help="Connect to a remote MCP server over SSE at the specified URL"
+        "--url", help="Connect to a remote MCP server over streamable HTTP at the specified URL"
+    )
+    source_group.add_argument(
+        "--sse-url", help="Connect to a remote MCP server over SSE at the specified URL"
     )
     source_group.add_argument(
         "--list-guardrail-providers",
@@ -115,6 +118,10 @@ async def main_async():
             await review_server_config(
                 "http", args.url, args.config_file, guardrail_provider, args.quarantine_path
             )
+        elif args.sse_url:
+            await review_server_config(
+                "sse", args.sse_url, args.config_file, guardrail_provider, args.quarantine_path
+            )
         return
 
     # Normal operation mode (not review)
@@ -128,8 +135,16 @@ async def main_async():
             args.quarantine_path,
         )
     elif args.url:
-        wrapper = MCPWrapperServer.wrap_http(
+        wrapper = MCPWrapperServer.wrap_streamable_http(
             args.url,
+            args.config_file,
+            guardrail_provider,
+            args.visualize_ansi_codes,
+            args.quarantine_path,
+        )
+    elif args.sse_url:
+        wrapper = MCPWrapperServer.wrap_http(
+            args.sse_url,
             args.config_file,
             guardrail_provider,
             args.visualize_ansi_codes,
@@ -139,7 +154,7 @@ async def main_async():
         # This should never happen due to the validation above
         # But we'll keep it as a fallback error message
         print(
-            "Error: Either --command, --url, or --list-guardrail-providers must be provided",
+            "Error: Either --command, --url, --sse-url, or --list-guardrail-providers must be provided",
             file=sys.stderr,
         )
         sys.exit(1)

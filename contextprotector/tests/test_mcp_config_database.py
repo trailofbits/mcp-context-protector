@@ -90,14 +90,14 @@ def test_config_database_save_load():
         sse_url = "http://localhost:8080/sse"
 
         db.save_server_config("stdio", stdio_command, echo_config)
-        db.save_server_config("http", sse_url, calc_config)
+        db.save_server_config("sse", sse_url, calc_config)
 
         # Create a new database instance to load from disk
         db2 = MCPConfigDatabase(config_path)
 
         # Check if configurations were saved and loaded correctly
         echo_loaded = db2.get_server_config("stdio", stdio_command)
-        calc_loaded = db2.get_server_config("http", sse_url)
+        calc_loaded = db2.get_server_config("sse", sse_url)
 
         # Verify the echo config
         assert echo_loaded is not None
@@ -128,7 +128,7 @@ def test_config_database_save_load():
         assert stdio_server["has_config"] is True
 
         # Find the sse server
-        sse_server = next((s for s in servers if s["type"] == "http"), None)
+        sse_server = next((s for s in servers if s["type"] == "sse"), None)
         assert sse_server is not None
         assert sse_server["identifier"] == sse_url
         assert sse_server["has_config"] is True

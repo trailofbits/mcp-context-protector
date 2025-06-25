@@ -533,8 +533,8 @@ class MCPServerConfig:
 class MCPServerEntry:
     """Class representing a server entry in the config database."""
 
-    type: Literal["stdio", "http"]
-    identifier: str  # URL for SSE servers, command for stdio servers
+    type: Literal["stdio", "http", "sse"]
+    identifier: str  # URL for HTTP/SSE servers, command for stdio servers
     config: Optional[Dict[str, Any]] = None  # Serialized MCPServerConfig
 
     @staticmethod
@@ -633,7 +633,7 @@ class MCPConfigDatabase:
         Get a server configuration by type and identifier.
 
         Args:
-            server_type: The server type ('stdio' or 'sse')
+            server_type: The server type ('stdio', 'http', or 'sse')
             identifier: The server identifier (command or URL)
 
         Returns:
@@ -654,7 +654,7 @@ class MCPConfigDatabase:
         Save a server configuration to the database.
 
         Args:
-            server_type: The server type ('stdio' or 'sse')
+            server_type: The server type ('stdio', 'http', or 'sse')
             identifier: The server identifier (command or URL)
             config: The server configuration
         """
@@ -673,7 +673,7 @@ class MCPConfigDatabase:
         Remove a server configuration from the database.
 
         Args:
-            server_type: The server type ('stdio' or 'sse')
+            server_type: The server type ('stdio', 'http', or 'sse')
             identifier: The server identifier (command or URL)
 
         Returns:

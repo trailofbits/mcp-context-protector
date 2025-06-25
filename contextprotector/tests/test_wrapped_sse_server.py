@@ -25,7 +25,7 @@ async def approve_server_config_using_review(url, config_path):
         url: The URL of the downstream server
         config_path: Path to the configuration file
     """
-    await _approve_config("http", url, config_path)
+    await _approve_config("sse", url, config_path)
 
 # Import global SERVER_PORT from sse_server_utils
 
@@ -53,7 +53,7 @@ async def run_with_wrapper_session(callback, config_path=None):
     # Use the shared utility function
     await _run_with_wrapper_session(
         callback,
-        "http",
+        "sse",
         sse_url,
         config_path
     )
@@ -133,7 +133,7 @@ async def test_echo_tool_through_wrapper(sse_server_fixture):
     from ..mcp_config import MCPConfigDatabase
     cdb = MCPConfigDatabase(temp_file.name)
     # assert cdb.servers == [], "wrong"
-    conf = cdb.get_server_config("http", sse_url)
+    conf = cdb.get_server_config("sse", sse_url)
     assert conf is not None, "couldn't find"
     sc_obj = json.loads(sc)
     conf_mine = MCPServerConfig.from_dict(sc_obj)

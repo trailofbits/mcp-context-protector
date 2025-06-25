@@ -11,10 +11,9 @@ context-protector is a security wrapper for MCP servers that addresses risks ass
 - Guardrail scanning and quarantining of tool responses
 - ANSI control character sanitization
 
-Use the table below to identify which features are useful to mitigate which risks:
+### Security risks and controls
 
-
-| Risk    | Relevant ontrol |
+| Risk    | Relevant control |
 | -------- | ------- |
 | Line jumping  | Server configuration blocking, approval and pinning; guardrail evaluation of server instructions and tool descriptions    |
 | Server configuration changes/rug pulls | Server configuration pinning     |
@@ -43,7 +42,7 @@ To review the response and release it from the quarantine, run the app with the 
 
 ## Getting started
 
-context-protector currently supports the stdio and SSE transports. It does not yet fully support the streamable HTTP transport introduced in the [March 26, 2025 update](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) to the protocol specification, but it will as soon as an official release of the Python SDK adds support for streamable HTTP.
+context-protector supports the stdio and SSE transports. It does not yet fully support the streamable HTTP transport introduced in the [March 26, 2025 update](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) to the protocol specification, but it will as soon as an official release of the Python SDK adds support for streamable HTTP.
 
 To start using Context Protector, first set up a virtual environment and install dependencies:
 
@@ -58,14 +57,14 @@ pip install -r requirements.txt
 pytest -v --timeout=10
 ```
 
-To start a server through the wrapper, run the `context-protector` script with either the `--command <COMMAND>` or `--url <URL>` argument:
+To start a server through the wrapper, run the `context-protector` script with either the `--command <COMMAND>` or `--sse-url <URL>` argument:
 
 ```
 # Start the wrapper with an stdio server
 /path/to/context-protector/.venv/bin/context-protector --command DOWNSTREAM_SERVER_COMMAND
 
 # Start the wrapper with an HTTP server
-/path/to/context-protector/.venv/bin/context-protector --url DOWNSTREAM_SERVER_URL
+/path/to/context-protector/.venv/bin/context-protector --sse-url DOWNSTREAM_SERVER_URL
 ```
 
 Configure your host app to run the command above using full paths to your virtual env. In the case of Claude Desktop, your `claude_config.json` file should look something like this:
@@ -97,14 +96,14 @@ Review functions:
 ## Usage
 
 ```
-usage: context-protector [-h] (--command COMMAND | --url URL | --list-guardrail-providers | --review-quarantine) [--config-file CONFIG_FILE]
+usage: context-protector [-h] (--command COMMAND | --sse-url URL | --list-guardrail-providers | --review-quarantine) [--config-file CONFIG_FILE]
                          [--guardrail-provider GUARDRAIL_PROVIDER] [--visualize-ansi-codes] [--review-server] [--quarantine-id QUARANTINE_ID]
                          [--quarantine-path QUARANTINE_PATH]
 
 options:
   -h, --help            show this help message and exit
   --command COMMAND     Start a wrapped server over the stdio transport using the specified command
-  --url URL             Connect to a remote MCP server over SSE at the specified URL
+  --sse-url URL         Connect to a remote MCP server over SSE at the specified URL
   --list-guardrail-providers
                         List available guardrail providers and exit
   --review-quarantine   Review and manage quarantined tool responses

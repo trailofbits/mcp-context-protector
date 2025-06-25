@@ -12,7 +12,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 async def approve_server_config_using_review(
-    connection_type: Literal["stdio", "http"],
+    connection_type: Literal["stdio", "http", "sse"],
     identifier: str,
     config_path: str,
 ) -> None:
@@ -20,7 +20,7 @@ async def approve_server_config_using_review(
     Run the --review-server process to approve a server configuration.
 
     Args:
-        connection_type: Type of connection ("stdio" or "http")
+        connection_type: Type of connection ("stdio", "http", or "sse")
         identifier: The command or URL to connect to
         config_path: Path to configuration file
     """
@@ -38,6 +38,8 @@ async def approve_server_config_using_review(
         cmd.extend(["--command", identifier])
     elif connection_type == "http":
         cmd.extend(["--url", identifier])
+    elif connection_type == "sse":
+        cmd.extend(["--sse-url", identifier])
     else:
         raise ValueError(f"Invalid connection type: {connection_type}")
 
@@ -70,7 +72,7 @@ async def approve_server_config_using_review(
 
 async def run_with_wrapper_session(
     callback: Callable[[ClientSession], Awaitable[None]],
-    connection_type: Literal["stdio", "http"],
+    connection_type: Literal["stdio", "http", "sse"],
     identifier: str,
     config_path: str,
     visualize_ansi: bool = False,
@@ -81,7 +83,7 @@ async def run_with_wrapper_session(
 
     Args:
         callback: Async function to call with the client session
-        connection_type: Type of connection ("stdio" or "http")
+        connection_type: Type of connection ("stdio", "http", or "sse")
         identifier: The command or URL to connect to the downstream server
         config_path: Path to the wrapper config file
         visualize_ansi: Whether to visualize ANSI escape codes
@@ -100,6 +102,8 @@ async def run_with_wrapper_session(
         args.extend(["--command", identifier])
     elif connection_type == "http":
         args.extend(["--url", identifier])
+    elif connection_type == "sse":
+        args.extend(["--sse-url", identifier])
     else:
         raise ValueError(f"Invalid connection type: {connection_type}")
     

@@ -82,6 +82,34 @@ class MCPWrapperServer:
         instance = cls(
             config_path, guardrail_provider, visualize_ansi_codes, quarantine_path
         )
+        instance.connection_type = "sse"
+        instance.server_url = url
+        return instance
+
+    @classmethod
+    def wrap_streamable_http(
+        cls,
+        url: str,
+        config_path: str = None,
+        guardrail_provider: Optional[GuardrailProvider] = None,
+        visualize_ansi_codes: bool = False,
+        quarantine_path: str = None,
+    ):
+        """
+        Create a wrapper server that connects to a remote MCP server via streamable HTTP.
+
+        Args:
+            url: The URL to connect to for a remote MCP server
+            config_path: Optional path to the wrapper config file
+            guardrail_provider: Optional guardrail provider object to use
+            visualize_ansi_codes: Whether to make ANSI escape codes visible in tool outputs
+
+        Returns:
+            An instance of MCPWrapperServer configured for streamable HTTP
+        """
+        instance = cls(
+            config_path, guardrail_provider, visualize_ansi_codes, quarantine_path
+        )
         instance.connection_type = "http"
         instance.server_url = url
         return instance
@@ -753,6 +781,8 @@ class MCPWrapperServer:
         if self.connection_type == "stdio":
             await self._connect_via_stdio()
         elif self.connection_type == "http":
+            await self._connect_via_streamable_http()
+        elif self.connection_type == "sse":
             await self._connect_via_http()
         else:
             raise ValueError(f"Unknown connection type: {self.connection_type}")
@@ -860,7 +890,7 @@ class MCPWrapperServer:
             self.server_identifier = self.server_url
 
             self.saved_config = self.config_db.get_server_config(
-                "http", self.server_identifier
+                "sse", self.server_identifier
             )
 
             # Add MCP-Protocol-Version header for SSE client
@@ -876,6 +906,39 @@ class MCPWrapperServer:
 
         except Exception as e:
             logger.error(f"Error connecting to downstream server via SSE: {e}")
+            raise
+
+    async def _connect_via_streamable_http(self):
+        """Connect to a downstream server via streamable HTTP."""
+        logger.info(f"Connecting to downstream server via streamable HTTP: {self.server_url}")
+
+        # Set up imports
+        from mcp import ClientSession
+        from mcp.client.streamable_http import streamablehttp_client
+
+        try:
+            logger.info(f"Connecting to streamable HTTP server at {self.server_url}")
+
+            self.server_identifier = self.server_url
+
+            self.saved_config = self.config_db.get_server_config(
+                "http", self.server_identifier
+            )
+
+            # Add MCP-Protocol-Version header for streamable HTTP client
+            headers = {"MCP-Protocol-Version": "2025-06-18"}
+            self.client_context = streamablehttp_client(self.server_url, headers=headers)
+            streams_and_session_id = await self.client_context.__aenter__()
+            self.streams = (streams_and_session_id[0], streams_and_session_id[1])
+
+            self.session = await ClientSession(
+                self.streams[0],
+                self.streams[1],
+                message_handler=self._handle_client_message,
+            ).__aenter__()
+
+        except Exception as e:
+            logger.error(f"Error connecting to downstream server via streamable HTTP: {e}")
             raise
 
     def _create_server_config(self) -> MCPServerConfig:
@@ -1043,7 +1106,7 @@ class MCPWrapperServer:
 
 
 async def review_server_config(
-    connection_type: Literal["stdio", "http"],
+    connection_type: Literal["stdio", "http", "sse"],
     identifier: str,
     config_path: Optional[str] = None,
     guardrail_provider: Optional[GuardrailProvider] = None,
@@ -1057,7 +1120,7 @@ async def review_server_config(
     as trusted in the config database.
 
     Args:
-        connection_type: Type of connection ("stdio" or "http")
+        connection_type: Type of connection ("stdio", "http", or "sse")
         identifier: The command or URL to connect to
         config_path: Optional path to config file
         guardrail_provider: Optional guardrail provider to use
