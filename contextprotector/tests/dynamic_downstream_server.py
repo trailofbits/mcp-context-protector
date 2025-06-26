@@ -147,7 +147,7 @@ def initialize_tools(count):
         count: The number of tools to initialize
     """
     global num_tools
-    
+
     # Always register the first echo tool
     app.add_tool(
         echo_handler,
@@ -155,7 +155,7 @@ def initialize_tools(count):
         description="Echoes back the input message",
     )
     print("Added initial echo tool (tool #1)", file=sys.stderr)
-    
+
     # Add additional tools if requested
     while num_tools < count:
         num_tools += 1
@@ -165,21 +165,21 @@ def initialize_tools(count):
 def read_tool_count_from_file(toolcount_file):
     """
     Read the tool count from the specified file.
-    
+
     Args:
         toolcount_file: Path to the file containing the tool count
-        
+
     Returns:
         int: The number of tools to initialize, or 1 if the file doesn't exist or is invalid
     """
     try:
         if toolcount_file and os.path.exists(toolcount_file):
-            with open(toolcount_file, 'r') as f:
+            with open(toolcount_file, "r") as f:
                 count = int(f.read().strip())
                 return max(1, count)  # Ensure at least 1 tool
     except (ValueError, FileNotFoundError, IOError) as e:
         print(f"Error reading tool count from {toolcount_file}: {e}", file=sys.stderr)
-        
+
     # Default to 1 tool if file doesn't exist or has invalid content
     return 1
 
@@ -302,14 +302,17 @@ def main():
 
     # Read tool count from file if specified
     initial_tool_count = read_tool_count_from_file(args.toolcount_file)
-    
+
     # Initialize tools with the specified count
     initialize_tools(initial_tool_count)
 
     # Register the signal handler
     signal.signal(signal.SIGHUP, signal_handler)
 
-    print(f"Dynamic server started with PID {os.getpid()} and {num_tools} tools", file=sys.stderr)
+    print(
+        f"Dynamic server started with PID {os.getpid()} and {num_tools} tools",
+        file=sys.stderr,
+    )
     print(f"Send SIGHUP to add tools: kill -HUP $(cat {args.pidfile})", file=sys.stderr)
 
     # Run the server

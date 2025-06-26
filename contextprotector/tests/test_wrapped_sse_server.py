@@ -27,6 +27,7 @@ async def approve_server_config_using_review(url, config_path):
     """
     await _approve_config("sse", url, config_path)
 
+
 # Import global SERVER_PORT from sse_server_utils
 
 
@@ -42,7 +43,9 @@ async def run_with_wrapper_session(callback, config_path=None):
     from . import sse_server_utils
 
     # Make sure we have a valid port
-    assert sse_server_utils.SERVER_PORT is not None, "Server port must be detected before connecting"
+    assert (
+        sse_server_utils.SERVER_PORT is not None
+    ), "Server port must be detected before connecting"
 
     config_path = config_path or MCPServerConfig.get_default_config_path()
 
@@ -51,18 +54,14 @@ async def run_with_wrapper_session(callback, config_path=None):
     logging.warning(f"Connecting wrapper to SSE server at: {sse_url}")
 
     # Use the shared utility function
-    await _run_with_wrapper_session(
-        callback,
-        "sse",
-        sse_url,
-        config_path
-    )
+    await _run_with_wrapper_session(callback, "sse", sse_url, config_path)
 
 
 @pytest.mark.asyncio
 async def test_echo_tool_through_wrapper(sse_server_fixture):
     """Test that the echo tool correctly works through the MCP wrapper using SSE transport."""
     sc = None
+
     async def callback(session):
         nonlocal sc
 
@@ -84,8 +83,7 @@ async def test_echo_tool_through_wrapper(sse_server_fixture):
 
         # Check that the call was blocked due to unapproved config
         assert isinstance(result_dict, dict) and result_dict["status"] == "blocked"
-        sc = result_dict['server_config']
-
+        sc = result_dict["server_config"]
 
     async def callback2(session):
         input_message = "Hello from Wrapped SSE Server!"
@@ -123,6 +121,7 @@ async def test_echo_tool_through_wrapper(sse_server_fixture):
     await run_with_wrapper_session(callback, temp_file.name)
     # Build the URL for the SSE server to be used in the review process
     from . import sse_server_utils
+
     sse_url = f"http://localhost:{sse_server_utils.SERVER_PORT}/sse"
 
     # Now we need to run the review process to approve this config
@@ -131,6 +130,7 @@ async def test_echo_tool_through_wrapper(sse_server_fixture):
     with open(temp_file.name, "r") as f:
         logging.error(f.read())
     from ..mcp_config import MCPConfigDatabase
+
     cdb = MCPConfigDatabase(temp_file.name)
     # assert cdb.servers == [], "wrong"
     conf = cdb.get_server_config("sse", sse_url)
@@ -138,7 +138,6 @@ async def test_echo_tool_through_wrapper(sse_server_fixture):
     sc_obj = json.loads(sc)
     conf_mine = MCPServerConfig.from_dict(sc_obj)
     assert conf_mine == conf
-    
 
     await run_with_wrapper_session(callback2, temp_file.name)
 
@@ -193,6 +192,7 @@ async def test_invalid_tool_through_wrapper(sse_server_fixture):
     await run_with_wrapper_session(callback, temp_file.name)
     # Build the URL for the SSE server to be used in the review process
     from . import sse_server_utils
+
     sse_url = f"http://localhost:{sse_server_utils.SERVER_PORT}/sse"
 
     # Run the review process to approve this config

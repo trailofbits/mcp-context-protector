@@ -20,12 +20,12 @@ import pytest_asyncio
 
 class SSEServerManager:
     """Manages the lifecycle of an SSE server process for testing."""
-    
+
     def __init__(self):
         self.process: Optional[subprocess.Popen] = None
         self.port: Optional[int] = None
         self.pid: Optional[int] = None
-    
+
     def get_ports_by_pid(self, pid: int) -> list[int]:
         """
         Finds and returns a list of ports opened by a process ID.
@@ -138,19 +138,19 @@ def get_ports_by_pid(pid: int) -> list[int]:
 async def start_sse_server() -> subprocess.Popen:
     """Global function for backward compatibility."""
     global SERVER_PROCESS, SERVER_PORT, SERVER_PID
-    
+
     process = await _global_manager.start_server()
     SERVER_PROCESS = _global_manager.process
     SERVER_PORT = _global_manager.port
     SERVER_PID = _global_manager.pid
-    
+
     return process
 
 
 async def stop_sse_server():
     """Global function for backward compatibility."""
     global SERVER_PROCESS, SERVER_PORT, SERVER_PID
-    
+
     await _global_manager.stop_server()
     SERVER_PROCESS = None
     SERVER_PORT = None

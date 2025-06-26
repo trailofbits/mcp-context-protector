@@ -11,6 +11,7 @@ from typing import Callable, Awaitable, Literal, Optional
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
+
 async def approve_server_config_using_review(
     connection_type: Literal["stdio", "http", "sse"],
     identifier: str,
@@ -31,9 +32,9 @@ async def approve_server_config_using_review(
         "contextprotector",
         "--review-server",
         "--config-file",
-        config_path
+        config_path,
     ]
-    
+
     if connection_type == "stdio":
         cmd.extend(["--command", identifier])
     elif connection_type == "http":
@@ -50,7 +51,7 @@ async def approve_server_config_using_review(
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True
+        text=True,
     )
 
     # Wait for the review process to start
@@ -64,10 +65,14 @@ async def approve_server_config_using_review(
     stdout, stderr = review_process.communicate(timeout=5)
 
     # Verify the review process output
-    assert review_process.returncode == 0, f"Review process failed with return code {review_process.returncode}: {stderr}"
+    assert (
+        review_process.returncode == 0
+    ), f"Review process failed with return code {review_process.returncode}: {stderr}"
 
     # Check for expected output in the review process
-    assert "has been trusted and saved" in stdout, f"Missing expected approval message in output: {stdout}"
+    assert (
+        "has been trusted and saved" in stdout
+    ), f"Missing expected approval message in output: {stdout}"
 
 
 async def run_with_wrapper_session(
@@ -96,7 +101,7 @@ async def run_with_wrapper_session(
         "--config-file",
         str(config_path),
     ]
-    
+
     # Add connection type specific args
     if connection_type == "stdio":
         args.extend(["--command", identifier])
@@ -106,21 +111,21 @@ async def run_with_wrapper_session(
         args.extend(["--sse-url", identifier])
     else:
         raise ValueError(f"Invalid connection type: {connection_type}")
-    
+
     # Add optional args
     if visualize_ansi:
         args.append("--visualize-ansi-codes")
-    
+
     if guardrail_provider:
         args.extend(["--guardrail-provider", guardrail_provider])
-    
+
     # Create server parameters
     server_params = StdioServerParameters(
         command="python",
         args=args,
         cwd=Path(__file__).parent.parent.parent.resolve(),
     )
-    
+
     # Connect to the wrapper
     async with stdio_client(server_params) as (read, write):
         assert read is not None and write is not None

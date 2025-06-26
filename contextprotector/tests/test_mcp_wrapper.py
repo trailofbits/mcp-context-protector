@@ -32,13 +32,13 @@ async def approve_server_config_using_review(command, config_path):
             "--command",
             command,
             "--config-file",
-            config_path
+            config_path,
         ],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         cwd=Path(__file__).parent.parent.parent.resolve(),
-        text=True
+        text=True,
     )
 
     # Wait for the review process to start
@@ -52,10 +52,14 @@ async def approve_server_config_using_review(command, config_path):
     stdout, stderr = review_process.communicate(timeout=5)
 
     # Verify the review process output
-    assert review_process.returncode == 0, f"Review process failed with return code {review_process.returncode}: {stderr}"
+    assert (
+        review_process.returncode == 0
+    ), f"Review process failed with return code {review_process.returncode}: {stderr}"
 
     # Check for expected output in the review process
-    assert "has been trusted and saved" in stdout, f"Missing expected approval message in output: {stdout}"
+    assert (
+        "has been trusted and saved" in stdout
+    ), f"Missing expected approval message in output: {stdout}"
 
 
 async def run_with_wrapper_session(callback, config_path=None):
@@ -109,7 +113,7 @@ async def test_echo_tool_through_wrapper():
 
     async def callback2(session):
         input = "Marco (Polo)"
-        
+
         # Call the echo tool again - should work now
         result = await session.call_tool(name="echo", arguments={"message": input})
         assert isinstance(result, types.CallToolResult)
@@ -130,7 +134,7 @@ async def test_echo_tool_through_wrapper():
     # Now we need to run the review process to approve this config
     await approve_server_config_using_review(
         f"python {str(Path(__file__).resolve().parent.joinpath('simple_downstream_server.py'))}",
-        temp_file.name
+        temp_file.name,
     )
     await run_with_wrapper_session(callback2, temp_file.name)
     os.unlink(temp_file.name)

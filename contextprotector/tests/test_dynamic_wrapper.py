@@ -28,47 +28,56 @@ TEMP_CONFIG_FILE = None
 def write_tool_count(count):
     """
     Write the specified tool count to a temporary file.
-    
+
     Args:
         count: The number of tools to write to the file
-        
+
     Returns:
         str: Path to the temporary file
     """
     global TEMP_TOOLCOUNT_FILE
-    
+
     # Create a temporary file for the tool count
     with tempfile.NamedTemporaryFile(delete=False, suffix=".count") as tmp:
         TEMP_TOOLCOUNT_FILE = tmp.name
-        tmp.write(str(count).encode('utf-8'))
-    
+        tmp.write(str(count).encode("utf-8"))
+
     return TEMP_TOOLCOUNT_FILE
 
 
 def create_approved_config(server_cmd):
     """
     Create a pre-approved configuration for the server to avoid blocking.
-    
+
     Args:
         server_cmd: The server command to create a config for
-        
+
     Returns:
         str: Path to the temporary config file
     """
     global TEMP_CONFIG_FILE
-    
+
     # Create a temporary config file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp:
         TEMP_CONFIG_FILE = tmp.name
-    
+
     # Use the review command to pre-approve the server config
-    subprocess.run([
-        sys.executable, "-m", "contextprotector",
-        "--command", server_cmd,
-        "--config-file", TEMP_CONFIG_FILE,
-        "--review-server", "yes"
-    ], cwd=Path(__file__).parent.parent.parent.resolve(), check=True)
-    
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "contextprotector",
+            "--command",
+            server_cmd,
+            "--config-file",
+            TEMP_CONFIG_FILE,
+            "--review-server",
+            "yes",
+        ],
+        cwd=Path(__file__).parent.parent.parent.resolve(),
+        check=True,
+    )
+
     return TEMP_CONFIG_FILE
 
 
@@ -94,9 +103,10 @@ async def run_with_dynamic_server_session(callback, initial_tool_count=None):
     # Construct the base command for the dynamic server
     args = [
         str(dir.joinpath("dynamic_downstream_server.py")),
-        "--pidfile", TEMP_PIDFILE,
+        "--pidfile",
+        TEMP_PIDFILE,
     ]
-    
+
     # Add toolcount-file if specified
     if initial_tool_count is not None:
         toolcount_file = write_tool_count(initial_tool_count)
@@ -137,7 +147,7 @@ async def run_with_dynamic_server_session(callback, initial_tool_count=None):
 def cleanup_files():
     """Clean up the temporary files if they exist."""
     global TEMP_PIDFILE, TEMP_TOOLCOUNT_FILE, TEMP_CONFIG_FILE
-    
+
     for file_path in [TEMP_PIDFILE, TEMP_TOOLCOUNT_FILE, TEMP_CONFIG_FILE]:
         if file_path and os.path.exists(file_path):
             try:
@@ -204,7 +214,7 @@ async def test_initial_tools():
         assert isinstance(result, types.CallToolResult)
         assert len(result.content) == 1
         assert isinstance(result.content[0], types.TextContent)
-        
+
         # Parse the text content
         response = json.loads(result.content[0].text)
         assert response["echo_message"] == input_message
@@ -229,14 +239,14 @@ async def test_preconfigured_tools():
         )
         response = json.loads(result.content[0].text)
         assert response["echo_message"] == input_message
-        
+
         # Test the calculator tool
         result = await session.call_tool(
             name="calculator", arguments={"a": 10, "b": 5, "operation": "add"}
         )
         response = json.loads(result.content[0].text)
         assert response["result"] == 15
-        
+
         # Test the counter tool
         result = await session.call_tool(name="counter", arguments={})
         response = json.loads(result.content[0].text)
@@ -254,7 +264,7 @@ async def test_sighup_adds_tool():
         # Check initial state - only echo tool should be present
         tool_names = await get_tool_names(session)
         assert tool_names == ["echo"]
-        
+
         # Try echo tool first - should work
         input_message = "Hello from dynamic server!"
         result = await session.call_tool(
@@ -290,7 +300,7 @@ async def test_multiple_sighups():
         # Check initial state with two tools
         tool_names = await get_tool_names(session)
         assert sorted(tool_names) == ["calculator", "echo"]
-        
+
         # Test calculator - should work
         result = await session.call_tool(
             name="calculator", arguments={"a": 5, "b": 7, "operation": "multiply"}
@@ -304,19 +314,19 @@ async def test_multiple_sighups():
         # Verify we now have 3 tools
         tool_names = await get_tool_names(session)
         assert sorted(tool_names) == ["calculator", "counter", "echo"]
-        
+
         # Test counter
         result = await session.call_tool(name="counter", arguments={})
         response = json.loads(result.content[0].text)
         assert response["count"] == 3  # Should show 3 tools
-        
+
         # Send another SIGHUP to add echo4
         await send_sighup_and_wait()
-        
+
         # Verify we now have 4 tools
         tool_names = await get_tool_names(session)
         assert sorted(tool_names) == ["calculator", "counter", "echo", "echo4"]
-        
+
         # Test echo4
         result = await session.call_tool(
             name="echo4", arguments={"message": "Testing echo4"}

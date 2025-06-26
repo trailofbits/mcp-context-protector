@@ -20,6 +20,7 @@ from mcp.server.session import ServerSession
 from contextlib import AsyncExitStack
 from mcp.server.lowlevel.helper_types import ReadResourceContents
 
+
 class ResourceTestServer:
     def __init__(self):
         self.server = Server("resource-test-server")
@@ -104,7 +105,9 @@ class ResourceTestServer:
             elif name == "toggle_resources":
                 # Toggle resources and notify clients
                 self.use_alternate_resources = not self.use_alternate_resources
-                resource_state = "alternate" if self.use_alternate_resources else "default"
+                resource_state = (
+                    "alternate" if self.use_alternate_resources else "default"
+                )
 
                 # Use the session to send a resource list changed notification
                 if self._session:
@@ -126,26 +129,34 @@ class ResourceTestServer:
             """Handle resource content requests."""
             if str(uri) == "contextprotector://sample_data":
                 # Return JSON sample data
-                content = json.dumps({
-                    "name": "Sample Data",
-                    "type": "test",
-                    "items": [
-                        {"id": 1, "value": "first"},
-                        {"id": 2, "value": "second"},
-                        {"id": 3, "value": "third"},
-                    ]
-                })
-                return [ReadResourceContents(content=content, mime_type="application/json")]
+                content = json.dumps(
+                    {
+                        "name": "Sample Data",
+                        "type": "test",
+                        "items": [
+                            {"id": 1, "value": "first"},
+                            {"id": 2, "value": "second"},
+                            {"id": 3, "value": "third"},
+                        ],
+                    }
+                )
+                return [
+                    ReadResourceContents(content=content, mime_type="application/json")
+                ]
             elif str(uri) == "contextprotector://image_resource":
                 # Just return placeholder text for testing
                 content = b"[Binary image data]"
                 return [ReadResourceContents(content=content, mime_type="image/png")]
             elif str(uri) == "contextprotector://document_resource":
-                # Return text document 
+                # Return text document
                 content = "This is a sample document resource.\nIt contains multiple lines.\nFor testing purposes."
                 return [ReadResourceContents(content=content, mime_type="text/plain")]
 
-            return [ReadResourceContents(content="Unknown resource requested", mime_type="text/plain")]
+            return [
+                ReadResourceContents(
+                    content="Unknown resource requested", mime_type="text/plain"
+                )
+            ]
 
     async def run(self):
         """Run the server with session tracking."""

@@ -36,11 +36,7 @@ async def run_with_ansi_visualization(
     """
     command = f"python {str(TEST_SERVER_PATH)}"
     await run_with_wrapper_session(
-        callback, 
-        "stdio", 
-        command, 
-        config_path, 
-        visualize_ansi
+        callback, "stdio", command, config_path, visualize_ansi
     )
 
 

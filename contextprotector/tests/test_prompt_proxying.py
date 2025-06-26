@@ -31,12 +31,7 @@ async def run_with_wrapper(callback, config_path: str):
         config_path: Path to the configuration file
     """
     command = f"python {str(PROMPT_TEST_SERVER_PATH)}"
-    await run_with_wrapper_session(
-        callback,
-        "stdio",
-        command,
-        config_path
-    )
+    await run_with_wrapper_session(callback, "stdio", command, config_path)
 
 
 class TestPromptProxying:
@@ -149,7 +144,7 @@ class TestPromptProxying:
             lambda session: asyncio.create_task(
                 session.call_tool("test_tool", {"message": "test"})
             ),
-            self.config_path
+            self.config_path,
         )
 
         # Use review process to approve the config

@@ -8,14 +8,19 @@ from .quarantine_cli import review_quarantine
 
 logger = logging.getLogger("mcp_wrapper")
 
+
 async def main_async():
     parser = argparse.ArgumentParser()
 
     # Create mutually exclusive group for command, URL, list-guardrail-providers, and review-quarantine
     source_group = parser.add_argument_group()
-    source_group.add_argument("--command", help="Start a wrapped server over the stdio transport using the specified command")
     source_group.add_argument(
-        "--url", help="Connect to a remote MCP server over streamable HTTP at the specified URL"
+        "--command",
+        help="Start a wrapped server over the stdio transport using the specified command",
+    )
+    source_group.add_argument(
+        "--url",
+        help="Connect to a remote MCP server over streamable HTTP at the specified URL",
     )
     source_group.add_argument(
         "--sse-url", help="Connect to a remote MCP server over SSE at the specified URL"
@@ -112,15 +117,27 @@ async def main_async():
         # For review mode, we need either command or url
         if args.command:
             await review_server_config(
-                "stdio", args.command, args.config_file, guardrail_provider, args.quarantine_path
+                "stdio",
+                args.command,
+                args.config_file,
+                guardrail_provider,
+                args.quarantine_path,
             )
         elif args.url:
             await review_server_config(
-                "http", args.url, args.config_file, guardrail_provider, args.quarantine_path
+                "http",
+                args.url,
+                args.config_file,
+                guardrail_provider,
+                args.quarantine_path,
             )
         elif args.sse_url:
             await review_server_config(
-                "sse", args.sse_url, args.config_file, guardrail_provider, args.quarantine_path
+                "sse",
+                args.sse_url,
+                args.config_file,
+                guardrail_provider,
+                args.quarantine_path,
             )
         return
 
@@ -166,8 +183,10 @@ async def main_async():
     finally:
         await wrapper.stop_child_process()
 
+
 def main():
     asyncio.run(main_async())
+
 
 if __name__ == "__main__":
     main()

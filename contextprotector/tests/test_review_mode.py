@@ -20,6 +20,7 @@ from ..mcp_config import MCPServerConfig
 
 from .test_utils import approve_server_config_using_review
 
+
 @pytest.mark.asyncio
 async def test_review_mode_already_trusted():
     """Test review mode when config is already trusted."""
@@ -42,9 +43,7 @@ async def test_review_mode_already_trusted():
         # Create mock for the utility function
         mock_approve_func = AsyncMock(return_value=None)
         with patch.object(
-            approve_server_config_using_review,
-            "__call__",
-            mock_approve_func
+            approve_server_config_using_review, "__call__", mock_approve_func
         ):
             # Capture stdout for assertion
             with patch("sys.stdout", new=StringIO()) as fake_stdout:

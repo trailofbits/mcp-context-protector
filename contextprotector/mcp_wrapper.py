@@ -134,7 +134,9 @@ class MCPWrapperServer:
         self.child_command = None
         self.server_url = None
         self.connection_type = None
-        self.server_identifier = None # Will be set after determining connection details
+        self.server_identifier = (
+            None  # Will be set after determining connection details
+        )
         self.child_process = None
         self.client_context = None
         self.streams = None
@@ -212,9 +214,9 @@ class MCPWrapperServer:
                                 content=content, mime_type=content_item.mimeType
                             )
                         )
-                        assert isinstance(contents[-1].content, bytes), (
-                            f"type {type(contents[-1].content)} value {content} is not bytes"
-                        )
+                        assert isinstance(
+                            contents[-1].content, bytes
+                        ), f"type {type(contents[-1].content)} value {content} is not bytes"
                     else:
                         contents.append(
                             ReadResourceContents(
@@ -223,11 +225,17 @@ class MCPWrapperServer:
                             )
                         )
 
-                logger.info(f"Successfully fetched resource {name} from downstream server")
+                logger.info(
+                    f"Successfully fetched resource {name} from downstream server"
+                )
                 return contents
             except Exception as e:
-                logger.error(f"Error fetching resource {name} from downstream server: {e}")
-                raise ValueError(f"Error fetching resource from downstream server: {str(e)}")
+                logger.error(
+                    f"Error fetching resource {name} from downstream server: {e}"
+                )
+                raise ValueError(
+                    f"Error fetching resource from downstream server: {str(e)}"
+                )
 
         @self.server.list_tools()
         async def list_tools() -> List[types.Tool]:
@@ -281,7 +289,9 @@ class MCPWrapperServer:
             )
 
             if not self.config_approved:
-                logger.warning(f"Blocking prompt '{name}' - server configuration not approved")
+                logger.warning(
+                    f"Blocking prompt '{name}' - server configuration not approved"
+                )
 
                 return types.GetPromptResult(
                     description="Server configuration not approved",
@@ -371,8 +381,10 @@ class MCPWrapperServer:
                     # Check if we have non-text content that needs to be preserved
                     has_non_text_content = False
                     if "content_list" in tool_result and tool_result["content_list"]:
-                        has_non_text_content = any(c.type != "text" for c in tool_result["content_list"])
-                    
+                        has_non_text_content = any(
+                            c.type != "text" for c in tool_result["content_list"]
+                        )
+
                     if has_non_text_content:
                         # Use the preserved content list to maintain resource links
                         content = tool_result["content_list"]
@@ -484,7 +496,9 @@ class MCPWrapperServer:
                         )
                         text_parts.append(processed_text)
                         # Create processed text content for the response
-                        processed_content.append(types.TextContent(type="text", text=processed_text))
+                        processed_content.append(
+                            types.TextContent(type="text", text=processed_text)
+                        )
                     else:
                         # Preserve non-text content (EmbeddedResource, ImageContent, etc.)
                         processed_content.append(content)
@@ -493,7 +507,9 @@ class MCPWrapperServer:
                     response_text = " ".join(text_parts)
             else:
                 # No content from downstream, use default text
-                response_text = f"Tool call to '{name}' succeeded but returned no content"
+                response_text = (
+                    f"Tool call to '{name}' succeeded but returned no content"
+                )
                 processed_content = [types.TextContent(type="text", text=response_text)]
 
             # Extract structured content if present
@@ -910,7 +926,9 @@ class MCPWrapperServer:
 
     async def _connect_via_streamable_http(self):
         """Connect to a downstream server via streamable HTTP."""
-        logger.info(f"Connecting to downstream server via streamable HTTP: {self.server_url}")
+        logger.info(
+            f"Connecting to downstream server via streamable HTTP: {self.server_url}"
+        )
 
         # Set up imports
         from mcp import ClientSession
@@ -927,7 +945,9 @@ class MCPWrapperServer:
 
             # Add MCP-Protocol-Version header for streamable HTTP client
             headers = {"MCP-Protocol-Version": "2025-06-18"}
-            self.client_context = streamablehttp_client(self.server_url, headers=headers)
+            self.client_context = streamablehttp_client(
+                self.server_url, headers=headers
+            )
             streams_and_session_id = await self.client_context.__aenter__()
             self.streams = (streams_and_session_id[0], streams_and_session_id[1])
 
@@ -938,7 +958,9 @@ class MCPWrapperServer:
             ).__aenter__()
 
         except Exception as e:
-            logger.error(f"Error connecting to downstream server via streamable HTTP: {e}")
+            logger.error(
+                f"Error connecting to downstream server via streamable HTTP: {e}"
+            )
             raise
 
     def _create_server_config(self) -> MCPServerConfig:
@@ -1197,9 +1219,7 @@ async def review_server_config(
                 f"\nThe server configuration for {identifier} has been trusted and saved."
             )
         else:
-            print(
-                f"\nThe server configuration for {identifier} has NOT been trusted."
-            )
+            print(f"\nThe server configuration for {identifier} has NOT been trusted.")
 
     finally:
         # Clean up

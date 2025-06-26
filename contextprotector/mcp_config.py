@@ -231,7 +231,7 @@ class MCPServerConfig:
         data_dir.mkdir(exist_ok=True)
 
         return str(data_dir / "config")
-    
+
     def add_tool(self, tool: Union[MCPToolDefinition, Dict[str, Any]]) -> None:
         """Add a tool to the server configuration.
 
@@ -503,14 +503,14 @@ class MCPServerConfig:
                     "default",
                     "enum",
                     "items",
-                    "properties"
+                    "properties",
                 ]
 
                 # Check for parameter changes
                 for attr_name in attrs:
                     self_val = getattr(self_param, attr_name, None)
                     other_val = getattr(other_param, attr_name, None)
-                    
+
                     if self_val != other_val:
                         param_changes[attr_name] = {
                             "old": self_val,

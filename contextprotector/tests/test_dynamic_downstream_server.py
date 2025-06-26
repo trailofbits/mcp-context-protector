@@ -71,9 +71,9 @@ async def verify_tools(session, expected_tool_names):
         tools_list: The list of tools from the server
     """
     tools = await session.list_tools()
-    assert len(tools.tools) == len(expected_tool_names), (
-        f"Expected {len(expected_tool_names)} tools, got {len(tools.tools)}"
-    )
+    assert len(tools.tools) == len(
+        expected_tool_names
+    ), f"Expected {len(expected_tool_names)} tools, got {len(tools.tools)}"
 
     # Check that all expected tools are present
     actual_names = [tool.name for tool in tools.tools]
@@ -103,14 +103,14 @@ async def send_sighup_and_wait(session, expected_tools, tracker):
 
     # Wait for the notification to be received
     notification_received = await tracker.wait_for_notification(timeout=2.0)
-    assert notification_received, (
-        "No tool update notification was received after sending SIGHUP"
-    )
+    assert (
+        notification_received
+    ), "No tool update notification was received after sending SIGHUP"
 
     # Additional verification: check that updates_received counter was incremented
-    assert tracker.updates_received > 0, (
-        "Tool update tracker did not receive any notifications"
-    )
+    assert (
+        tracker.updates_received > 0
+    ), "Tool update tracker did not receive any notifications"
 
     # Verify that the tools list now contains the expected tools
     await verify_tools(session, expected_tools)
@@ -123,20 +123,20 @@ async def send_sighup_and_wait(session, expected_tools, tracker):
 def write_tool_count(count):
     """
     Write the specified tool count to a temporary file.
-    
+
     Args:
         count: The number of tools to write to the file
-        
+
     Returns:
         str: Path to the temporary file
     """
     global TEMP_TOOLCOUNT_FILE
-    
+
     # Create a temporary file for the tool count
     with tempfile.NamedTemporaryFile(delete=False, suffix=".count") as tmp:
         TEMP_TOOLCOUNT_FILE = tmp.name
-        tmp.write(str(count).encode('utf-8'))
-    
+        tmp.write(str(count).encode("utf-8"))
+
     return TEMP_TOOLCOUNT_FILE
 
 
@@ -153,14 +153,14 @@ async def start_dynamic_server(callback: callable, initial_tool_count=None):
     # Create a temporary pidfile
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pid") as tmp:
         TEMP_PIDFILE = tmp.name
-    
+
     # Create a command args list
     args = [
         str(Path(__file__).resolve().parent.joinpath("dynamic_downstream_server.py")),
         "--pidfile",
         TEMP_PIDFILE,
     ]
-    
+
     # Add tool count file if specified
     if initial_tool_count is not None:
         toolcount_file = write_tool_count(initial_tool_count)
@@ -205,13 +205,13 @@ async def start_dynamic_server(callback: callable, initial_tool_count=None):
 def cleanup_files():
     """Clean up the temporary files if they exist."""
     global TEMP_PIDFILE, TEMP_TOOLCOUNT_FILE
-    
+
     if TEMP_PIDFILE and os.path.exists(TEMP_PIDFILE):
         try:
             os.unlink(TEMP_PIDFILE)
         except OSError:
             pass
-            
+
     if TEMP_TOOLCOUNT_FILE and os.path.exists(TEMP_TOOLCOUNT_FILE):
         try:
             os.unlink(TEMP_TOOLCOUNT_FILE)
@@ -275,23 +275,23 @@ async def test_initial_tools():
 async def test_preconfigured_tools():
     """
     Test that the server can start with a preconfigured number of tools.
-    
+
     This test verifies:
     1. The server initializes with multiple tools when specified in the tool count file
     2. The tools are properly initialized and functional
     """
-    
+
     async def callback(session, tracker):
         """
         Test callback that verifies multiple tools are available at startup.
-        
+
         Args:
             session: The MCP client session connected to the server
             tracker: The notification tracker for monitoring tool updates
         """
         # Check that all expected tools are available
         await verify_tools(session, ["echo", "calculator", "counter"])
-        
+
         # Test the echo tool
         input_message = "Hello, preconfigured server!"
         result = await session.call_tool(
@@ -299,19 +299,19 @@ async def test_preconfigured_tools():
         )
         response = json.loads(result.content[0].text)
         assert response == {"echo_message": input_message}
-        
+
         # Test the calculator tool
         result = await session.call_tool(
             name="calculator", arguments={"a": 5, "b": 7, "operation": "add"}
         )
         response = json.loads(result.content[0].text)
         assert response == {"result": 12}
-        
+
         # Test the counter tool
         result = await session.call_tool(name="counter", arguments={})
         response = json.loads(result.content[0].text)
         assert response == {"count": 3}
-        
+
     # Start server with 3 tools
     await start_dynamic_server(callback, initial_tool_count=3)
 
@@ -350,9 +350,9 @@ async def test_sighup_adds_tool():
 
         # The latest_tools in the notification should include the calculator tool
         tool_names = [tool.name for tool in tracker.latest_tools]
-        assert "calculator" in tool_names, (
-            "Calculator tool not found in the update notification"
-        )
+        assert (
+            "calculator" in tool_names
+        ), "Calculator tool not found in the update notification"
 
         # Test the calculator tool
         result = await session.call_tool(
@@ -397,9 +397,9 @@ async def test_notification_on_sighup():
             tracker: The notification tracker for monitoring tool updates
         """
         # Verify no notifications yet
-        assert tracker.updates_received == 0, (
-            "Should have no notifications before SIGHUP"
-        )
+        assert (
+            tracker.updates_received == 0
+        ), "Should have no notifications before SIGHUP"
 
         # Send SIGHUP
         os.kill(SERVER_PID, signal.SIGHUP)
@@ -422,9 +422,9 @@ async def test_notification_on_sighup():
         os.kill(SERVER_PID, signal.SIGHUP)
 
         notification_received = await tracker.wait_for_notification(timeout=2.0)
-        assert notification_received, (
-            "No second notification received within timeout period"
-        )
+        assert (
+            notification_received
+        ), "No second notification received within timeout period"
         assert tracker.updates_received == 2, "Expected two notifications total"
 
         # Get updated tools list
@@ -440,37 +440,37 @@ async def test_notification_on_sighup():
 async def test_preconfigured_with_sighup():
     """
     Test that a server with preconfigured tools correctly responds to SIGHUP.
-    
+
     This test verifies:
     1. The server starts with multiple tools from the configuration file
     2. When SIGHUP is sent, additional tools are added correctly
     3. Tool notifications work properly for servers with preconfigured tools
     """
-    
+
     async def callback(session, tracker):
         """
         Test callback that verifies SIGHUP behavior with preconfigured tools.
-        
+
         Args:
             session: The MCP client session connected to the server
             tracker: The notification tracker for monitoring tool updates
         """
         # Check initial state - two tools should be present
         await verify_tools(session, ["echo", "calculator"])
-        
+
         # Send SIGHUP to add counter tool and verify notification
         await send_sighup_and_wait(session, ["echo", "calculator", "counter"], tracker)
-        
+
         # Test the counter tool that was just added
         result = await session.call_tool(name="counter", arguments={})
         response = json.loads(result.content[0].text)
         assert response == {"count": 3}
-        
+
         # Send another SIGHUP to add echo4 tool
         await send_sighup_and_wait(
             session, ["echo", "calculator", "counter", "echo4"], tracker
         )
-        
+
         # Test the echo4 tool
         result = await session.call_tool(
             name="echo4", arguments={"message": "Testing echo4"}
@@ -478,7 +478,7 @@ async def test_preconfigured_with_sighup():
         response = json.loads(result.content[0].text)
         assert response["echo_message"] == "Testing echo4"
         assert response["tool_number"] == 4
-        
+
     # Start server with 2 tools
     await start_dynamic_server(callback, initial_tool_count=2)
 
@@ -511,9 +511,9 @@ async def test_multiple_sighups():
         await send_sighup_and_wait(session, ["echo", "calculator"], tracker)
 
         # Verify notification for first SIGHUP
-        assert tracker.updates_received == 1, (
-            "Expected 1 notification after first SIGHUP"
-        )
+        assert (
+            tracker.updates_received == 1
+        ), "Expected 1 notification after first SIGHUP"
         tools = await session.list_tools()
         tool_names1 = [tool.name for tool in tools.tools]
         assert "calculator" in tool_names1, "Calculator tool missing after first SIGHUP"
@@ -526,9 +526,9 @@ async def test_multiple_sighups():
         await send_sighup_and_wait(session, ["echo", "calculator", "counter"], tracker)
 
         # Verify notification for second SIGHUP
-        assert tracker.updates_received == 2, (
-            "Expected 2 notifications total after second SIGHUP"
-        )
+        assert (
+            tracker.updates_received == 2
+        ), "Expected 2 notifications total after second SIGHUP"
         tools = await session.list_tools()
         tool_names2 = [tool.name for tool in tools.tools]
         assert "counter" in tool_names2, "Counter tool missing after second SIGHUP"
@@ -551,9 +551,9 @@ async def test_multiple_sighups():
         )
 
         # Verify notification for third SIGHUP
-        assert tracker.updates_received == 3, (
-            "Expected 3 notifications total after third SIGHUP"
-        )
+        assert (
+            tracker.updates_received == 3
+        ), "Expected 3 notifications total after third SIGHUP"
         tools = await session.list_tools()
         tool_names3 = [tool.name for tool in tools.tools]
         assert "echo4" in tool_names3, "Echo4 tool missing after third SIGHUP"
