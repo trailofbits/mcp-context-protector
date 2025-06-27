@@ -4,6 +4,7 @@ import base64
 import logging
 import json
 import re
+import traceback
 from typing import List, Optional, Literal, Dict, Any
 
 import mcp.types as types
@@ -153,6 +154,7 @@ class MCPWrapperServer:
         self.visualize_ansi_codes = visualize_ansi_codes
         self.prompts = []
         self.resources = []
+        self.server_session = None  # Track the server session for sending notifications
         self.quarantine = (
             ToolResponseQuarantine(quarantine_path) if self.use_guardrails else None
         )
@@ -160,6 +162,7 @@ class MCPWrapperServer:
 
     def _setup_handlers(self):
         """Setup MCP server handlers"""
+        self._setup_notification_handlers()
 
         @self.server.list_prompts()
         async def list_prompts() -> List[types.Prompt]:
@@ -693,6 +696,61 @@ class MCPWrapperServer:
             logger.info("Tools updated but configuration unchanged")
             self.config_approved = True
 
+    async def _forward_notification_to_upstream(self, method: str, params=None):
+        """
+        Forward a notification to the upstream client.
+        
+        Args:
+            method: The notification method (e.g., "notifications/progress")
+            params: Optional notification parameters
+        """
+        if not self.server_session:
+            logger.warning("No server session available to forward notification")
+            return
+            
+        try:
+            # Create appropriate notification type based on method
+            if method == "notifications/progress":
+                notification = types.ProgressNotification(
+                    method=method,
+                    params=params if params else None
+                )
+            elif method == "notifications/message":
+                notification = types.LoggingMessageNotification(
+                    method=method,
+                    params=params if params else None
+                )
+            elif method == "notifications/tools/list_changed":
+                notification = types.ToolListChangedNotification(method=method)
+            elif method == "notifications/prompts/list_changed":
+                notification = types.PromptListChangedNotification(method=method)
+            elif method == "notifications/resources/list_changed":
+                notification = types.ResourceListChangedNotification(method=method)
+            elif method == "notifications/resources/updated":
+                notification = types.ResourceUpdatedNotification(
+                    method=method,
+                    params=params if params else None
+                )
+            elif method == "notifications/cancelled":
+                notification = types.CancelledNotification(
+                    method=method,
+                    params=params if params else None
+                )
+            elif method == "notifications/initialized":
+                notification = types.InitializedNotification(method=method)
+            else:
+                # Fallback for any other valid notifications
+                notification = types.JSONRPCNotification(
+                    jsonrpc="2.0",
+                    method=method,
+                    params=params
+                )
+            
+            await self.server_session.send_notification(notification)
+            logger.info(f"Forwarded {method} to upstream client")
+        except Exception as e:
+            logger.warning(f"Failed to forward {method} notification: {e}")
+
     async def _handle_client_message(self, message):
         """
         Message handler for the ClientSession to process notifications,
@@ -702,27 +760,47 @@ class MCPWrapperServer:
             message: The message from the server, can be a notification or other message type
         """
         if isinstance(message, types.ServerNotification):
-            if message.root.method == "notifications/tools/list_changed":
+            spec_compliant_notifications = {
+                "notifications/tools/list_changed",
+                "notifications/prompts/list_changed", 
+                "notifications/resources/list_changed",
+                "notifications/progress",
+                "notifications/message",
+                "notifications/resources/updated",
+                "notifications/cancelled",
+                "notifications/initialized",
+            }
+
+            method = message.root.method
+            params = message.root.params
+
+            if method == "notifications/tools/list_changed":
                 self.config_approved = False
-                asyncio.create_task(self.update_tools())
-            elif message.root.method == "notifications/prompts/list_changed":
+                asyncio.create_task(self.update_tools(send_notification=True))
+            elif method == "notifications/prompts/list_changed":
                 # Prompt changes do NOT affect the config approval status
                 logger.info(
                     "Received notification that prompts have changed (not affecting approval status)"
                 )
-                asyncio.create_task(self.update_prompts())
-            elif message.root.method == "notifications/resources/list_changed":
+                asyncio.create_task(self.update_prompts(send_notification=True))
+            elif method == "notifications/resources/list_changed":
                 # Resource changes do NOT affect the config approval status
                 logger.info(
                     "Received notification that resources have changed (not affecting approval status)"
                 )
-                asyncio.create_task(self.update_resources())
+                asyncio.create_task(self.update_resources(send_notification=True))
+                await self._forward_notification_to_upstream(method, params)
+            elif method in spec_compliant_notifications:
+                # Forward other specification-compliant notifications to upstream client
+                logger.info(f"Forwarding notification to upstream client: {method}")
+                await self._forward_notification_to_upstream(method, params)
             else:
-                logger.info(f"Received notification: {message.method}")
+                # Discard non-specification notifications
+                logger.info(f"Discarding non-specification notification: {method}")
         else:
             logger.info(f"Received non-notification message: {type(message)}")
 
-    async def update_prompts(self):
+    async def update_prompts(self, send_notification: bool=False):
         """
         Update prompts from the downstream server.
 
@@ -746,10 +824,13 @@ class MCPWrapperServer:
             else:
                 logger.info("No prompts available from downstream server")
                 self.prompts = []
+            if send_notification:
+                await self._forward_notification_to_upstream("notifications/prompts/list_changed", None)
         except Exception as e:
-            logger.warning(f"Error updating prompts from downstream server: {e}")
+            out = traceback.format_exc()
+            logger.warning(f"Error updating prompts from downstream server: {e} {out}")
 
-    async def update_resources(self):
+    async def update_resources(self, send_notification: bool=False):
         """
         Update resources from the downstream server.
 
@@ -775,10 +856,12 @@ class MCPWrapperServer:
             else:
                 logger.info("No resources available from downstream server")
                 self.resources = []
+            if send_notification:
+                await self._forward_notification_to_upstream("notifications/resources/list_changed", None)
         except Exception as e:
             logger.warning(f"Error updating resources from downstream server: {e}")
 
-    async def update_tools(self):
+    async def update_tools(self, send_notification: bool=False):
         """Update tools from the downstream server."""
         try:
             downstream_tools = await self.session.list_tools()
@@ -789,6 +872,8 @@ class MCPWrapperServer:
             )
 
             await self._handle_tool_updates(downstream_tools.tools)
+            if send_notification:
+                await self._forward_notification_to_upstream("notifications/tools/list_changed", None)
         except Exception as e:
             logger.warning(f"Error handling tool update notification: {e}")
 
@@ -1014,6 +1099,73 @@ class MCPWrapperServer:
 
         return config
 
+    def _setup_notification_handlers(self):
+        """Setup handlers for client → server notifications to forward to downstream server."""
+        
+        @self.server.progress_notification()
+        async def handle_progress_notification(notification: types.ProgressNotification):
+            """Forward progress notifications from upstream client to downstream server."""
+            logger.info("Forwarding progress notification from client to downstream server")
+            
+            if self.session:
+                try:
+                    # Forward the notification to the downstream server's session
+                    # Note: ClientSession doesn't have send_notification, so we'll need to send as JSON-RPC
+                    await self._forward_notification_to_downstream(notification)
+                except Exception as e:
+                    logger.warning(f"Failed to forward progress notification to downstream: {e}")
+        
+        # Handle other client notifications by registering them manually
+        # Since there may not be decorators for all notification types, we'll register directly
+        
+        async def handle_cancelled_notification(notification: types.CancelledNotification):
+            """Forward cancelled notifications from upstream client to downstream server."""
+            logger.info("Forwarding cancelled notification from client to downstream server") 
+            
+            if self.session:
+                try:
+                    await self._forward_notification_to_downstream(notification)
+                except Exception as e:
+                    logger.warning(f"Failed to forward cancelled notification to downstream: {e}")
+        
+        async def handle_initialized_notification(notification: types.InitializedNotification):
+            """Forward initialized notifications from upstream client to downstream server."""
+            logger.info("Forwarding initialized notification from client to downstream server")
+            
+            if self.session:
+                try:
+                    await self._forward_notification_to_downstream(notification)
+                except Exception as e:
+                    logger.warning(f"Failed to forward initialized notification to downstream: {e}")
+        
+        async def handle_message_notification(notification: types.LoggingMessageNotification):
+            """Forward log message notifications from upstream client to downstream server."""
+            logger.info("Forwarding message notification from client to downstream server")
+            
+            if self.session:
+                try:
+                    await self._forward_notification_to_downstream(notification)
+                except Exception as e:
+                    logger.warning(f"Failed to forward message notification to downstream: {e}")
+        
+        # Register the handlers manually in the notification_handlers dict
+        self.server.notification_handlers[types.CancelledNotification] = handle_cancelled_notification
+        self.server.notification_handlers[types.InitializedNotification] = handle_initialized_notification
+        self.server.notification_handlers[types.LoggingMessageNotification] = handle_message_notification
+
+    async def _forward_notification_to_downstream(self, notification):
+        """Forward a notification from upstream client to downstream server."""
+        if not self.session:
+            logger.warning("No downstream session available to forward notification")
+            return
+            
+        try:
+            # ClientSession does have send_notification - use it to forward to downstream
+            await self.session.send_notification(notification)
+            logger.info(f"Successfully forwarded notification {notification.method} to downstream server")
+        except Exception as e:
+            logger.error(f"Error forwarding notification {notification.method} to downstream: {e}")
+
     def _make_ansi_escape_codes_visible(self, text: str) -> str:
         """
         Convert ANSI escape sequences to visible text by replacing escape character with "ESC".
@@ -1105,24 +1257,44 @@ class MCPWrapperServer:
 
         try:
             from mcp.server.stdio import stdio_server
+            from mcp.server.session import ServerSession
+            from contextlib import AsyncExitStack
+            import anyio
 
             async with stdio_server() as streams:
-                await self.server.run(
-                    streams[0],
-                    streams[1],
-                    InitializationOptions(
-                        server_name="mcp_wrapper",
-                        server_version="0.1.0",
-                        capabilities=self.server.get_capabilities(
-                            notification_options=NotificationOptions(
-                                tools_changed=True,
-                                prompts_changed=True,
-                                resources_changed=True,
-                            ),
-                            experimental_capabilities={},
+                init_options = InitializationOptions(
+                    server_name="mcp_wrapper",
+                    server_version="0.1.0",
+                    capabilities=self.server.get_capabilities(
+                        notification_options=NotificationOptions(
+                            tools_changed=True,
+                            prompts_changed=True,
+                            resources_changed=True,
                         ),
+                        experimental_capabilities={},
                     ),
                 )
+
+                async with AsyncExitStack() as stack:
+                    # Create and store the server session
+                    self.server_session = await stack.enter_async_context(
+                        ServerSession(
+                            streams[0],
+                            streams[1],
+                            init_options,
+                        )
+                    )
+
+                    # Process incoming messages
+                    async with anyio.create_task_group() as tg:
+                        async for message in self.server_session.incoming_messages:
+                            tg.start_soon(
+                                self.server._handle_message,
+                                message,
+                                self.server_session,
+                                None,  # No lifespan context needed
+                                False,  # Don't raise exceptions
+                            )
         finally:
             await self.stop_child_process()
 
