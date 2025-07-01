@@ -16,6 +16,11 @@ class ParameterType(str, Enum):
     OBJECT = "object"
 
 
+class ApprovalStatus(str, Enum):
+    APPROVED = "approved"
+    UNAPPROVED = "unapproved"
+
+
 @dataclass
 class MCPToolSpec:
     """Specification for a tool that can be used by a model."""
@@ -536,6 +541,7 @@ class MCPServerEntry:
     type: Literal["stdio", "http", "sse"]
     identifier: str  # URL for HTTP/SSE servers, command for stdio servers
     config: Optional[Dict[str, Any]] = None  # Serialized MCPServerConfig
+    approval_status: ApprovalStatus = ApprovalStatus.UNAPPROVED
 
     @staticmethod
     def create_key(server_type: str, identifier: str) -> str:
@@ -592,10 +598,17 @@ class MCPConfigDatabase:
                     with open(self.config_path, "r") as f:
                         data = json.load(f)
                         for server_data in data.get("servers", []):
+                            approval_status_str = server_data.get("approval_status", ApprovalStatus.UNAPPROVED.value)
+                            try:
+                                approval_status = ApprovalStatus(approval_status_str)
+                            except ValueError:
+                                approval_status = ApprovalStatus.UNAPPROVED
+                            
                             entry = MCPServerEntry(
                                 type=server_data.get("type"),
                                 identifier=server_data.get("identifier"),
                                 config=server_data.get("config"),
+                                approval_status=approval_status,
                             )
                             self.servers[entry.key] = entry
             except (json.JSONDecodeError, FileNotFoundError, ValueError):
@@ -611,6 +624,7 @@ class MCPConfigDatabase:
                         "type": entry.type,
                         "identifier": entry.identifier,
                         "config": entry.config,
+                        "approval_status": entry.approval_status.value,
                     }
                     for entry in self.servers.values()
                 ]
@@ -648,7 +662,7 @@ class MCPConfigDatabase:
         return None
 
     def save_server_config(
-        self, server_type: str, identifier: str, config: MCPServerConfig
+        self, server_type: str, identifier: str, config: MCPServerConfig, approval_status: ApprovalStatus = ApprovalStatus.APPROVED
     ) -> None:
         """
         Save a server configuration to the database.
@@ -657,13 +671,14 @@ class MCPConfigDatabase:
             server_type: The server type ('stdio', 'http', or 'sse')
             identifier: The server identifier (command or URL)
             config: The server configuration
+            approval_status: The approval status for the configuration
         """
         # Reload the database first to avoid overwriting other changes
         self._load()
 
         key = MCPServerEntry.create_key(server_type, identifier)
         self.servers[key] = MCPServerEntry(
-            type=server_type, identifier=identifier, config=config.to_dict()
+            type=server_type, identifier=identifier, config=config.to_dict(), approval_status=approval_status
         )
 
         self._save()
@@ -702,6 +717,79 @@ class MCPConfigDatabase:
                 "type": entry.type,
                 "identifier": entry.identifier,
                 "has_config": entry.config is not None,
+                "approval_status": entry.approval_status.value,
             }
             for entry in self.servers.values()
         ]
+
+    def save_unapproved_config(
+        self, server_type: str, identifier: str, config: MCPServerConfig
+    ) -> None:
+        """
+        Save an unapproved server configuration to the database.
+        
+        This is called when the wrapper encounters a new server configuration
+        that hasn't been approved yet.
+
+        Args:
+            server_type: The server type ('stdio', 'http', or 'sse')
+            identifier: The server identifier (command or URL)
+            config: The server configuration
+        """
+        self.save_server_config(server_type, identifier, config, ApprovalStatus.UNAPPROVED)
+
+    def approve_server_config(self, server_type: str, identifier: str) -> bool:
+        """
+        Mark a server configuration as approved.
+
+        Args:
+            server_type: The server type ('stdio', 'http', or 'sse')
+            identifier: The server identifier (command or URL)
+
+        Returns:
+            True if the server was found and approved, False otherwise
+        """
+        # Reload the database first to avoid overwriting other changes
+        self._load()
+
+        key = MCPServerEntry.create_key(server_type, identifier)
+        if key in self.servers:
+            self.servers[key].approval_status = ApprovalStatus.APPROVED
+            self._save()
+            return True
+
+        return False
+
+    def list_unapproved_servers(self) -> List[Dict[str, Any]]:
+        """
+        List all unapproved server entries in the database.
+
+        Returns:
+            A list of unapproved server entries
+        """
+        return [
+            {
+                "type": entry.type,
+                "identifier": entry.identifier,
+                "has_config": entry.config is not None,
+                "approval_status": entry.approval_status.value,
+            }
+            for entry in self.servers.values()
+            if entry.approval_status == ApprovalStatus.UNAPPROVED
+        ]
+
+    def is_server_approved(self, server_type: str, identifier: str) -> bool:
+        """
+        Check if a server configuration is approved.
+
+        Args:
+            server_type: The server type ('stdio', 'http', or 'sse')
+            identifier: The server identifier (command or URL)
+
+        Returns:
+            True if the server is approved, False otherwise
+        """
+        key = MCPServerEntry.create_key(server_type, identifier)
+        if key in self.servers:
+            return self.servers[key].approval_status == ApprovalStatus.APPROVED
+        return False

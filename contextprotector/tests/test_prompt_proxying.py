@@ -100,9 +100,9 @@ class TestPromptProxying:
 
         # First callback - before approval, confirm blocking
         async def callback1(session):
-            # List available tools
+            # List available tools - should only see config_instructions when unapproved
             tools = await session.list_tools()
-            assert "test_tool" in [t.name for t in tools.tools]
+            assert "config_instructions" in [t.name for t in tools.tools]
 
             # Call a tool to get the config (it will be blocked)
             blocked_result = await session.call_tool("test_tool", {"message": "test"})
@@ -219,7 +219,7 @@ class TestPromptProxying:
             blocked_result = await session.call_tool("test_tool", {"message": "test"})
             blocked_response = json.loads(blocked_result.content[0].text)
             assert blocked_response["status"] == "blocked"
-            assert "server_config" in blocked_response
+            # Note: server_config is no longer included to prevent information leakage
 
         # Part 2: After approval
         async def callback2(session):

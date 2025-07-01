@@ -60,18 +60,16 @@ async def run_with_wrapper_session(callback, config_path=None):
 @pytest.mark.asyncio
 async def test_echo_tool_through_wrapper(sse_server_fixture):
     """Test that the echo tool correctly works through the MCP wrapper using SSE transport."""
-    sc = None
 
     async def callback(session):
-        nonlocal sc
 
         input_message = "Hello from Wrapped SSE Server!"
 
         # List available tools
         tools = await session.list_tools()
 
-        # Should only have the echo tool
-        assert sorted([t.name for t in tools.tools]) == ["echo"]
+        # Should only have the config_instructions tool when config is unapproved
+        assert sorted([t.name for t in tools.tools]) == ["config_instructions"]
 
         # First try calling the echo tool - expect to get blocked
         result = await session.call_tool(
@@ -83,7 +81,7 @@ async def test_echo_tool_through_wrapper(sse_server_fixture):
 
         # Check that the call was blocked due to unapproved config
         assert isinstance(result_dict, dict) and result_dict["status"] == "blocked"
-        sc = result_dict["server_config"]
+        # Note: server_config is no longer included to prevent information leakage
 
     async def callback2(session):
         input_message = "Hello from Wrapped SSE Server!"
@@ -99,8 +97,6 @@ async def test_echo_tool_through_wrapper(sse_server_fixture):
 
         # Parse the response
         response_json = json.loads(result.content[0].text)
-        if response_json["status"] == "blocked":
-            assert sc == response_json["server_config"]
         assert response_json["status"] == "completed"
 
         # The actual echo response should be in the response field
@@ -132,12 +128,8 @@ async def test_echo_tool_through_wrapper(sse_server_fixture):
     from ..mcp_config import MCPConfigDatabase
 
     cdb = MCPConfigDatabase(temp_file.name)
-    # assert cdb.servers == [], "wrong"
     conf = cdb.get_server_config("sse", sse_url)
-    assert conf is not None, "couldn't find"
-    sc_obj = json.loads(sc)
-    conf_mine = MCPServerConfig.from_dict(sc_obj)
-    assert conf_mine == conf
+    assert conf is not None, "couldn't find approved config"
 
     await run_with_wrapper_session(callback2, temp_file.name)
 

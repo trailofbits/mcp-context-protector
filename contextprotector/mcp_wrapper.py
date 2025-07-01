@@ -25,6 +25,7 @@ from .mcp_config import (
     MCPParameterDefinition,
     ParameterType,
     MCPConfigDatabase,
+    ApprovalStatus,
 )
 
 logger = logging.getLogger("mcp_wrapper")
@@ -242,7 +243,45 @@ class MCPWrapperServer:
 
         @self.server.list_tools()
         async def list_tools() -> List[types.Tool]:
-            """Return tool specs from the child MCP server and add wrapper-specific tools."""
+            """Return tool specs based on config approval status."""
+            
+            if not self.config_approved:
+                # When config is not approved, return wrapper tools only (no downstream server tools)
+                logger.info("Config not approved - returning only wrapper tools")
+                
+                wrapper_tools = [
+                    types.Tool(
+                        name="config_instructions",
+                        description="Get instructions for approving the server configuration",
+                        inputSchema={
+                            "type": "object",
+                            "properties": {},
+                            "required": []
+                        }
+                    )
+                ]
+                
+                # Add quarantine_release tool if quarantine is enabled (this is a wrapper tool, not downstream)
+                if self.use_guardrails and self.quarantine:
+                    quarantine_release_tool = types.Tool(
+                        name="quarantine_release",
+                        description="Release a quarantined tool response for review",
+                        inputSchema={
+                            "type": "object",
+                            "required": ["uuid"],
+                            "properties": {
+                                "uuid": {
+                                    "type": "string",
+                                    "description": "UUID of the quarantined tool response to release",
+                                }
+                            },
+                        },
+                    )
+                    wrapper_tools.append(quarantine_release_tool)
+                
+                return wrapper_tools
+            
+            # Config is approved - return all downstream tools
             all_tools = []
 
             for spec in self.tool_specs:
@@ -338,6 +377,12 @@ class MCPWrapperServer:
                 f"Tool call with name {name} and config_approved {self.config_approved}"
             )
 
+            if name == "config_instructions":
+                if self.config_approved:
+                    # config_instructions tool should not be available when config is approved
+                    raise ValueError("config_instructions tool is only available when server configuration is not approved")
+                return await self._handle_config_instructions()
+
             if name == "quarantine_release" and self.use_guardrails and self.quarantine:
                 return await self._handle_quarantine_release(arguments)
 
@@ -349,24 +394,10 @@ class MCPWrapperServer:
                     f"Blocking tool '{name}' - server configuration not approved"
                 )
 
-                self.current_config = self._create_server_config()
-
-                # Create diff if we have a saved config to compare against
-                diff_text = "New server - no previous configuration to compare"
-                if self.saved_config:
-                    diff = self.saved_config.compare(self.current_config)
-                    if diff.has_differences():
-                        diff_text = str(diff)
-                    else:
-                        diff_text = "No differences found (configs are identical)"
-
-                serialized_config = self.current_config.to_json()
-
+                # Don't leak any server information in the blocked response
                 blocked_response = {
-                    "status": "blocked",
-                    "server_config": serialized_config,
-                    "diff": diff_text,
-                    "reason": "Server configuration not approved - all tools blocked",
+                    "status": "blocked", 
+                    "reason": "Server configuration not approved. Use the 'config_instructions' tool for approval instructions.",
                 }
 
                 error_json = json.dumps(blocked_response)
@@ -418,6 +449,33 @@ class MCPWrapperServer:
             except Exception as e:
                 logger.error(f"Error from child MCP server: {e}")
                 raise ValueError(f"Error from child MCP server: {str(e)}")
+
+    async def _handle_config_instructions(self) -> List[types.TextContent]:
+        """
+        Handle the config_instructions tool call.
+        
+        Returns:
+            Instructions for approving the server configuration
+        """
+        instructions = """
+To approve this server configuration, you need to run the wrapper in review mode:
+
+1. For stdio servers:
+   python -m contextprotector --review-server stdio "your-server-command" [--config /path/to/config]
+
+2. For HTTP/SSE servers:
+   python -m contextprotector --review-server sse "http://your-server-url" [--config /path/to/config]
+
+3. For streamable HTTP servers:
+   python -m contextprotector --review-server http "http://your-server-url" [--config /path/to/config]
+
+The review process will show you the server's capabilities and tools, and ask if you want to trust them.
+Once approved, you can use all the server's tools through this wrapper.
+
+Note: This tool is only available when the server configuration is not yet approved.
+"""
+        
+        return [types.TextContent(type="text", text=instructions.strip())]
 
     async def _handle_quarantine_release(
         self, arguments: Dict[str, Any]
@@ -922,18 +980,34 @@ class MCPWrapperServer:
 
         self.current_config = self._create_server_config()
 
-        if self.saved_config and self.saved_config == self.current_config:
-            logger.info(
-                "Current configuration matches saved configuration - auto-approving"
-            )
-            self.config_approved = True
-        else:
-            if not self.saved_config:
-                logger.info("No saved configuration found - approval required")
+        # Check approval status using the new database system
+        is_approved = self.config_db.is_server_approved(self.connection_type, self._get_server_identifier())
+        
+        if is_approved:
+            # Check if current config matches the approved one
+            saved_config = self.config_db.get_server_config(self.connection_type, self._get_server_identifier())
+            if saved_config and saved_config == self.current_config:
+                logger.info("Current configuration matches approved configuration")
+                self.config_approved = True
             else:
-                logger.info(
-                    "Configuration has changed since last approval - re-approval required"
-                )
+                logger.info("Configuration has changed since last approval - re-approval required")
+                # Save the new config as unapproved
+                self.config_db.save_unapproved_config(self.connection_type, self._get_server_identifier(), self.current_config)
+                self.config_approved = False
+        else:
+            logger.info("Server configuration not approved - saving as unapproved")
+            # Save the config as unapproved for later review
+            self.config_db.save_unapproved_config(self.connection_type, self._get_server_identifier(), self.current_config)
+            self.config_approved = False
+
+    def _get_server_identifier(self) -> str:
+        """Get the server identifier for database storage."""
+        if self.connection_type == "stdio":
+            return self.child_command
+        elif self.connection_type in ["http", "sse"]:
+            return self.server_url
+        else:
+            raise ValueError(f"Unknown connection type: {self.connection_type}")
 
     async def _connect_via_stdio(self):
         """Connect to a downstream server via stdio."""
@@ -1384,8 +1458,9 @@ async def review_server_config(
         if response in ("yes", "y"):
             wrapper.config_db.save_server_config(
                 wrapper.connection_type,
-                wrapper.server_identifier,
+                wrapper._get_server_identifier(),
                 wrapper.current_config,
+                ApprovalStatus.APPROVED,
             )
             print(
                 f"\nThe server configuration for {identifier} has been trusted and saved."

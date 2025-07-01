@@ -61,18 +61,10 @@ class TestAnsiVisualization:
 
         # First test stage - get blocked
         async def callback1(session):
-            # List available tools
+            # List available tools - should only see config_instructions when unapproved
             tools = await session.list_tools()
-
-            # There should be an ansi_echo tool
             tool_names = [t.name for t in tools.tools]
-            assert "ansi_echo" in tool_names
-
-            # Find the ansi_echo tool
-            ansi_tool = next(t for t in tools.tools if t.name == "ansi_echo")
-
-            # Verify that the description contains ANSI escape sequences
-            assert "\x1b[" in ansi_tool.description
+            assert tool_names == ["config_instructions"]
 
             # First attempt to call ansi_echo should be blocked
             blocked_result = await session.call_tool("ansi_echo", {"message": "test"})
@@ -81,6 +73,15 @@ class TestAnsiVisualization:
 
         # Second test stage - after approval
         async def callback2(session):
+            # After approval, list tools to verify ANSI codes in descriptions
+            tools = await session.list_tools()
+            tool_names = [t.name for t in tools.tools]
+            assert "ansi_echo" in tool_names
+
+            # Find the ansi_echo tool and verify ANSI escape sequences in description
+            ansi_tool = next(t for t in tools.tools if t.name == "ansi_echo")
+            assert "\x1b[" in ansi_tool.description
+
             # Now try calling the ansi_echo tool
             result = await session.call_tool("ansi_echo", {"message": "test"})
 
@@ -114,12 +115,10 @@ class TestAnsiVisualization:
 
         # First test stage - get blocked
         async def callback1(session):
-            # List available tools
+            # List available tools - should only see config_instructions when unapproved
             tools = await session.list_tools()
-
-            # There should be an ansi_echo tool
             tool_names = [t.name for t in tools.tools]
-            assert "ansi_echo" in tool_names
+            assert tool_names == ["config_instructions"]
 
             # First attempt to call ansi_echo should be blocked
             blocked_result = await session.call_tool("ansi_echo", {"message": "test"})

@@ -40,6 +40,11 @@ async def main_async():
         action="store_true",
         help="Review and manage quarantined tool responses",
     )
+    source_group.add_argument(
+        "--list-unapproved",
+        action="store_true",
+        help="List unapproved server configurations for review",
+    )
 
     # Add config file argument with new name
     parser.add_argument(
@@ -112,6 +117,10 @@ async def main_async():
         await review_quarantine(args.quarantine_path, args.quarantine_id)
         return
 
+    if args.list_unapproved:
+        await list_unapproved_configs(args.config_file)
+        return
+
     # Check if we're in server review mode
     if args.review_server:
         # For review mode, we need either command or url
@@ -182,6 +191,90 @@ async def main_async():
         logger.info("Shutting down")
     finally:
         await wrapper.stop_child_process()
+
+
+async def list_unapproved_configs(config_path: str = None):
+    """List and provide a menu for reviewing unapproved server configurations."""
+    from .mcp_config import MCPConfigDatabase
+    from .mcp_wrapper import review_server_config
+    
+    config_db = MCPConfigDatabase(config_path if config_path else None)
+    
+    unapproved_servers = config_db.list_unapproved_servers()
+    
+    if not unapproved_servers:
+        print("No unapproved server configurations found.")
+        return
+    
+    print(f"\nFound {len(unapproved_servers)} unapproved server configuration(s):\n")
+    
+    for i, server in enumerate(unapproved_servers, 1):
+        print(f"{i}. [{server['type'].upper()}] {server['identifier']}")
+        if server['has_config']:
+            print("   Status: Configuration available for review")
+        else:
+            print("   Status: No configuration data available")
+        print()
+    
+    # Interactive menu
+    while True:
+        try:
+            print("Options:")
+            print("  [1-{}] Review and approve a specific server".format(len(unapproved_servers)))
+            print("  [a] Approve all servers")
+            print("  [q] Quit")
+            
+            choice = input("\nEnter your choice: ").strip().lower()
+            
+            if choice == 'q':
+                break
+            elif choice == 'a':
+                # Approve all servers
+                confirm = input("Are you sure you want to approve ALL unapproved servers? (yes/no): ").strip().lower()
+                if confirm in ('yes', 'y'):
+                    approved_count = 0
+                    for server in unapproved_servers:
+                        success = config_db.approve_server_config(server['type'], server['identifier'])
+                        if success:
+                            approved_count += 1
+                            print(f"✓ Approved: [{server['type'].upper()}] {server['identifier']}")
+                        else:
+                            print(f"✗ Failed to approve: [{server['type'].upper()}] {server['identifier']}")
+                    print(f"\nApproved {approved_count} out of {len(unapproved_servers)} server configurations.")
+                    break
+                else:
+                    print("Bulk approval cancelled.")
+            else:
+                # Try to parse as a number
+                try:
+                    index = int(choice) - 1
+                    if 0 <= index < len(unapproved_servers):
+                        server = unapproved_servers[index]
+                        print(f"\nReviewing: [{server['type'].upper()}] {server['identifier']}")
+                        
+                        # Call the existing review function
+                        await review_server_config(
+                            server['type'],
+                            server['identifier'],
+                            config_path
+                        )
+                        
+                        # Refresh the list and continue
+                        unapproved_servers = config_db.list_unapproved_servers()
+                        if not unapproved_servers:
+                            print("\n✓ All server configurations have been reviewed!")
+                            break
+                        else:
+                            print(f"\n{len(unapproved_servers)} unapproved configuration(s) remaining.")
+                    else:
+                        print("Invalid selection. Please try again.")
+                except ValueError:
+                    print("Invalid input. Please enter a number, 'a', or 'q'.")
+        except KeyboardInterrupt:
+            print("\n\nExiting...")
+            break
+        except Exception as e:
+            print(f"Error: {e}")
 
 
 def main():
