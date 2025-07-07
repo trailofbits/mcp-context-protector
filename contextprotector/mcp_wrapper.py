@@ -243,66 +243,25 @@ class MCPWrapperServer:
 
         @self.server.list_tools()
         async def list_tools() -> List[types.Tool]:
-            """Return tool specs based on config approval status."""
+            """Return tool specs based on granular approval status."""
             
-            if not self.config_approved:
-                # When config is not approved, return wrapper tools only (no downstream server tools)
-                logger.info("Config not approved - returning only wrapper tools")
-                
-                wrapper_tools = [
-                    types.Tool(
-                        name="config_instructions",
-                        description="Get instructions for approving the server configuration",
-                        inputSchema={
-                            "type": "object",
-                            "properties": {},
-                            "required": []
-                        }
-                    )
-                ]
-                
-                # Add quarantine_release tool if quarantine is enabled (this is a wrapper tool, not downstream)
-                if self.use_guardrails and self.quarantine:
-                    quarantine_release_tool = types.Tool(
-                        name="quarantine_release",
-                        description="Release a quarantined tool response for review",
-                        inputSchema={
-                            "type": "object",
-                            "required": ["uuid"],
-                            "properties": {
-                                "uuid": {
-                                    "type": "string",
-                                    "description": "UUID of the quarantined tool response to release",
-                                }
-                            },
-                        },
-                    )
-                    wrapper_tools.append(quarantine_release_tool)
-                
-                return wrapper_tools
+            wrapper_tools = []
             
-            # Config is approved - return all downstream tools
-            all_tools = []
-
-            for spec in self.tool_specs:
-                tool_kwargs = {
-                    "name": spec.name,
-                    "description": spec.description,
-                    "inputSchema": self._convert_parameters_to_schema(
-                        spec.parameters, spec.required
-                    ),
-                }
-
-                # Add outputSchema if present
-                if spec.output_schema is not None:
-                    tool_kwargs["outputSchema"] = spec.output_schema
-
-                tool = types.Tool(**tool_kwargs)
-                all_tools.append(tool)
-
+            # Add config_instructions if server/instructions not fully approved
+            if not self.config_approved or (hasattr(self, 'approval_status') and not self.approval_status.get("instructions_approved", False)):
+                wrapper_tools.append(types.Tool(
+                    name="config_instructions",
+                    description="Get instructions for approving the server configuration",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                ))
+            
             # Add quarantine_release tool if quarantine is enabled
             if self.use_guardrails and self.quarantine:
-                quarantine_release_tool = types.Tool(
+                wrapper_tools.append(types.Tool(
                     name="quarantine_release",
                     description="Release a quarantined tool response for review",
                     inputSchema={
@@ -315,8 +274,35 @@ class MCPWrapperServer:
                             }
                         },
                     },
-                )
-                all_tools.append(quarantine_release_tool)
+                ))
+            
+            # If config is not approved at all, return only wrapper tools
+            if not self.config_approved:
+                logger.info("Config not approved - returning only wrapper tools")
+                return wrapper_tools
+            
+            # Config is approved (at least partially) - return approved downstream tools
+            all_tools = wrapper_tools.copy()
+
+            for spec in self.tool_specs:
+                # Check if this specific tool is approved
+                if (hasattr(self, 'approval_status') and 
+                    self.approval_status.get("tools", {}).get(spec.name, False)):
+                    
+                    tool_kwargs = {
+                        "name": spec.name,
+                        "description": spec.description,
+                        "inputSchema": self._convert_parameters_to_schema(
+                            spec.parameters, spec.required
+                        ),
+                    }
+
+                    # Add outputSchema if present
+                    if spec.output_schema is not None:
+                        tool_kwargs["outputSchema"] = spec.output_schema
+
+                    tool = types.Tool(**tool_kwargs)
+                    all_tools.append(tool)
 
             return all_tools
 
@@ -377,10 +363,8 @@ class MCPWrapperServer:
                 f"Tool call with name {name} and config_approved {self.config_approved}"
             )
 
+            # Handle wrapper tools
             if name == "config_instructions":
-                if self.config_approved:
-                    # config_instructions tool should not be available when config is approved
-                    raise ValueError("config_instructions tool is only available when server configuration is not approved")
                 return await self._handle_config_instructions()
 
             if name == "quarantine_release" and self.use_guardrails and self.quarantine:
@@ -389,21 +373,59 @@ class MCPWrapperServer:
             if not self.session:
                 raise ValueError("Child MCP server not connected")
 
-            if not self.config_approved:
-                logger.warning(
-                    f"Blocking tool '{name}' - server configuration not approved"
-                )
+            # Check if this specific tool is approved using granular approval system
+            if not hasattr(self, 'approval_status'):
+                logger.warning(f"Blocking tool '{name}' - approval status not initialized")
+                blocked_response = {
+                    "status": "blocked", 
+                    "reason": "Server approval status not initialized. Try reconnecting.",
+                }
+                error_json = json.dumps(blocked_response)
+                raise ValueError(error_json)
 
-                # Don't leak any server information in the blocked response
+            # Check if server is completely new or instructions changed
+            if self.approval_status.get("is_new_server", False):
+                logger.warning(f"Blocking tool '{name}' - new server not approved")
                 blocked_response = {
                     "status": "blocked", 
                     "reason": "Server configuration not approved. Use the 'config_instructions' tool for approval instructions.",
                 }
-
                 error_json = json.dumps(blocked_response)
                 raise ValueError(error_json)
 
-            # If we get here, config is approved, so proxy the tool call
+            # Check instructions approval - but differentiate between never-approved and changed instructions
+            if not self.approval_status.get("instructions_approved", False):
+                if self.approval_status.get("server_approved", False):
+                    # Server was previously approved but instructions changed
+                    logger.warning(f"Blocking tool '{name}' - server instructions have changed")
+                    blocked_response = {
+                        "status": "blocked", 
+                        "reason": "Server instructions have changed and need re-approval. Use the 'config_instructions' tool for approval instructions.",
+                    }
+                else:
+                    # Server was never approved
+                    logger.warning(f"Blocking tool '{name}' - server not approved")
+                    blocked_response = {
+                        "status": "blocked", 
+                        "reason": "Server configuration not approved. Use the 'config_instructions' tool for approval instructions.",
+                    }
+                error_json = json.dumps(blocked_response)
+                raise ValueError(error_json)
+
+            # Check if this specific tool is approved
+            # Only block if the tool exists in our config but is not approved
+            # If the tool doesn't exist in our config, let the downstream server handle it
+            tools_dict = self.approval_status.get("tools", {})
+            if name in tools_dict and not tools_dict[name]:
+                logger.warning(f"Blocking tool '{name}' - tool not approved")
+                blocked_response = {
+                    "status": "blocked", 
+                    "reason": f"Tool '{name}' is not approved. Use the 'config_instructions' tool for approval instructions.",
+                }
+                error_json = json.dumps(blocked_response)
+                raise ValueError(error_json)
+
+            # Tool is approved, proxy the call
             try:
                 tool_result = await self._proxy_tool_to_downstream(name, arguments)
 
@@ -732,27 +754,39 @@ Note: This tool is only available when the server configuration is not yet appro
         """
         self.tool_specs = self._convert_mcp_tools_to_specs(tools)
 
-        # Temporarily reset approval while we check if the config has changed
-        self.config_approved = False
-
         old_config = self.current_config
         self.current_config = self._create_server_config()
 
-        # If tools have changed, check against the saved config (if any)
+        # Re-evaluate approval status with the new config
+        self.approval_status = self.config_db.get_server_approval_status(
+            self.connection_type, self._get_server_identifier(), self.current_config
+        )
+
+        # Log the configuration changes if any
         if old_config != self.current_config:
             diff = old_config.compare(self.current_config)
             if diff.has_differences():
-                logger.warning(f"Configuration differences: {diff}")
+                logger.warning(f"Configuration differences detected: {diff}")
+                
+                # Update the database with new unapproved config
+                self.config_db.save_unapproved_config(
+                    self.connection_type, self._get_server_identifier(), self.current_config
+                )
 
-            if self.saved_config and self.saved_config == self.current_config:
-                logger.info("Tools changed but match saved approved configuration")
-                self.config_approved = True
-            else:
-                logger.warning("Tools changed, requiring re-approval")
-
+        # Update config_approved based on the new granular status
+        if self.approval_status.get("is_new_server", False):
+            self.config_approved = False
+        elif not self.approval_status.get("instructions_approved", False):
+            self.config_approved = False
         else:
-            logger.info("Tools updated but configuration unchanged")
-            self.config_approved = True
+            # Check if we have any approved tools
+            approved_tool_count = sum(1 for approved in self.approval_status["tools"].values() if approved)
+            self.config_approved = approved_tool_count > 0
+            
+        logger.info(f"Tool update processed - approval status: {self.config_approved}")
+        if hasattr(self, 'approval_status'):
+            approved_tools = [name for name, approved in self.approval_status["tools"].items() if approved]
+            logger.info(f"Approved tools: {approved_tools}")
 
     async def _forward_notification_to_upstream(self, method: str, params=None):
         """
@@ -980,25 +1014,32 @@ Note: This tool is only available when the server configuration is not yet appro
 
         self.current_config = self._create_server_config()
 
-        # Check approval status using the new database system
-        is_approved = self.config_db.is_server_approved(self.connection_type, self._get_server_identifier())
+        # Get granular approval status using the new system
+        self.approval_status = self.config_db.get_server_approval_status(
+            self.connection_type, self._get_server_identifier(), self.current_config
+        )
         
-        if is_approved:
-            # Check if current config matches the approved one
-            saved_config = self.config_db.get_server_config(self.connection_type, self._get_server_identifier())
-            if saved_config and saved_config == self.current_config:
-                logger.info("Current configuration matches approved configuration")
-                self.config_approved = True
-            else:
-                logger.info("Configuration has changed since last approval - re-approval required")
-                # Save the new config as unapproved
-                self.config_db.save_unapproved_config(self.connection_type, self._get_server_identifier(), self.current_config)
-                self.config_approved = False
-        else:
-            logger.info("Server configuration not approved - saving as unapproved")
+        if self.approval_status["is_new_server"]:
+            logger.info("New server detected - saving as unapproved")
             # Save the config as unapproved for later review
             self.config_db.save_unapproved_config(self.connection_type, self._get_server_identifier(), self.current_config)
             self.config_approved = False
+        elif not self.approval_status["instructions_approved"]:
+            logger.info("Server instructions have changed - server blocked until re-approval")
+            # Save the updated config as unapproved
+            self.config_db.save_unapproved_config(self.connection_type, self._get_server_identifier(), self.current_config)
+            self.config_approved = False
+        else:
+            # Instructions are approved, check if we have any approved tools
+            approved_tool_count = sum(1 for approved in self.approval_status["tools"].values() if approved)
+            total_tool_count = len(self.approval_status["tools"])
+            
+            if approved_tool_count > 0:
+                logger.info(f"Server partially approved - {approved_tool_count}/{total_tool_count} tools approved")
+                self.config_approved = True  # Allow partial operation
+            else:
+                logger.info("Server instructions approved but no tools approved yet")
+                self.config_approved = False
 
     def _get_server_identifier(self) -> str:
         """Get the server identifier for database storage."""
@@ -1127,7 +1168,8 @@ Note: This tool is only available when the server configuration is not yet appro
         config = MCPServerConfig()
 
         if self.initialize_result and hasattr(self.initialize_result, "instructions"):
-            config.instructions = self.initialize_result.instructions
+            # Handle None instructions
+            config.instructions = self.initialize_result.instructions or ""
 
         for spec in self.tool_specs:
             parameters = []
@@ -1456,6 +1498,23 @@ async def review_server_config(
             .lower()
         )
         if response in ("yes", "y"):
+            # First approve instructions
+            wrapper.config_db.approve_instructions(
+                wrapper.connection_type,
+                wrapper._get_server_identifier(),
+                wrapper.current_config.instructions,
+            )
+            
+            # Then approve each tool individually
+            for tool in wrapper.current_config.tools:
+                wrapper.config_db.approve_tool(
+                    wrapper.connection_type,
+                    wrapper._get_server_identifier(),
+                    tool.name,
+                    tool,
+                )
+            
+            # Finally set the server as approved
             wrapper.config_db.save_server_config(
                 wrapper.connection_type,
                 wrapper._get_server_identifier(),
