@@ -14,7 +14,14 @@ from pathlib import Path
 
 import mcp.types as types
 from contextprotector.mcp_config import MCPConfigDatabase, ApprovalStatus
-from contextprotector.tests.test_utils import run_with_wrapper_session, approve_server_config_using_review
+from .test_utils import run_with_wrapper_session, approve_server_config_using_review
+
+
+def get_server_command(server_filename: str) -> str:
+    """Get the absolute path command for a server script, regardless of cwd."""
+    test_dir = Path(__file__).parent
+    server_path = test_dir / server_filename
+    return f"python {server_path}"
 
 
 @pytest.mark.asyncio
@@ -40,13 +47,13 @@ async def test_dynamic_tool_addition_with_existing_server():
     
     await run_with_wrapper_session(
         callback_initial_approval, "stdio",
-        "python contextprotector/tests/simple_downstream_server.py",
+        get_server_command("simple_downstream_server.py"),
         temp_file.name
     )
     
     # Approve the initial configuration
     await approve_server_config_using_review(
-        "stdio", "python contextprotector/tests/simple_downstream_server.py", temp_file.name
+        "stdio", get_server_command("simple_downstream_server.py"), temp_file.name
     )
     
     # Step 2: Verify echo tool works after approval
@@ -65,7 +72,7 @@ async def test_dynamic_tool_addition_with_existing_server():
     
     await run_with_wrapper_session(
         callback_initial_working, "stdio",
-        "python contextprotector/tests/simple_downstream_server.py",
+        get_server_command("simple_downstream_server.py"),
         temp_file.name
     )
     
@@ -75,7 +82,7 @@ async def test_dynamic_tool_addition_with_existing_server():
     db = MCPConfigDatabase(temp_file.name)
     
     # Get current config and add a new tool
-    config = db.get_server_config("stdio", "python contextprotector/tests/simple_downstream_server.py")
+    config = db.get_server_config("stdio", get_server_command("simple_downstream_server.py"))
     new_tool = MCPToolDefinition(
         name="new_test_tool",
         description="A newly added test tool",
@@ -91,12 +98,12 @@ async def test_dynamic_tool_addition_with_existing_server():
     config.add_tool(new_tool)
     
     # Save the updated config as unapproved (simulating dynamic tool addition)
-    db.save_unapproved_config("stdio", "python contextprotector/tests/simple_downstream_server.py", config)
+    db.save_unapproved_config("stdio", get_server_command("simple_downstream_server.py"), config)
     
     # Step 4: Test granular blocking - original tool works, new tool blocked
     async def callback_after_addition(session):
         # Check approval status
-        approval_status = db.get_server_approval_status("stdio", "python contextprotector/tests/simple_downstream_server.py", config)
+        approval_status = db.get_server_approval_status("stdio", get_server_command("simple_downstream_server.py"), config)
         
         # Instructions should still be approved
         assert approval_status["instructions_approved"] == True
@@ -112,7 +119,7 @@ async def test_dynamic_tool_addition_with_existing_server():
     
     await run_with_wrapper_session(
         callback_after_addition, "stdio",
-        "python contextprotector/tests/simple_downstream_server.py", 
+        get_server_command("simple_downstream_server.py"),
         temp_file.name
     )
 

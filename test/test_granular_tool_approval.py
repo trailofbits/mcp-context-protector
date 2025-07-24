@@ -16,7 +16,7 @@ from pathlib import Path
 
 import mcp.types as types
 from contextprotector.mcp_config import MCPConfigDatabase, MCPServerConfig, MCPToolDefinition, MCPParameterDefinition, ParameterType, ApprovalStatus
-from contextprotector.tests.test_utils import run_with_wrapper_session, approve_server_config_using_review
+from .test_utils import run_with_wrapper_session, approve_server_config_using_review
 
 
 @pytest.mark.asyncio

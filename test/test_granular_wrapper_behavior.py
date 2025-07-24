@@ -13,7 +13,14 @@ from pathlib import Path
 
 import mcp.types as types
 from contextprotector.mcp_config import MCPConfigDatabase, MCPServerConfig, MCPToolDefinition, MCPParameterDefinition, ParameterType, ApprovalStatus
-from contextprotector.tests.test_utils import run_with_wrapper_session, approve_server_config_using_review
+from .test_utils import run_with_wrapper_session, approve_server_config_using_review
+
+
+def get_server_command(server_filename: str) -> str:
+    """Get the absolute path command for a server script, regardless of cwd."""
+    test_dir = Path(__file__).parent
+    server_path = test_dir / server_filename
+    return f"python {server_path}"
 
 
 @pytest.mark.asyncio
@@ -25,30 +32,30 @@ async def test_granular_tool_filtering_in_list_tools():
     # Step 1: Start with multi-tool server and approve it fully
     await run_with_wrapper_session(
         lambda session: session.list_tools(), "stdio", 
-        "python contextprotector/tests/multi_tool_downstream_server.py", 
+        get_server_command("multi_tool_downstream_server.py"), 
         temp_file.name
     )
     
     # Approve the server
     await approve_server_config_using_review(
-        "stdio", "python contextprotector/tests/multi_tool_downstream_server.py", temp_file.name
+        "stdio", get_server_command("multi_tool_downstream_server.py"), temp_file.name
     )
     
     # Step 2: Create a mixed approval scenario by approving only one tool
     db = MCPConfigDatabase(temp_file.name)
     
     # Get the current config (which should have both echo and greet tools)
-    config = db.get_server_config("stdio", "python contextprotector/tests/multi_tool_downstream_server.py")
+    config = db.get_server_config("stdio", get_server_command("multi_tool_downstream_server.py"))
     
     # Reset approval - remove the server entry completely and recreate it
     from contextprotector.mcp_config import MCPServerEntry
-    key = MCPServerEntry.create_key("stdio", "python contextprotector/tests/multi_tool_downstream_server.py")
+    key = MCPServerEntry.create_key("stdio", get_server_command("multi_tool_downstream_server.py"))
     if key in db.servers:
         del db.servers[key]
         db._save()
     
     # Save as unapproved config (this will create a fresh entry)
-    db.save_unapproved_config("stdio", "python contextprotector/tests/multi_tool_downstream_server.py", config)
+    db.save_unapproved_config("stdio", get_server_command("multi_tool_downstream_server.py"), config)
     
     # Find the tools in the config
     echo_tool = None
@@ -60,9 +67,9 @@ async def test_granular_tool_filtering_in_list_tools():
             greet_tool = tool
     
     # Approve instructions and only the echo tool
-    db.approve_instructions("stdio", "python contextprotector/tests/multi_tool_downstream_server.py", config.instructions)
+    db.approve_instructions("stdio", get_server_command("multi_tool_downstream_server.py"), config.instructions)
     if echo_tool:
-        db.approve_tool("stdio", "python contextprotector/tests/multi_tool_downstream_server.py", "echo", echo_tool)
+        db.approve_tool("stdio", get_server_command("multi_tool_downstream_server.py"), "echo", echo_tool)
     # Note: NOT approving greet tool
     
     
@@ -97,7 +104,7 @@ async def test_granular_tool_filtering_in_list_tools():
     
     await run_with_wrapper_session(
         test_granular_filtering, "stdio",
-        "python contextprotector/tests/multi_tool_downstream_server.py",
+        get_server_command("multi_tool_downstream_server.py"),
         temp_file.name
     )
 
@@ -308,7 +315,7 @@ async def test_new_server_complete_blocking():
     
     await run_with_wrapper_session(
         test_new_server_blocking, "stdio",
-        "python contextprotector/tests/simple_downstream_server.py",
+        get_server_command("simple_downstream_server.py"),
         temp_file.name
     )
     

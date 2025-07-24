@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from datetime import datetime, timedelta
 
-from ..quarantine import QuarantinedToolResponse, ToolResponseQuarantine
+from contextprotector.quarantine import QuarantinedToolResponse, ToolResponseQuarantine
 
 
 class TestQuarantinedToolResponse(unittest.TestCase):

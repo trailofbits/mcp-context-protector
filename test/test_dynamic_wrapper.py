@@ -69,7 +69,7 @@ def create_approved_config(server_cmd):
             "contextprotector",
             "--command",
             server_cmd,
-            "--config-file",
+            "--server-config-file",
             TEMP_CONFIG_FILE,
             "--review-server",
             "yes",

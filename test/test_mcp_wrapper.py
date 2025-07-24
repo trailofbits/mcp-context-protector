@@ -11,7 +11,7 @@ import asyncio
 from mcp import ClientSession, StdioServerParameters, types
 from mcp.client.stdio import stdio_client
 from pathlib import Path
-from ..mcp_config import MCPServerConfig
+from contextprotector.mcp_config import MCPServerConfig
 
 
 async def approve_server_config_using_review(command, config_path):
@@ -31,7 +31,7 @@ async def approve_server_config_using_review(command, config_path):
             "--review-server",
             "--command",
             command,
-            "--config-file",
+            "--server-config-file",
             config_path,
         ],
         stdin=subprocess.PIPE,
@@ -75,7 +75,7 @@ async def run_with_wrapper_session(callback, config_path=None):
             "contextprotector",
             "--command",
             f"python {str(dir.joinpath('simple_downstream_server.py'))}",
-            "--config-file",
+            "--server-config-file",
             str(config_path),
         ],  # Wrapper command + downstream server
         cwd=Path(__file__).parent.parent.parent.resolve(),

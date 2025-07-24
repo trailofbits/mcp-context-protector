@@ -1,4 +1,10 @@
-# context-protector
+# contextprotector
+
+<!--- BADGES: START --->
+[![CI](https://github.com/trailofbits/contextprotector/actions/workflows/tests.yml/badge.svg)](https://github.com/trailofbits/contextprotector/actions/workflows/tests.yml)
+[![PyPI version](https://badge.fury.io/py/contextprotector.svg)](https://pypi.org/project/contextprotector)
+[![Packaging status](https://repology.org/badge/tiny-repos/python:contextprotector.svg)](https://repology.org/project/python:contextprotector/versions)
+<!--- BADGES: END --->
 
 ## Overview
 
@@ -11,7 +17,36 @@ context-protector is a security wrapper for MCP servers that addresses risks ass
 - Guardrail scanning and quarantining of tool responses
 - ANSI control character sanitization
 
-### Security risks and controls
+## Quickstart
+
+Installation:
+
+```
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# Download context-protector
+git clone https://github.com/trailofbits/context-protector
+# Install dependencies
+cd context-protector
+uv sync
+```
+
+To make it easier to launch `context-protector`, we recommend updating `context-protector.sh` to contain the full path to `uv`. Some MCP clients, including Claude Desktop, replace the `PATH` environment variable with a minimal set of paths when launching MCP servers.
+
+Now configure your client to run your MCP servers through `context-protector`, and tool configuration pinning will automatically be enabled. Here's a sample Claude Desktop config:
+
+```
+{
+  "mcpServers": {
+    "wrapped_acme_server": {
+      "command": "/path/to/context-protector/context-protector.sh",
+      "args": ["--command", "/path/to/node /path/to/acme/server.js"]
+    }
+  }
+}
+```
+
+## Security risks and controls
 
 | Risk    | Relevant control |
 | -------- | ------- |
@@ -32,7 +67,7 @@ The database of server configurations is stored in a JSON-encoded file whose def
 
 Servers are uniquely identified in this file by their type and an identifier, which is either a URL or the command string that launches the server. context-protector does not care about changes to a server's name in the host app's configuration (such as the `claude_desktop_config.json` file). If the command string (or URL) is unchanged, it's treated as the same server, and if the command string has changed, even in inconsequential ways, it's treated as a different server, and the configuration will need to be approved exactly as if context-protector were seeing the server for the first time.
 
-To approve a server's configuration and allow the host app to connect to it, run the CLI app with the argument `--review-server`. The wrapper server will connect to the downstream server, retrieve its configuration, and display it in the shell. If you approve the configuration, it will be added to the database and you can restart your host app to use it normally.
+To approve a server's configuration and allow the host app to connect to it, run the CLI app with the argument `--review-server`. The wrapper server will connect to the downstream server, retrieve its configuration, and display it in the shell. If you approve the configuration, it will be added to the database, and you can restart your host app to use it normally.
 
 ## Tool response guardrails and quarantine
 
@@ -40,82 +75,76 @@ If context-protector is launched with a guardrail provider, it will use the chos
 
 To review the response and release it from the quarantine, run the app with the argument `--review-quarantine`, optionally with the `--quarantine-id <ID>` argument to specify which quarantined response you want to review. The app will then display the tool call and response in the shell and let you review it. If you approve the response, the LLM app can then use the `quarantine_release` tool to retrieve the response and continue as normal.
 
-## Getting started
+## Configuring context-protector
 
-context-protector supports the stdio and SSE transports. It does not yet fully support the streamable HTTP transport introduced in the [March 26, 2025 update](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) to the protocol specification, but it will as soon as an official release of the Python SDK adds support for streamable HTTP.
-
-To start using context-protector, first set up a virtual environment and install dependencies:
-
-```bash
-# Environment setup
-git clone https://github.com/trailofbits/context-protector && cd context-protector
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-# Run tests if you like
-pytest -v --timeout=10
-```
-
-To start a server through the wrapper, run the `context-protector` script with either the `--command <COMMAND>` or `--sse-url <URL>` argument:
+`context-protector` is packaged with `uv` and can be run with To start a server through the wrapper, run the `context-protector.sh` launcher script with the arguments `--command <COMMAND>` or `--url <URL>`:
 
 ```
 # Start the wrapper with an stdio server
-/path/to/context-protector/.venv/bin/context-protector --command DOWNSTREAM_SERVER_COMMAND
+/path/context-protector.sh --command DOWNSTREAM_SERVER_COMMAND
 
 # Start the wrapper with an HTTP server
-/path/to/context-protector/.venv/bin/context-protector --sse-url DOWNSTREAM_SERVER_URL
+/path/context-protector.sh --url DOWNSTREAM_SERVER_URL
 ```
 
-Configure your host app to run the command above using full paths to your virtual env. In the case of Claude Desktop, your `claude_config.json` file should look something like this:
-
-```json
-{
-  "mcpServers": {
-    "wrapped_weather": {
-      "command": "/path/to/context-protector/.venv/bin/context-protector",
-      "args": ["--command", "/path/to/node /path/to/downstream/server.js"]
-    }
-  }
-}
-```
+If your downstream server requires the older SSE transport, use `--sse-url <URL>`.
 
 To include support for tool response scanning, include the `--guardrail-provider` argument:
 
 ```
-/path/to/context-protector/.venv/bin/context-protector --command DOWNSTREAM_SERVER_COMMAND --guardrail-provider LlamaFirewall
+context-protector.sh --command DOWNSTREAM_SERVER_COMMAND --guardrail-provider LlamaFirewall
 ```
 
 Review functions:
 
 ```
-/path/to/context-protector/.venv/bin/context-protector --review-server
-/path/to/context-protector/.venv/bin/context-protector --review-quarantine --quarantine-id <ID>
+context-protector.sh --review-all-servers
+context-protector.sh --review-quarantine --quarantine-id <ID>
 ```
 
 ## Usage
 
 ```
-usage: context-protector [-h] (--command COMMAND | --sse-url URL | --list-guardrail-providers | --review-quarantine) [--config-file CONFIG_FILE]
-                         [--guardrail-provider GUARDRAIL_PROVIDER] [--visualize-ansi-codes] [--review-server] [--quarantine-id QUARANTINE_ID]
-                         [--quarantine-path QUARANTINE_PATH]
+usage: contextprotector [-h] [--command COMMAND] [--url URL] [--sse-url SSE_URL] [--list-guardrail-providers] [--review-server] [--review-quarantine]
+                        [--review-all-servers] [--server-config-file SERVER_CONFIG_FILE] [--guardrail-provider GUARDRAIL_PROVIDER] [--visualize-ansi-codes]
+                        [--quarantine-id QUARANTINE_ID] [--quarantine-path QUARANTINE_PATH]
 
 options:
   -h, --help            show this help message and exit
-  --command COMMAND     Start a wrapped server over the stdio transport using the specified command
-  --sse-url URL         Connect to a remote MCP server over SSE at the specified URL
-  --list-guardrail-providers
-                        List available guardrail providers and exit
-  --review-quarantine   Review and manage quarantined tool responses
-  --config-file CONFIG_FILE
-                        The path to the wrapper config file
+  --server-config-file SERVER_CONFIG_FILE
+                        The path to the server config database file (default: ~/.context-protector/servers.json)
   --guardrail-provider GUARDRAIL_PROVIDER
                         The guardrail provider to use for checking server configurations
   --visualize-ansi-codes
                         Make ANSI escape codes visible by replacing escape characters with 'ESC'
-  --review-server       Review and approve server configuration before starting
   --quarantine-id QUARANTINE_ID
                         The ID of a specific quarantined response to review
   --quarantine-path QUARANTINE_PATH
-                        The path to the quarantine database file
+                        The path to the quarantine database file (default: ~/.context-protector/quarantine.json)
+
+  --command COMMAND     Start a wrapped server over the stdio transport using the specified command
+  --url URL             Connect to a remote MCP server over streamable HTTP at the specified URL
+  --sse-url SSE_URL     Connect to a remote MCP server over SSE at the specified URL
+  --list-guardrail-providers
+                        List available guardrail providers and exit
+  --review-server       Review and approve changes to a specific server configuration (must be used with --command, --url or --sse-url)
+  --review-quarantine   Review quarantined tool responses
+  --review-all-servers  Review all unapproved server configurations
+```
+
+## License
+```
+Copyright 2025 Trail of Bits
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+
+You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 ```

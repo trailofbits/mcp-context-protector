@@ -8,9 +8,9 @@ import json
 import tempfile
 import pytest
 
-from ..quarantine import ToolResponseQuarantine
-from ..mcp_wrapper import MCPWrapperServer
-from ..guardrail_providers.mock_provider import MockGuardrailProvider
+from contextprotector.quarantine import ToolResponseQuarantine
+from contextprotector.mcp_wrapper import MCPWrapperServer
+from contextprotector.guardrail_providers.mock_provider import MockGuardrailProvider
 
 
 @pytest.fixture
@@ -113,11 +113,12 @@ async def test_quarantine_release_unreleased_fails(setup_quarantine_test):
     )
 
     # Call the quarantine_release tool handler with an unreleased ID
-    with pytest.raises(ValueError) as excinfo:
-        await wrapper._handle_quarantine_release({"uuid": test_data["unreleased_id"]})
+    result = await wrapper._handle_quarantine_release({"uuid": test_data["unreleased_id"]})
 
-    # Verify that the correct error message is returned
-    error_msg = str(excinfo.value)
+    # Verify that the correct error message is returned as TextContent
+    assert len(result) == 1
+    assert result[0].type == "text"
+    error_msg = result[0].text
     assert "not marked for release" in error_msg
     assert "--review-quarantine" in error_msg
 

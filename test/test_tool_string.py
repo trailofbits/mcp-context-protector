@@ -3,7 +3,7 @@
 Test for the MCPToolDefinition.__str__ method.
 """
 
-from ..mcp_config import MCPToolDefinition, MCPParameterDefinition, ParameterType
+from contextprotector.mcp_config import MCPToolDefinition, MCPParameterDefinition, ParameterType
 
 
 def test_tool_str():
@@ -75,7 +75,7 @@ if __name__ == "__main__":
 
     # Add parent directory to path so imports work correctly
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-    from ..mcp_config import MCPToolDefinition, MCPParameterDefinition, ParameterType
+    from contextprotector.mcp_config import MCPToolDefinition, MCPParameterDefinition, ParameterType
 
     # Run the test
     test_tool_str()

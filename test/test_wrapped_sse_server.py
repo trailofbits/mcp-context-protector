@@ -11,7 +11,7 @@ import pytest
 import tempfile
 
 from mcp import types
-from ..mcp_config import MCPServerConfig
+from contextprotector.mcp_config import MCPServerConfig
 from .test_utils import approve_server_config_using_review as _approve_config
 from .sse_server_utils import sse_server_fixture
 
@@ -125,7 +125,7 @@ async def test_echo_tool_through_wrapper(sse_server_fixture):
 
     with open(temp_file.name, "r") as f:
         logging.error(f.read())
-    from ..mcp_config import MCPConfigDatabase
+    from contextprotector.mcp_config import MCPConfigDatabase
 
     cdb = MCPConfigDatabase(temp_file.name)
     conf = cdb.get_server_config("sse", sse_url)

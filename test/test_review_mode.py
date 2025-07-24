@@ -15,8 +15,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # Import (but don't use) the shared utility function for patching
 
-from ..mcp_wrapper import review_server_config, MCPWrapperServer
-from ..mcp_config import MCPServerConfig
+from contextprotector.mcp_wrapper import review_server_config, MCPWrapperServer
+from contextprotector.mcp_config import MCPServerConfig
 
 from .test_utils import approve_server_config_using_review
 

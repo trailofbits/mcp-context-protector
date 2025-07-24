@@ -10,8 +10,8 @@ from unittest.mock import MagicMock
 from mcp.types import CallToolResult as ToolCallResult
 from mcp.types import TextContent
 
-from ..mcp_wrapper import MCPWrapperServer
-from ..guardrail_providers.mock_provider import (
+from contextprotector.mcp_wrapper import MCPWrapperServer
+from contextprotector.guardrail_providers.mock_provider import (
     MockGuardrailProvider,
     AlwaysAlertGuardrailProvider,
 )
