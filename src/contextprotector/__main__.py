@@ -117,7 +117,7 @@ async def main_async():
         await review_quarantine(args.quarantine_path, args.quarantine_id)
         return
 
-    if args.list_unapproved:
+    if args.review_all_servers:
         await list_unapproved_configs(args.config_file)
         return
 
