@@ -61,10 +61,10 @@ class TestAnsiVisualization:
 
         # First test stage - get blocked
         async def callback1(session):
-            # List available tools - should only see config_instructions when unapproved
+            # List available tools - should only see context-protector-block when unapproved
             tools = await session.list_tools()
             tool_names = [t.name for t in tools.tools]
-            assert tool_names == ["config_instructions"]
+            assert tool_names == ["context-protector-block"]
 
             # First attempt to call ansi_echo should be blocked
             blocked_result = await session.call_tool("ansi_echo", {"message": "test"})
@@ -115,10 +115,10 @@ class TestAnsiVisualization:
 
         # First test stage - get blocked
         async def callback1(session):
-            # List available tools - should only see config_instructions when unapproved
+            # List available tools - should only see context-protector-block when unapproved
             tools = await session.list_tools()
             tool_names = [t.name for t in tools.tools]
-            assert tool_names == ["config_instructions"]
+            assert tool_names == ["context-protector-block"]
 
             # First attempt to call ansi_echo should be blocked
             blocked_result = await session.call_tool("ansi_echo", {"message": "test"})

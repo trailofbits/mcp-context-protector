@@ -100,9 +100,9 @@ class TestPromptProxying:
 
         # First callback - before approval, confirm blocking
         async def callback1(session):
-            # List available tools - should only see config_instructions when unapproved
+            # List available tools - should only see context-protector-block when unapproved
             tools = await session.list_tools()
-            assert "config_instructions" in [t.name for t in tools.tools]
+            assert "context-protector-block" in [t.name for t in tools.tools]
 
             # Call a tool to get the config (it will be blocked)
             blocked_result = await session.call_tool("test_tool", {"message": "test"})

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Core guardrail types for MCP Context Protector.
+Core guardrail types for context-protector.
 Defines the base classes and data structures used by guardrail providers.
 """
 

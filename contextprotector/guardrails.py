@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Guardrails module for MCP Context Protector.
+Guardrails module for context-protector.
 Provides functionality to load and manage guardrail providers.
 """
 

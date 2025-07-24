@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Llama Firewall guardrail provider for MCP Context Protector.
+Llama Firewall guardrail provider for context-protector.
 Provides server configuration checking capabilities.
 """
 
@@ -23,7 +23,7 @@ logger = logging.getLogger("llama_firewall_provider")
 
 class LlamaFirewallProvider(GuardrailProvider):
     """
-    Llama Firewall guardrail provider for MCP Context Protector.
+    Llama Firewall guardrail provider.
     Checks server configurations against Llama Firewall guardrails.
     """
 

@@ -1,5 +1,5 @@
 """
-Context Protector package for managing MCP wrapper servers with guardrails.
+context-protector package that provides an MCP security wrapper.
 """
 
 __version__ = "0.1.0"

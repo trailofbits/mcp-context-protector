@@ -292,13 +292,13 @@ async def test_new_server_complete_blocking():
     
     # Test connecting to a server that has never been seen before
     async def test_new_server_blocking(session):
-        # New server should only show config_instructions
+        # New server should only show context-protector-block
         tools = await session.list_tools()
         tool_names = [t.name for t in tools.tools]
         
-        # Should ONLY have config_instructions tool
-        assert "config_instructions" in tool_names
-        assert len([t for t in tool_names if t != "config_instructions"]) == 0, f"New server should only show config_instructions, got: {tool_names}"
+        # Should ONLY have context-protector-block tool
+        assert "context-protector-block" in tool_names
+        assert len([t for t in tool_names if t != "context-protector-block"]) == 0, f"New server should only show context-protector-block, got: {tool_names}"
         
         # All downstream tools should be blocked
         result = await session.call_tool(name="echo", arguments={"message": "test"})

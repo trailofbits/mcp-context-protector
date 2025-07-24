@@ -29,8 +29,8 @@ async def test_dynamic_tool_addition_with_existing_server():
     # Step 1: Start with the simple server and approve it  
     async def callback_initial_approval(session):
         tools = await session.list_tools()
-        # Should only have config_instructions initially
-        assert "config_instructions" in [t.name for t in tools.tools]
+        # Should only have context-protector-block initially
+        assert "context-protector-block" in [t.name for t in tools.tools]
         
         # Try to call echo tool - should be blocked
         result = await session.call_tool(name="echo", arguments={"message": "test"})

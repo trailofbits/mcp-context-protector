@@ -1,4 +1,4 @@
-# Context Protector
+# context-protector
 
 ## Overview
 
@@ -44,7 +44,7 @@ To review the response and release it from the quarantine, run the app with the 
 
 context-protector supports the stdio and SSE transports. It does not yet fully support the streamable HTTP transport introduced in the [March 26, 2025 update](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) to the protocol specification, but it will as soon as an official release of the Python SDK adds support for streamable HTTP.
 
-To start using Context Protector, first set up a virtual environment and install dependencies:
+To start using context-protector, first set up a virtual environment and install dependencies:
 
 ```bash
 # Environment setup

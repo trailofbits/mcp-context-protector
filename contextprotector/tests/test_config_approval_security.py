@@ -2,7 +2,7 @@
 Test that ensures ZERO information leakage from unapproved downstream server configurations.
 
 This test verifies that when a configuration is not approved:
-1. Only the 'config_instructions' tool is visible in list_tools()
+1. Only the 'context-protector-block' tool is visible in list_tools()
 2. No downstream server tool names, descriptions, or metadata are exposed
 3. All blocked tool calls return clean error messages without server info leakage
 4. The security boundary is maintained consistently
@@ -31,30 +31,30 @@ async def test_zero_information_leakage_unapproved_config():
     async def test_callback(session: ClientSession):
         """Test callback that verifies complete information isolation."""
         
-        # 1. Test list_tools() - should ONLY return config_instructions tool
+        # 1. Test list_tools() - should ONLY return context-protector-block tool
         tools_result = await session.list_tools()
         assert isinstance(tools_result, types.ListToolsResult)
         
         # Verify only wrapper tools are returned (no downstream server tools)
         tool_names = [t.name for t in tools_result.tools]
         
-        # Must include config_instructions
-        assert "config_instructions" in tool_names, f"Expected 'config_instructions' tool, got {tool_names}"
+        # Must include context-protector-block
+        assert "context-protector-block" in tool_names, f"Expected 'context-protector-block' tool, got {tool_names}"
         
         # Should not include any downstream server tools
         downstream_tools = ["test_tool", "toggle_prompts", "ansi_echo", "echo"]
         for downstream_tool in downstream_tools:
             assert downstream_tool not in tool_names, f"Downstream tool '{downstream_tool}' leaked in unapproved config: {tool_names}"
         
-        # Find the config_instructions tool
-        config_tool = next(t for t in tools_result.tools if t.name == "config_instructions")
-        assert "instructions for approving" in config_tool.description.lower(), f"Unexpected description: {config_tool.description}"
+        # Find the context-protector-block tool
+        config_tool = next(t for t in tools_result.tools if t.name == "context-protector-block")
+        assert "blocked server configuration" in config_tool.description.lower(), f"Unexpected description: {config_tool.description}"
         
-        logger.info("✓ list_tools() correctly shows only config_instructions tool")
+        logger.info("✓ list_tools() correctly shows only context-protector-block tool")
         
-        # 2. Test calling the config_instructions tool - should work
+        # 2. Test calling the context-protector-block tool - should work
         config_result = await session.call_tool(
-            name="config_instructions",
+            name="context-protector-block",
             arguments={}
         )
         assert isinstance(config_result, types.CallToolResult)
@@ -62,10 +62,10 @@ async def test_zero_information_leakage_unapproved_config():
         
         # Parse the response to verify it contains approval instructions
         response_text = config_result.content[0].text
-        # The config_instructions tool returns plain text instructions, not JSON
+        # The context-protector-block tool returns plain text instructions, not JSON
         assert "approval" in response_text.lower() or "review" in response_text.lower()
         
-        logger.info("✓ config_instructions tool works correctly")
+        logger.info("✓ context-protector-block tool works correctly")
         
         # 3. Test calling downstream server tools - should be blocked with clean errors
         
@@ -202,8 +202,8 @@ async def test_information_visible_after_approval():
         assert "test_tool" in tool_names, f"Expected 'test_tool' after approval, got: {tool_names}"
         assert "toggle_prompts" in tool_names, f"Expected 'toggle_prompts' after approval, got: {tool_names}"
         
-        # Should NOT include config_instructions anymore
-        assert "config_instructions" not in tool_names, f"config_instructions should not be visible after approval, got: {tool_names}"
+        # Should NOT include context-protector-block anymore
+        assert "context-protector-block" not in tool_names, f"context-protector-block should not be visible after approval, got: {tool_names}"
         
         # Test that the tools actually work
         result = await session.call_tool(

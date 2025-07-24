@@ -247,11 +247,30 @@ class MCPWrapperServer:
             
             wrapper_tools = []
             
-            # Add config_instructions if server/instructions not fully approved
+            # Add context-protector-block if server/instructions not fully approved
             if not self.config_approved or (hasattr(self, 'approval_status') and not self.approval_status.get("instructions_approved", False)):
+                # Count blocked tools
+                total_tools = 0
+                blocked_new_tools = 0
+                blocked_changed_tools = 0
+                if hasattr(self, 'approval_status'):
+                    tools_status = self.approval_status.get("tools", {})
+                    total_tools = len(tools_status)
+                    blocked_tools = sum(1 for approved in tools_status.values() if not approved)
+                    if self.approval_status.get("is_new_server", False):
+                        blocked_new_tools = blocked_tools
+                    else:
+                        blocked_changed_tools = blocked_tools
+                
+                description = f"Get information about blocked server configuration. {total_tools} tools blocked"
+                if blocked_new_tools > 0:
+                    description += f" ({blocked_new_tools} new tools)"
+                if blocked_changed_tools > 0:
+                    description += f" ({blocked_changed_tools} changed tools)"
+                    
                 wrapper_tools.append(types.Tool(
-                    name="config_instructions",
-                    description="Get instructions for approving the server configuration",
+                    name="context-protector-block",
+                    description=description,
                     inputSchema={
                         "type": "object",
                         "properties": {},
@@ -364,8 +383,8 @@ class MCPWrapperServer:
             )
 
             # Handle wrapper tools
-            if name == "config_instructions":
-                return await self._handle_config_instructions()
+            if name == "context-protector-block":
+                return await self._handle_context_protector_block()
 
             if name == "quarantine_release" and self.use_guardrails and self.quarantine:
                 return await self._handle_quarantine_release(arguments)
@@ -388,7 +407,7 @@ class MCPWrapperServer:
                 logger.warning(f"Blocking tool '{name}' - new server not approved")
                 blocked_response = {
                     "status": "blocked", 
-                    "reason": "Server configuration not approved. Use the 'config_instructions' tool for approval instructions.",
+                    "reason": "Server configuration not approved. Use the 'context-protector-block' tool for approval instructions.",
                 }
                 error_json = json.dumps(blocked_response)
                 raise ValueError(error_json)
@@ -400,14 +419,14 @@ class MCPWrapperServer:
                     logger.warning(f"Blocking tool '{name}' - server instructions have changed")
                     blocked_response = {
                         "status": "blocked", 
-                        "reason": "Server instructions have changed and need re-approval. Use the 'config_instructions' tool for approval instructions.",
+                        "reason": "Server instructions have changed and need re-approval. Use the 'context-protector-block' tool for approval instructions.",
                     }
                 else:
                     # Server was never approved
                     logger.warning(f"Blocking tool '{name}' - server not approved")
                     blocked_response = {
                         "status": "blocked", 
-                        "reason": "Server configuration not approved. Use the 'config_instructions' tool for approval instructions.",
+                        "reason": "Server configuration not approved. Use the 'context-protector-block' tool for approval instructions.",
                     }
                 error_json = json.dumps(blocked_response)
                 raise ValueError(error_json)
@@ -420,7 +439,7 @@ class MCPWrapperServer:
                 logger.warning(f"Blocking tool '{name}' - tool not approved")
                 blocked_response = {
                     "status": "blocked", 
-                    "reason": f"Tool '{name}' is not approved. Use the 'config_instructions' tool for approval instructions.",
+                    "reason": f"Tool '{name}' is not approved. Use the 'context-protector-block' tool for approval instructions.",
                 }
                 error_json = json.dumps(blocked_response)
                 raise ValueError(error_json)
@@ -472,15 +491,43 @@ class MCPWrapperServer:
                 logger.error(f"Error from child MCP server: {e}")
                 raise ValueError(f"Error from child MCP server: {str(e)}")
 
-    async def _handle_config_instructions(self) -> List[types.TextContent]:
+    async def _handle_context_protector_block(self) -> List[types.TextContent]:
         """
-        Handle the config_instructions tool call.
+        Handle the context-protector-block tool call.
         
         Returns:
-            Instructions for approving the server configuration
+            Information about blocked tools and instructions for approving the server configuration
         """
-        instructions = """
-To approve this server configuration, you need to run the wrapper in review mode:
+        # Count blocked tools and categorize them
+        total_tools = 0
+        blocked_tools = 0
+        blocked_new_tools = 0
+        blocked_changed_tools = 0
+        
+        if hasattr(self, 'approval_status'):
+            tools_status = self.approval_status.get("tools", {})
+            total_tools = len(tools_status)
+            blocked_tools = sum(1 for approved in tools_status.values() if not approved)
+            
+            if self.approval_status.get("is_new_server", False):
+                blocked_new_tools = blocked_tools
+            else:
+                blocked_changed_tools = blocked_tools
+        
+        instructions = f"""
+context-protector status:
+
+{blocked_tools} out of {total_tools} tools are currently blocked
+"""
+        
+        if blocked_new_tools > 0:
+            instructions += f"- {blocked_new_tools} tools blocked because they are from a new server\n"
+        if blocked_changed_tools > 0:
+            instructions += f"- {blocked_changed_tools} tools blocked because their configuration has changed\n"
+        
+        instructions += """
+
+To approve this server configuration, run the wrapper in review mode:
 
 1. For stdio servers:
    python -m contextprotector --review-server stdio "your-server-command" [--config /path/to/config]
@@ -494,7 +541,7 @@ To approve this server configuration, you need to run the wrapper in review mode
 The review process will show you the server's capabilities and tools, and ask if you want to trust them.
 Once approved, you can use all the server's tools through this wrapper.
 
-Note: This tool is only available when the server configuration is not yet approved.
+Note: This tool is only available when tools are blocked due to security restrictions.
 """
         
         return [types.TextContent(type="text", text=instructions.strip())]

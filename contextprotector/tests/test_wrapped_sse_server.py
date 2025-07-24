@@ -68,8 +68,8 @@ async def test_echo_tool_through_wrapper(sse_server_fixture):
         # List available tools
         tools = await session.list_tools()
 
-        # Should only have the config_instructions tool when config is unapproved
-        assert sorted([t.name for t in tools.tools]) == ["config_instructions"]
+        # Should only have the context-protector-block tool when config is unapproved
+        assert sorted([t.name for t in tools.tools]) == ["context-protector-block"]
 
         # First try calling the echo tool - expect to get blocked
         result = await session.call_tool(
