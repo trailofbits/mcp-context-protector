@@ -33,17 +33,17 @@ async def main_async():
     source_group.add_argument(
         "--review-server",
         action="store_true",
-        help="Review and approve server configuration before starting",
+        help="Review and approve changes to a specific server configuration (must be used with --command, --url or --sse-url)",
     )
     source_group.add_argument(
         "--review-quarantine",
         action="store_true",
-        help="Review and manage quarantined tool responses",
+        help="Review quarantined tool responses",
     )
     source_group.add_argument(
-        "--list-unapproved",
+        "--review-all-servers",
         action="store_true",
-        help="List unapproved server configurations for review",
+        help="Review all unapproved server configurations",
     )
 
     # Add config file argument with new name

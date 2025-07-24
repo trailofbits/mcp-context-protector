@@ -529,14 +529,7 @@ context-protector status:
 
 To approve this server configuration, run the wrapper in review mode:
 
-1. For stdio servers:
-   context-protector.sh --review-server stdio "your-server-command"
-
-2. For HTTP/SSE servers:
-   context-protector.sh --review-server sse "http://your-server-url"
-
-3. For streamable HTTP servers:
-   context-protector.sh --review-server http "http://your-server-url"
+context-protector.sh --list-server stdio "your-server-command"
 
 The review process will show you the server's capabilities and tools, and ask if you want to trust them.
 Once approved, you can use all the server's tools through this wrapper.
@@ -593,11 +586,10 @@ Note: This tool is only available when tools are blocked due to security restric
             final_response = json.dumps(wrapped_response)
             return [types.TextContent(type="text", text=final_response)]
         else:
-            raise ValueError(
-                f"Response {response_id} is not marked for release. "
-                f"Please use the CLI to review and release it first: "
-                f"context-protector.sh --review-quarantine --quarantine-id {response_id}"
-            )
+            error = f"Response {response_id} is not marked for release. " + \
+                    f"Please use the CLI to review and release it first: " + \
+                    f"context-protector.sh --review-quarantine --quarantine-id {response_id}"
+            return [types.TextContent(type="text", text=error)]
 
     async def _proxy_tool_to_downstream(self, name: str, arguments: dict) -> str:
         """Proxy a tool call to the downstream server using MCP client"""
