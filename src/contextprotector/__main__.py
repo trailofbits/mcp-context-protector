@@ -48,7 +48,7 @@ async def main_async():
 
     # Add config file argument with new name
     parser.add_argument(
-        "--config-file", help="The path to the wrapper config file", default=""
+        "--server-config-file", help="The path to the server config database file (default: ~/.context-protector/servers.json)", default=""
     )
 
     # Add guardrail provider argument
@@ -73,7 +73,7 @@ async def main_async():
     # Add quarantine-path argument
     parser.add_argument(
         "--quarantine-path",
-        help="The path to the quarantine database file",
+        help="The path to the quarantine database file (default: ~/.context-protector/quarantine.json)",
     )
 
     args = parser.parse_args()
@@ -118,7 +118,7 @@ async def main_async():
         return
 
     if args.review_all_servers:
-        await list_unapproved_configs(args.config_file)
+        await list_unapproved_configs(args.server_config_file)
         return
 
     # Check if we're in server review mode
@@ -128,7 +128,7 @@ async def main_async():
             await review_server_config(
                 "stdio",
                 args.command,
-                args.config_file,
+                args.server_config_file,
                 guardrail_provider,
                 args.quarantine_path,
             )
@@ -136,7 +136,7 @@ async def main_async():
             await review_server_config(
                 "http",
                 args.url,
-                args.config_file,
+                args.server_config_file,
                 guardrail_provider,
                 args.quarantine_path,
             )
@@ -144,7 +144,7 @@ async def main_async():
             await review_server_config(
                 "sse",
                 args.sse_url,
-                args.config_file,
+                args.server_config_file,
                 guardrail_provider,
                 args.quarantine_path,
             )
@@ -155,7 +155,7 @@ async def main_async():
     if args.command:
         wrapper = MCPWrapperServer.wrap_stdio(
             args.command,
-            args.config_file,
+            args.server_config_file,
             guardrail_provider,
             args.visualize_ansi_codes,
             args.quarantine_path,
@@ -163,7 +163,7 @@ async def main_async():
     elif args.url:
         wrapper = MCPWrapperServer.wrap_streamable_http(
             args.url,
-            args.config_file,
+            args.server_config_file,
             guardrail_provider,
             args.visualize_ansi_codes,
             args.quarantine_path,
@@ -171,7 +171,7 @@ async def main_async():
     elif args.sse_url:
         wrapper = MCPWrapperServer.wrap_http(
             args.sse_url,
-            args.config_file,
+            args.server_config_file,
             guardrail_provider,
             args.visualize_ansi_codes,
             args.quarantine_path,

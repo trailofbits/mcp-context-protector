@@ -31,7 +31,7 @@ async def approve_server_config_using_review(
         "-m",
         "contextprotector",
         "--review-server",
-        "--config-file",
+        "--server-config-file",
         config_path,
     ]
 
@@ -98,7 +98,7 @@ async def run_with_wrapper_session(
     args = [
         "-m",
         "contextprotector",
-        "--config-file",
+        "--server-config-file",
         str(config_path),
     ]
 
