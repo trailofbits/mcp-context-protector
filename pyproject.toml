@@ -1,34 +1,106 @@
-[build-system]
-requires = ["setuptools >= 77.0.3"]
-build-backend = "setuptools.build_meta"
-
 [project]
-name = "context-protector"
-version = "0.0.1"
-authors = [
-  { name="Trail of Bits", email="cliff.smith@trailofbits.com" },
-]
-description = "context-protector MCP security wrapper"
+name = "contextprotector"
+dynamic = ["version"]
+description = "MCP security wrapper"
 readme = "README.md"
-requires-python = ">=3.9"
-dependencies = [
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.20.0",
-    "pytest-timeout>=2.4.0",
-    "mcp==1.9.4",
-    "ruff>=0.0.270",
-    "psutil>=7.0.0",
-    "llamafirewall>=1.0.3"
+license-files = ["LICENSE"]
+license = "Apache-2.0"
+
+authors = [
+    { name = "Trail of Bits", email = "opensource@trailofbits.com" },
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent",
 ]
-license = {text="MIT"}
+dependencies = [
+    "mcp==1.9.4",
+    "llamafirewall>=1.0.3"
+]
+requires-python = ">=3.10"
+
+[tool.setuptools.dynamic]
+version = { attr = "contextprotector.__version__" }
+
+[project.optional-dependencies]
+doc = ["pdoc"]
+test = ["pytest", "pytest-cov", "pretend", "coverage[toml]"]
+lint = [
+    # NOTE: ruff is under active development, so we pin conservatively here
+    # and let Dependabot periodically perform this update.
+    "ruff ~= 0.6.2",
+    "mypy >= 1.0",
+    "types-html5lib",
+    "types-requests",
+    "types-toml",
+    "interrogate",
+]
+dev = ["contextprotector[doc,test,lint]", "twine", "build"]
 
 [project.scripts]
-context-protector = "contextprotector.__main__:main"
+"contextprotector" = "contextprotector.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/trailofbits/context-protector"
-Issues = "https://github.com/trailofbits/context-protector/issues"
+Homepage = "https://pypi.org/project/contextprotector"
+Documentation = "https://trailofbits.github.io/contextprotector/"
+Issues = "https://github.com/trailofbits/contextprotector/issues"
+Source = "https://github.com/trailofbits/contextprotector"
+
+[tool.coverage.run]
+# don't attempt code coverage for the CLI entrypoints
+omit = ["src/contextprotector/_cli.py"]
+
+[tool.mypy]
+mypy_path = "src"
+packages = "contextprotector"
+allow_redefinition = true
+check_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+no_implicit_optional = true
+show_error_codes = true
+sqlite_cache = true
+strict_equality = true
+warn_no_return = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_unreachable = true
+warn_unused_configs = true
+warn_unused_ignores = true
+
+[tool.ruff]
+line-length = 100
+include = ["src/**/*.py", "test/**/*.py"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+# D203 and D213 are incompatible with D211 and D212 respectively.
+# COM812 and ISC001 can cause conflicts when using ruff as a formatter.
+# See https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules.
+ignore = ["D203", "D213", "COM812", "ISC001"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/contextprotector/_cli.py" = [
+    "T201", # allow `print` in cli module
+]
+"test/**/*.py" = [
+    "D",    # no docstrings in tests
+    "S101", # asserts are expected in tests
+]
+[tool.interrogate]
+# don't enforce documentation coverage for packaging, testing, the virtual
+# environment, or the CLI (which is documented separately).
+exclude = ["env", "test", "src/contextprotector/_cli.py"]
+ignore-semiprivate = true
+fail-under = 100
+
+[dependency-groups]
+dev = [
+    "psutil>=7.0.0",
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.1.0",
+    "pytest-timeout>=2.4.0",
+]
+
+[tool.uv]
+package = true

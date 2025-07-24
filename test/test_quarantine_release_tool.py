@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simplified tests for the quarantine_release functionality.
+Tests for the quarantine_release tool functionality.
 """
 
 import os
@@ -8,9 +8,10 @@ import json
 import tempfile
 import pytest
 
-from ..quarantine import ToolResponseQuarantine
-from ..mcp_wrapper import MCPWrapperServer
-from ..guardrail_providers.mock_provider import MockGuardrailProvider
+import mcp.types as types
+from contextprotector.quarantine import ToolResponseQuarantine
+from contextprotector.mcp_wrapper import MCPWrapperServer
+from contextprotector.guardrail_providers.mock_provider import MockGuardrailProvider
 
 
 @pytest.fixture
@@ -62,6 +63,36 @@ def setup_quarantine_test():
     # Clean up
     if os.path.exists(tmp_file.name):
         os.unlink(tmp_file.name)
+
+
+@pytest.mark.asyncio
+async def test_quarantine_release_tool_lists_in_tools(setup_quarantine_test):
+    """Test that the quarantine_release tool is added to the tool list."""
+    test_data = setup_quarantine_test
+
+    # Create a wrapper with a guardrail provider and quarantine
+    provider = MockGuardrailProvider()
+    wrapper = MCPWrapperServer(
+        guardrail_provider=provider, quarantine_path=test_data["quarantine_path"]
+    )
+
+    # Mock the necessary components
+    wrapper.tool_specs = []
+
+    # Get the list_tools handler and call it directly
+    tools_response = await wrapper.server.request_handlers[types.ListToolsRequest](
+        wrapper.server
+    )
+    tools = tools_response.root.tools
+
+    # Verify that quarantine_release tool is included
+    tool_names = [tool.name for tool in tools]
+    assert "quarantine_release" in tool_names
+
+    # Find the quarantine_release tool and verify its schema
+    quarantine_tool = next(tool for tool in tools if tool.name == "quarantine_release")
+    assert "uuid" in quarantine_tool.inputSchema["properties"]
+    assert "uuid" in quarantine_tool.inputSchema["required"]
 
 
 @pytest.mark.asyncio
@@ -144,3 +175,23 @@ async def test_quarantine_release_invalid_uuid(setup_quarantine_test):
     # Verify that the correct error message is returned
     error_msg = str(excinfo.value)
     assert "No quarantined response found" in error_msg
+
+
+@pytest.mark.asyncio
+async def test_quarantine_release_missing_uuid(setup_quarantine_test):
+    """Test that attempting to release without a UUID fails."""
+    test_data = setup_quarantine_test
+
+    # Create a wrapper with a guardrail provider and quarantine
+    provider = MockGuardrailProvider()
+    wrapper = MCPWrapperServer(
+        guardrail_provider=provider, quarantine_path=test_data["quarantine_path"]
+    )
+
+    # Call the quarantine_release tool handler without a UUID
+    with pytest.raises(ValueError) as excinfo:
+        await wrapper._handle_quarantine_release({})
+
+    # Verify that the correct error message is returned
+    error_msg = str(excinfo.value)
+    assert "Missing required parameter" in error_msg

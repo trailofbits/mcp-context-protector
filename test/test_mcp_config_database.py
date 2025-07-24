@@ -7,7 +7,7 @@ import tempfile
 import json
 from pathlib import Path
 
-from ..mcp_config import (
+from contextprotector.mcp_config import (
     MCPServerConfig,
     MCPToolDefinition,
     MCPParameterDefinition,

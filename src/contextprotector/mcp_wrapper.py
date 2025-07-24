@@ -530,13 +530,13 @@ context-protector status:
 To approve this server configuration, run the wrapper in review mode:
 
 1. For stdio servers:
-   python -m contextprotector --review-server stdio "your-server-command" [--config /path/to/config]
+   context-protector.sh --review-server stdio "your-server-command"
 
 2. For HTTP/SSE servers:
-   python -m contextprotector --review-server sse "http://your-server-url" [--config /path/to/config]
+   context-protector.sh --review-server sse "http://your-server-url"
 
 3. For streamable HTTP servers:
-   python -m contextprotector --review-server http "http://your-server-url" [--config /path/to/config]
+   context-protector.sh --review-server http "http://your-server-url"
 
 The review process will show you the server's capabilities and tools, and ask if you want to trust them.
 Once approved, you can use all the server's tools through this wrapper.
@@ -596,7 +596,7 @@ Note: This tool is only available when tools are blocked due to security restric
             raise ValueError(
                 f"Response {response_id} is not marked for release. "
                 f"Please use the CLI to review and release it first: "
-                f"python -m contextprotector --review-quarantine --quarantine-id {response_id}"
+                f"context-protector.sh --review-quarantine --quarantine-id {response_id}"
             )
 
     async def _proxy_tool_to_downstream(self, name: str, arguments: dict) -> str:

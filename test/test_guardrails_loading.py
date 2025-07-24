@@ -6,8 +6,8 @@ Tests for the guardrails provider loading functionality.
 import sys
 from pathlib import Path
 import pytest
-from tests.logging_config import configure_logging
-from ..guardrails import get_provider, get_provider_names
+from test.logging_config import configure_logging
+from contextprotector.guardrails import get_provider, get_provider_names
 
 # Add the project root to the path if not already there
 project_root = Path(__file__).resolve().parent.parent
@@ -40,7 +40,7 @@ def test_get_nonexistent_provider():
 
 def test_provider_check_server_config():
     """Test that a provider can check a server config and log the results."""
-    from ..mcp_config import MCPServerConfig, MCPToolDefinition
+    from contextprotector.mcp_config import MCPServerConfig, MCPToolDefinition
 
     # Get the Llama Firewall provider
     provider = get_provider("Llama Firewall")

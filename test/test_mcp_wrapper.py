@@ -11,7 +11,7 @@ import asyncio
 from mcp import ClientSession, StdioServerParameters, types
 from mcp.client.stdio import stdio_client
 from pathlib import Path
-from ..mcp_config import MCPServerConfig
+from contextprotector.mcp_config import MCPServerConfig
 
 
 async def approve_server_config_using_review(command, config_path):

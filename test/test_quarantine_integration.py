@@ -8,9 +8,9 @@ import tempfile
 import pytest
 from unittest.mock import MagicMock
 
-from ..quarantine import ToolResponseQuarantine
-from ..mcp_wrapper import MCPWrapperServer
-from ..guardrail_providers.mock_provider import AlwaysAlertGuardrailProvider
+from contextprotector.quarantine import ToolResponseQuarantine
+from contextprotector.mcp_wrapper import MCPWrapperServer
+from contextprotector.guardrail_providers.mock_provider import AlwaysAlertGuardrailProvider
 
 from mcp.types import CallToolResult, TextContent
 
