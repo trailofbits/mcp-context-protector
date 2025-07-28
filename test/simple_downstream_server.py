@@ -14,9 +14,7 @@ echo_tool = Tool(
     description="Echoes back the input message",
     inputSchema={
         "type": "object",
-        "properties": {
-            "message": {"type": "string", "description": "The message to echo back"}
-        },
+        "properties": {"message": {"type": "string", "description": "The message to echo back"}},
         "required": ["message"],
     },
 )

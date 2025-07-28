@@ -221,9 +221,7 @@ def write_pidfile(pidfile_path):
             f.write(str(pid))
 
         # Register cleanup function to remove pidfile on exit
-        atexit.register(
-            lambda: os.remove(pidfile_path) if os.path.exists(pidfile_path) else None
-        )
+        atexit.register(lambda: os.remove(pidfile_path) if os.path.exists(pidfile_path) else None)
 
         print(f"PID {pid} written to {pidfile_path}", file=sys.stderr)
     except Exception as e:
@@ -257,9 +255,7 @@ async def my_run(
     )
     async with stdio_server() as (read_stream, write_stream):
         async with AsyncExitStack() as stack:
-            lifespan_context = await stack.enter_async_context(
-                self._mcp_server.lifespan(self)
-            )
+            lifespan_context = await stack.enter_async_context(self._mcp_server.lifespan(self))
             session = await stack.enter_async_context(
                 ServerSession(
                     read_stream,
@@ -283,9 +279,7 @@ async def my_run(
 def main():
     """Main function to run the server with signal handling and pidfile."""
     # Parse command line arguments
-    parser = argparse.ArgumentParser(
-        description="Dynamic MCP server with signal handling"
-    )
+    parser = argparse.ArgumentParser(description="Dynamic MCP server with signal handling")
     parser.add_argument(
         "--pidfile",
         default="dynamic_server.pid",

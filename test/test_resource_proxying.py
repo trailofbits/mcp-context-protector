@@ -62,9 +62,7 @@ class TestResourceProxying:
             assert "Image resource" in resource_names
 
             # Verify resource details
-            sample_data = next(
-                r for r in initial_resources.resources if r.name == "Sample data"
-            )
+            sample_data = next(r for r in initial_resources.resources if r.name == "Sample data")
             assert "Sample data resource" in sample_data.description
             assert sample_data.mime_type == "application/json"
 
@@ -76,9 +74,7 @@ class TestResourceProxying:
 
         async def callback(session):
             # Check we can access resource content without approving the server config
-            sample_data_result = await session.read_resource(
-                "contextprotector://sample_data"
-            )
+            sample_data_result = await session.read_resource("contextprotector://sample_data")
 
             # Verify the resource content
             assert sample_data_result.contents[0].mimeType == "application/json"
@@ -135,23 +131,17 @@ class TestResourceProxying:
             assert "Image resource" not in resource_names
 
             # Verify we can still use tools without re-approval after resource changes
-            tool_result = await session.call_tool(
-                "test_tool", {"message": "after resource change"}
-            )
+            tool_result = await session.call_tool("test_tool", {"message": "after resource change"})
             response_text = tool_result.content[0].text
             assert "Echo: after resource change" in response_text
 
             # Verify we can access the new resource
-            document_result = await session.read_resource(
-                "contextprotector://document_resource"
-            )
+            document_result = await session.read_resource("contextprotector://document_resource")
             assert document_result.contents[0].mimeType == "text/plain"
             assert "sample document resource" in document_result.contents[0].text
 
             # Verify we can use the updated version of an existing resource
-            sample_data_result = await session.read_resource(
-                "contextprotector://sample_data"
-            )
+            sample_data_result = await session.read_resource("contextprotector://sample_data")
             assert sample_data_result.contents[0].mimeType == "application/json"
             content = json.loads(sample_data_result.contents[0].text)
             assert content["name"] == "Sample Data"
@@ -165,9 +155,7 @@ class TestResourceProxying:
 
         async def callback(session):
             # Access image resource with custom width parameter
-            image_result = await session.read_resource(
-                "contextprotector://image_resource"
-            )
+            image_result = await session.read_resource("contextprotector://image_resource")
 
             # Verify the correct parameter was passed through
             assert type(image_result.contents[0]) is types.BlobResourceContents

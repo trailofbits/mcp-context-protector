@@ -76,9 +76,7 @@ async def test_quarantine_release_success(setup_quarantine_test):
     )
 
     # Call the quarantine_release tool handler
-    result = await wrapper._handle_quarantine_release(
-        {"uuid": test_data["released_id"]}
-    )
+    result = await wrapper._handle_quarantine_release({"uuid": test_data["released_id"]})
 
     # Verify the result
     assert len(result) == 1

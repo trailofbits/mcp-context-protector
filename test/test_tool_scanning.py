@@ -27,9 +27,7 @@ def mock_session():
     # Mock the call_tool method to return a ToolCallResult
     async def mock_call_tool(name, arguments):
         if name == "test_tool":
-            return ToolCallResult(
-                content=[TextContent(type="text", text="Test result")]
-            )
+            return ToolCallResult(content=[TextContent(type="text", text="Test result")])
         elif name == "dangerous_tool":
             return ToolCallResult(
                 content=[
@@ -93,9 +91,7 @@ async def test_tool_scanning_with_alert():
     wrapper.session.call_tool = mock_call_tool
 
     # Call the tool
-    result = await wrapper._proxy_tool_to_downstream(
-        "dangerous_tool", {"param": "value"}
-    )
+    result = await wrapper._proxy_tool_to_downstream("dangerous_tool", {"param": "value"})
 
     # Verify the result - it should still return the result since we're only logging for now
     assert "Security risk detected" in result
@@ -169,9 +165,7 @@ async def test_tool_vs_config_scanning_separation():
     provider.check_server_config.assert_not_called()
 
     # Verify the arguments passed to check_tool_response
-    call_args = provider.check_tool_response.call_args[0][
-        0
-    ]  # First positional argument
+    call_args = provider.check_tool_response.call_args[0][0]  # First positional argument
     assert call_args.tool_name == "test_tool"
     assert call_args.tool_input == {"param": "value"}
     assert call_args.tool_output == "Test result"

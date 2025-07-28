@@ -44,10 +44,7 @@ def test_tool_str():
     assert "Description: A test tool for testing the __str__ method" in tool_str
     assert "Parameters:" in tool_str
     assert "required_param (string) (required): A required parameter" in tool_str
-    assert (
-        "optional_param (number) (optional): An optional parameter [Default: 42]"
-        in tool_str
-    )
+    assert "optional_param (number) (optional): An optional parameter [Default: 42]" in tool_str
     assert (
         "enum_param (string) (required): A parameter with enum values [Values: value1, value2, value3]"
         in tool_str

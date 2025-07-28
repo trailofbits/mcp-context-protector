@@ -90,7 +90,9 @@ class MCPToolDefinition:
             lines.append("Parameters:")
             for param in self.parameters:
                 required = "(required)" if param.required else "(optional)"
-                param_line = f"  - {param.name} ({param.type.value}) {required}: {param.description}"
+                param_line = (
+                    f"  - {param.name} ({param.type.value}) {required}: {param.description}"
+                )
 
                 if param.enum:
                     param_line += f" [Values: {', '.join(str(v) for v in param.enum)}]"
@@ -209,9 +211,7 @@ class ConfigDiff:
                     for param_name, param_changes in changes["modified_params"].items():
                         lines.append(f"      ~ {param_name}:")
                         for field, values in param_changes.items():
-                            lines.append(
-                                f"        {field}: {values['old']} → {values['new']}"
-                            )
+                            lines.append(f"        {field}: {values['old']} → {values['new']}")
 
         return "\n".join(lines)
 
@@ -277,9 +277,7 @@ class MCPServerConfig:
                 return tool
         return None
 
-    def to_json(
-        self, path: str = None, fp: TextIO = None, indent: int = 2
-    ) -> Optional[str]:
+    def to_json(self, path: str = None, fp: TextIO = None, indent: int = 2) -> Optional[str]:
         """
         Serialize the configuration to JSON.
 
@@ -352,17 +350,9 @@ class MCPServerConfig:
                             "description": param.description,
                             "type": param.type.value,
                             "required": param.required,
-                            **(
-                                {"default": param.default}
-                                if param.default is not None
-                                else {}
-                            ),
+                            **({"default": param.default} if param.default is not None else {}),
                             **({"enum": param.enum} if param.enum is not None else {}),
-                            **(
-                                {"items": param.items}
-                                if param.items is not None
-                                else {}
-                            ),
+                            **({"items": param.items} if param.items is not None else {}),
                             **(
                                 {"properties": param.properties}
                                 if param.properties is not None
@@ -451,9 +441,7 @@ class MCPServerConfig:
 
         diff.added_tool_names = list(other_tool_names - self_tool_names)
         diff.added_tools = {
-            name: tool
-            for (name, tool) in other_tools.items()
-            if name in diff.added_tool_names
+            name: tool for (name, tool) in other_tools.items() if name in diff.added_tool_names
         }
         diff.removed_tools = list(self_tool_names - other_tool_names)
 
@@ -560,31 +548,31 @@ class MCPServerEntry:
         """Check if a specific tool is approved."""
         if tool_name not in self.approved_tools:
             return False
-        
+
         current_hash = self._hash_tool_definition(tool_definition)
         return self.approved_tools[tool_name] == current_hash
-    
+
     def are_instructions_approved(self, instructions: str) -> bool:
         """Check if the current instructions are approved."""
         if self.approved_instructions_hash is None:
             return False
-        
+
         current_hash = self._hash_instructions(instructions)
         return self.approved_instructions_hash == current_hash
-    
+
     def approve_tool(self, tool_name: str, tool_definition: MCPToolDefinition) -> None:
         """Approve a specific tool."""
         tool_hash = self._hash_tool_definition(tool_definition)
         self.approved_tools[tool_name] = tool_hash
-    
+
     def approve_instructions(self, instructions: str) -> None:
         """Approve the server instructions."""
         self.approved_instructions_hash = self._hash_instructions(instructions)
-    
+
     def remove_tool_approval(self, tool_name: str) -> None:
         """Remove approval for a specific tool."""
         self.approved_tools.pop(tool_name, None)
-    
+
     @staticmethod
     def _hash_tool_definition(tool_definition: MCPToolDefinition) -> str:
         """Create a hash of a tool definition for comparison."""
@@ -592,33 +580,36 @@ class MCPServerEntry:
         tool_dict = {
             "name": tool_definition.name,
             "description": tool_definition.description,
-            "parameters": sorted([
-                {
-                    "name": p.name,
-                    "description": p.description,
-                    "type": p.type.value,
-                    "required": p.required,
-                    "default": p.default,
-                    "enum": p.enum,
-                    "items": p.items,
-                    "properties": p.properties,
-                }
-                for p in tool_definition.parameters
-            ], key=lambda x: x["name"]),
+            "parameters": sorted(
+                [
+                    {
+                        "name": p.name,
+                        "description": p.description,
+                        "type": p.type.value,
+                        "required": p.required,
+                        "default": p.default,
+                        "enum": p.enum,
+                        "items": p.items,
+                        "properties": p.properties,
+                    }
+                    for p in tool_definition.parameters
+                ],
+                key=lambda x: x["name"],
+            ),
             "output_schema": tool_definition.output_schema,
         }
-        
+
         # Convert to JSON and hash
-        json_str = json.dumps(tool_dict, sort_keys=True, separators=(',', ':'))
-        return hashlib.sha256(json_str.encode('utf-8')).hexdigest()
-    
+        json_str = json.dumps(tool_dict, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(json_str.encode("utf-8")).hexdigest()
+
     @staticmethod
     def _hash_instructions(instructions: str) -> str:
         """Create a hash of server instructions."""
         # Handle None instructions (empty string)
         if instructions is None:
             instructions = ""
-        return hashlib.sha256(instructions.encode('utf-8')).hexdigest()
+        return hashlib.sha256(instructions.encode("utf-8")).hexdigest()
 
 
 class MCPConfigDatabase:
@@ -665,19 +656,23 @@ class MCPConfigDatabase:
                     with open(self.config_path, "r") as f:
                         data = json.load(f)
                         for server_data in data.get("servers", []):
-                            approval_status_str = server_data.get("approval_status", ApprovalStatus.UNAPPROVED.value)
+                            approval_status_str = server_data.get(
+                                "approval_status", ApprovalStatus.UNAPPROVED.value
+                            )
                             try:
                                 approval_status = ApprovalStatus(approval_status_str)
                             except ValueError:
                                 approval_status = ApprovalStatus.UNAPPROVED
-                            
+
                             entry = MCPServerEntry(
                                 type=server_data.get("type"),
                                 identifier=server_data.get("identifier"),
                                 config=server_data.get("config"),
                                 approval_status=approval_status,
                                 approved_tools=server_data.get("approved_tools", {}),
-                                approved_instructions_hash=server_data.get("approved_instructions_hash"),
+                                approved_instructions_hash=server_data.get(
+                                    "approved_instructions_hash"
+                                ),
                             )
                             self.servers[entry.key] = entry
             except (json.JSONDecodeError, FileNotFoundError, ValueError):
@@ -711,9 +706,7 @@ class MCPConfigDatabase:
             # Atomically replace the old file with the new one
             os.replace(temp_path, self.config_path)
 
-    def get_server_config(
-        self, server_type: str, identifier: str
-    ) -> Optional[MCPServerConfig]:
+    def get_server_config(self, server_type: str, identifier: str) -> Optional[MCPServerConfig]:
         """
         Get a server configuration by type and identifier.
 
@@ -733,7 +726,11 @@ class MCPConfigDatabase:
         return None
 
     def save_server_config(
-        self, server_type: str, identifier: str, config: MCPServerConfig, approval_status: ApprovalStatus = ApprovalStatus.APPROVED
+        self,
+        server_type: str,
+        identifier: str,
+        config: MCPServerConfig,
+        approval_status: ApprovalStatus = ApprovalStatus.APPROVED,
     ) -> None:
         """
         Save a server configuration to the database.
@@ -748,21 +745,24 @@ class MCPConfigDatabase:
         self._load()
 
         key = MCPServerEntry.create_key(server_type, identifier)
-        
+
         # Preserve existing granular approvals if updating an existing entry
         existing_entry = self.servers.get(key)
         if existing_entry:
             self.servers[key] = MCPServerEntry(
-                type=server_type, 
-                identifier=identifier, 
-                config=config.to_dict(), 
+                type=server_type,
+                identifier=identifier,
+                config=config.to_dict(),
                 approval_status=approval_status,
                 approved_tools=existing_entry.approved_tools,
-                approved_instructions_hash=existing_entry.approved_instructions_hash
+                approved_instructions_hash=existing_entry.approved_instructions_hash,
             )
         else:
             self.servers[key] = MCPServerEntry(
-                type=server_type, identifier=identifier, config=config.to_dict(), approval_status=approval_status
+                type=server_type,
+                identifier=identifier,
+                config=config.to_dict(),
+                approval_status=approval_status,
             )
 
         self._save()
@@ -811,7 +811,7 @@ class MCPConfigDatabase:
     ) -> None:
         """
         Save an unapproved server configuration to the database.
-        
+
         This is called when the wrapper encounters a new server configuration
         that hasn't been approved yet.
 
@@ -878,7 +878,9 @@ class MCPConfigDatabase:
             return self.servers[key].approval_status == ApprovalStatus.APPROVED
         return False
 
-    def approve_tool(self, server_type: str, identifier: str, tool_name: str, tool_definition: MCPToolDefinition) -> bool:
+    def approve_tool(
+        self, server_type: str, identifier: str, tool_name: str, tool_definition: MCPToolDefinition
+    ) -> bool:
         """
         Approve a specific tool for a server.
 
@@ -892,7 +894,7 @@ class MCPConfigDatabase:
             True if the tool was approved, False if server not found
         """
         self._load()
-        
+
         key = MCPServerEntry.create_key(server_type, identifier)
         if key in self.servers:
             self.servers[key].approve_tool(tool_name, tool_definition)
@@ -913,7 +915,7 @@ class MCPConfigDatabase:
             True if the instructions were approved, False if server not found
         """
         self._load()
-        
+
         key = MCPServerEntry.create_key(server_type, identifier)
         if key in self.servers:
             # Handle None instructions
@@ -923,7 +925,9 @@ class MCPConfigDatabase:
             return True
         return False
 
-    def is_tool_approved(self, server_type: str, identifier: str, tool_name: str, tool_definition: MCPToolDefinition) -> bool:
+    def is_tool_approved(
+        self, server_type: str, identifier: str, tool_name: str, tool_definition: MCPToolDefinition
+    ) -> bool:
         """
         Check if a specific tool is approved for a server.
 
@@ -941,7 +945,9 @@ class MCPConfigDatabase:
             return self.servers[key].is_tool_approved(tool_name, tool_definition)
         return False
 
-    def are_instructions_approved(self, server_type: str, identifier: str, instructions: str) -> bool:
+    def are_instructions_approved(
+        self, server_type: str, identifier: str, instructions: str
+    ) -> bool:
         """
         Check if the instructions are approved for a server.
 
@@ -955,12 +961,14 @@ class MCPConfigDatabase:
         """
         key = MCPServerEntry.create_key(server_type, identifier)
         if key in self.servers:
-            # Handle None instructions 
+            # Handle None instructions
             instructions = instructions or ""
             return self.servers[key].are_instructions_approved(instructions)
         return False
 
-    def get_server_approval_status(self, server_type: str, identifier: str, config: MCPServerConfig) -> Dict[str, Any]:
+    def get_server_approval_status(
+        self, server_type: str, identifier: str, config: MCPServerConfig
+    ) -> Dict[str, Any]:
         """
         Get detailed approval status for a server and its components.
 
@@ -973,26 +981,26 @@ class MCPConfigDatabase:
             Dict with approval status details
         """
         key = MCPServerEntry.create_key(server_type, identifier)
-        
+
         result = {
             "server_approved": False,
             "instructions_approved": False,
             "tools": {},
-            "is_new_server": key not in self.servers
+            "is_new_server": key not in self.servers,
         }
-        
+
         if key not in self.servers:
             # New server - nothing is approved
             for tool in config.tools:
                 result["tools"][tool.name] = False
             return result
-        
+
         entry = self.servers[key]
         result["server_approved"] = entry.approval_status == ApprovalStatus.APPROVED
         result["instructions_approved"] = entry.are_instructions_approved(config.instructions)
-        
+
         # Check each tool
         for tool in config.tools:
             result["tools"][tool.name] = entry.is_tool_approved(tool.name, tool)
-        
+
         return result

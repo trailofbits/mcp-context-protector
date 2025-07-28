@@ -70,9 +70,7 @@ async def test_echo_tool_via_sse(sse_server):
         input_message = "Hello SSE MCP Server!"
 
         # Call the echo tool
-        result = await session.call_tool(
-            name="echo", arguments={"message": input_message}
-        )
+        result = await session.call_tool(name="echo", arguments={"message": input_message})
 
         # Verify the result
         assert isinstance(result, CallToolResult)
@@ -85,9 +83,7 @@ async def test_echo_tool_via_sse(sse_server):
 
         # Try another message
         second_message = "Testing SSE with a different message!"
-        result2 = await session.call_tool(
-            name="echo", arguments={"message": second_message}
-        )
+        result2 = await session.call_tool(name="echo", arguments={"message": second_message})
         response2 = json.loads(result2.content[0].text)
         assert response2["echo_message"] == second_message
 
@@ -100,9 +96,7 @@ async def test_invalid_tool_call_via_sse(sse_server):
 
     async def callback(session):
         # Try to call a tool that doesn't exist
-        result = await session.call_tool(
-            name="nonexistent_tool", arguments={"foo": "bar"}
-        )
+        result = await session.call_tool(name="nonexistent_tool", arguments={"foo": "bar"})
         assert result.content and len(result.content) == 1
         assert result.content[0].text.startswith("Unknown tool")
 

@@ -35,9 +35,7 @@ async def run_with_ansi_visualization(
         visualize_ansi: Whether to visualize ANSI escape codes
     """
     command = f"python {str(TEST_SERVER_PATH)}"
-    await run_with_wrapper_session(
-        callback, "stdio", command, config_path, visualize_ansi
-    )
+    await run_with_wrapper_session(callback, "stdio", command, config_path, visualize_ansi)
 
 
 class TestAnsiVisualization:
@@ -94,17 +92,13 @@ class TestAnsiVisualization:
             assert "\x1b[" in response_json["response"]
 
         # Run first part of the test
-        await run_with_ansi_visualization(
-            callback1, self.config_path, visualize_ansi=False
-        )
+        await run_with_ansi_visualization(callback1, self.config_path, visualize_ansi=False)
 
         # Use review to approve the config
         await approve_server_config_using_review("stdio", command, self.config_path)
 
         # Run second part of the test with the approved config
-        await run_with_ansi_visualization(
-            callback2, self.config_path, visualize_ansi=False
-        )
+        await run_with_ansi_visualization(callback2, self.config_path, visualize_ansi=False)
 
     @pytest.mark.asyncio
     async def test_ansi_visualization_enabled(self):
@@ -139,14 +133,10 @@ class TestAnsiVisualization:
             assert "\x1b[" not in response_json["response"]
 
         # Run first part of the test
-        await run_with_ansi_visualization(
-            callback1, self.config_path, visualize_ansi=True
-        )
+        await run_with_ansi_visualization(callback1, self.config_path, visualize_ansi=True)
 
         # Use review to approve the config
         await approve_server_config_using_review("stdio", command, self.config_path)
 
         # Run second part of the test with the approved config
-        await run_with_ansi_visualization(
-            callback2, self.config_path, visualize_ansi=True
-        )
+        await run_with_ansi_visualization(callback2, self.config_path, visualize_ansi=True)

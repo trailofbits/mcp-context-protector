@@ -49,9 +49,7 @@ def test_provider_check_server_config():
 
     # Create a simple config to check
     config = MCPServerConfig()
-    config.add_tool(
-        MCPToolDefinition(name="test_tool", description="A test tool", parameters=[])
-    )
+    config.add_tool(MCPToolDefinition(name="test_tool", description="A test tool", parameters=[]))
     logger.info(f"Created test config with {len(config.tools)} tools")
 
     # Check the config and log the result

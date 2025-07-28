@@ -49,9 +49,7 @@ class GuardrailProvider:
     @property
     def name(self) -> str:
         """Get the provider name."""
-        raise NotImplementedError(
-            "Guardrail providers must implement the name property"
-        )
+        raise NotImplementedError("Guardrail providers must implement the name property")
 
     def check_server_config(self, config) -> Optional[GuardrailAlert]:
         """
@@ -65,9 +63,7 @@ class GuardrailProvider:
         """
         return None
 
-    def check_tool_response(
-        self, tool_response: ToolResponse
-    ) -> Optional[GuardrailAlert]:
+    def check_tool_response(self, tool_response: ToolResponse) -> Optional[GuardrailAlert]:
         """
         Check a tool response against the guardrail.
 

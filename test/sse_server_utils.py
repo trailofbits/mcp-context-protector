@@ -58,9 +58,7 @@ class SSEServerManager:
         pid_file.close()
 
         # Get the path to the server script
-        server_script = str(
-            Path(__file__).resolve().parent.joinpath("simple_sse_server.py")
-        )
+        server_script = str(Path(__file__).resolve().parent.joinpath("simple_sse_server.py"))
 
         # Start the server process
         self.process = subprocess.Popen(

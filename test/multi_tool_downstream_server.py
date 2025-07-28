@@ -14,9 +14,7 @@ echo_tool = Tool(
     description="Echoes back the input message",
     inputSchema={
         "type": "object",
-        "properties": {
-            "message": {"type": "string", "description": "The message to echo back"}
-        },
+        "properties": {"message": {"type": "string", "description": "The message to echo back"}},
         "required": ["message"],
     },
 )
@@ -33,14 +31,17 @@ greet_tool = Tool(
     },
 )
 
+
 # Handler functions
 async def echo_handler(message: str) -> Dict[str, Any]:
     """Echo handler function that returns the input message."""
     return {"echo_message": message}
 
+
 async def greet_handler(name: str) -> Dict[str, Any]:
     """Greet handler function that greets a person by name."""
     return {"greeting": f"Hello, {name}!"}
+
 
 # Create the server
 app = FastMCP()

@@ -19,9 +19,7 @@ class MockGuardrailProvider(GuardrailProvider):
     Only available when running tests.
     """
 
-    def __init__(
-        self, trigger_alert: bool = False, alert_text: str = "Test guardrail alert"
-    ):
+    def __init__(self, trigger_alert: bool = False, alert_text: str = "Test guardrail alert"):
         """
         Initialize the mock guardrail provider.
 
@@ -39,9 +37,7 @@ class MockGuardrailProvider(GuardrailProvider):
         """Get the provider name."""
         return "Mock Guardrail Provider"
 
-    def set_trigger_alert(
-        self, trigger: bool, alert_text: Optional[str] = None
-    ) -> None:
+    def set_trigger_alert(self, trigger: bool, alert_text: Optional[str] = None) -> None:
         """
         Configure the provider to trigger an alert or not.
 
@@ -82,9 +78,7 @@ class MockGuardrailProvider(GuardrailProvider):
         logger.info("No alert triggered")
         return None
 
-    def check_tool_response(
-        self, tool_response: ToolResponse
-    ) -> Optional[GuardrailAlert]:
+    def check_tool_response(self, tool_response: ToolResponse) -> Optional[GuardrailAlert]:
         """
         Check the tool response based on the current trigger setting.
 

@@ -105,9 +105,7 @@ class ResourceTestServer:
             elif name == "toggle_resources":
                 # Toggle resources and notify clients
                 self.use_alternate_resources = not self.use_alternate_resources
-                resource_state = (
-                    "alternate" if self.use_alternate_resources else "default"
-                )
+                resource_state = "alternate" if self.use_alternate_resources else "default"
 
                 # Use the session to send a resource list changed notification
                 if self._session:
@@ -117,9 +115,7 @@ class ResourceTestServer:
                     )
 
                 return [
-                    types.TextContent(
-                        type="text", text=f"Toggled to {resource_state} resources"
-                    )
+                    types.TextContent(type="text", text=f"Toggled to {resource_state} resources")
                 ]
 
             return [types.TextContent(type="text", text="Unknown tool")]
@@ -140,9 +136,7 @@ class ResourceTestServer:
                         ],
                     }
                 )
-                return [
-                    ReadResourceContents(content=content, mime_type="application/json")
-                ]
+                return [ReadResourceContents(content=content, mime_type="application/json")]
             elif str(uri) == "contextprotector://image_resource":
                 # Just return placeholder text for testing
                 content = b"[Binary image data]"
@@ -153,9 +147,7 @@ class ResourceTestServer:
                 return [ReadResourceContents(content=content, mime_type="text/plain")]
 
             return [
-                ReadResourceContents(
-                    content="Unknown resource requested", mime_type="text/plain"
-                )
+                ReadResourceContents(content="Unknown resource requested", mime_type="text/plain")
             ]
 
     async def run(self):
