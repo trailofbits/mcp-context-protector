@@ -25,9 +25,9 @@ Installation:
 # Install uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 # Download context-protector
-git clone https://github.com/trailofbits/context-protector
+git clone https://github.com/trailofbits/mcp-context-protector
 # Install dependencies
-cd context-protector
+cd mcp-context-protector
 uv sync
 ```
 
