@@ -53,9 +53,7 @@ class MCPWrapperServer:
         Returns:
             An instance of MCPWrapperServer configured for stdio
         """
-        instance = cls(
-            config_path, guardrail_provider, visualize_ansi_codes, quarantine_path
-        )
+        instance = cls(config_path, guardrail_provider, visualize_ansi_codes, quarantine_path)
         instance.connection_type = "stdio"
         instance.child_command = command
         return instance
@@ -81,9 +79,7 @@ class MCPWrapperServer:
         Returns:
             An instance of MCPWrapperServer configured for HTTP
         """
-        instance = cls(
-            config_path, guardrail_provider, visualize_ansi_codes, quarantine_path
-        )
+        instance = cls(config_path, guardrail_provider, visualize_ansi_codes, quarantine_path)
         instance.connection_type = "sse"
         instance.server_url = url
         return instance
@@ -109,9 +105,7 @@ class MCPWrapperServer:
         Returns:
             An instance of MCPWrapperServer configured for streamable HTTP
         """
-        instance = cls(
-            config_path, guardrail_provider, visualize_ansi_codes, quarantine_path
-        )
+        instance = cls(config_path, guardrail_provider, visualize_ansi_codes, quarantine_path)
         instance.connection_type = "http"
         instance.server_url = url
         return instance
@@ -136,9 +130,7 @@ class MCPWrapperServer:
         self.child_command = None
         self.server_url = None
         self.connection_type = None
-        self.server_identifier = (
-            None  # Will be set after determining connection details
-        )
+        self.server_identifier = None  # Will be set after determining connection details
         self.child_process = None
         self.client_context = None
         self.streams = None
@@ -156,9 +148,7 @@ class MCPWrapperServer:
         self.prompts = []
         self.resources = []
         self.server_session = None  # Track the server session for sending notifications
-        self.quarantine = (
-            ToolResponseQuarantine(quarantine_path) if self.use_guardrails else None
-        )
+        self.quarantine = ToolResponseQuarantine(quarantine_path) if self.use_guardrails else None
         self._setup_handlers()
 
     def _setup_handlers(self):
@@ -172,9 +162,7 @@ class MCPWrapperServer:
             When config isn't approved, we don't reveal any prompts to clients.
             """
             if not self.config_approved:
-                logger.warning(
-                    "Blocking list_prompts - server configuration not approved"
-                )
+                logger.warning("Blocking list_prompts - server configuration not approved")
                 return []
 
             return self.prompts
@@ -214,9 +202,7 @@ class MCPWrapperServer:
                     if content is not None:
                         content = base64.b64decode(content)
                         contents.append(
-                            ReadResourceContents(
-                                content=content, mime_type=content_item.mimeType
-                            )
+                            ReadResourceContents(content=content, mime_type=content_item.mimeType)
                         )
                         assert isinstance(
                             contents[-1].content, bytes
@@ -229,31 +215,28 @@ class MCPWrapperServer:
                             )
                         )
 
-                logger.info(
-                    f"Successfully fetched resource {name} from downstream server"
-                )
+                logger.info(f"Successfully fetched resource {name} from downstream server")
                 return contents
             except Exception as e:
-                logger.error(
-                    f"Error fetching resource {name} from downstream server: {e}"
-                )
-                raise ValueError(
-                    f"Error fetching resource from downstream server: {str(e)}"
-                )
+                logger.error(f"Error fetching resource {name} from downstream server: {e}")
+                raise ValueError(f"Error fetching resource from downstream server: {str(e)}")
 
         @self.server.list_tools()
         async def list_tools() -> List[types.Tool]:
             """Return tool specs based on granular approval status."""
-            
+
             wrapper_tools = []
-            
+
             # Add context-protector-block if server/instructions not fully approved
-            if not self.config_approved or (hasattr(self, 'approval_status') and not self.approval_status.get("instructions_approved", False)):
+            if not self.config_approved or (
+                hasattr(self, "approval_status")
+                and not self.approval_status.get("instructions_approved", False)
+            ):
                 # Count blocked tools
                 total_tools = 0
                 blocked_new_tools = 0
                 blocked_changed_tools = 0
-                if hasattr(self, 'approval_status'):
+                if hasattr(self, "approval_status"):
                     tools_status = self.approval_status.get("tools", {})
                     total_tools = len(tools_status)
                     blocked_tools = sum(1 for approved in tools_status.values() if not approved)
@@ -261,53 +244,53 @@ class MCPWrapperServer:
                         blocked_new_tools = blocked_tools
                     else:
                         blocked_changed_tools = blocked_tools
-                
+
                 description = f"Get information about blocked server configuration. {total_tools} tools blocked"
                 if blocked_new_tools > 0:
                     description += f" ({blocked_new_tools} new tools)"
                 if blocked_changed_tools > 0:
                     description += f" ({blocked_changed_tools} changed tools)"
-                    
-                wrapper_tools.append(types.Tool(
-                    name="context-protector-block",
-                    description=description,
-                    inputSchema={
-                        "type": "object",
-                        "properties": {},
-                        "required": []
-                    }
-                ))
-            
+
+                wrapper_tools.append(
+                    types.Tool(
+                        name="context-protector-block",
+                        description=description,
+                        inputSchema={"type": "object", "properties": {}, "required": []},
+                    )
+                )
+
             # Add quarantine_release tool if quarantine is enabled
             if self.use_guardrails and self.quarantine:
-                wrapper_tools.append(types.Tool(
-                    name="quarantine_release",
-                    description="Release a quarantined tool response for review",
-                    inputSchema={
-                        "type": "object",
-                        "required": ["uuid"],
-                        "properties": {
-                            "uuid": {
-                                "type": "string",
-                                "description": "UUID of the quarantined tool response to release",
-                            }
+                wrapper_tools.append(
+                    types.Tool(
+                        name="quarantine_release",
+                        description="Release a quarantined tool response for review",
+                        inputSchema={
+                            "type": "object",
+                            "required": ["uuid"],
+                            "properties": {
+                                "uuid": {
+                                    "type": "string",
+                                    "description": "UUID of the quarantined tool response to release",
+                                }
+                            },
                         },
-                    },
-                ))
-            
+                    )
+                )
+
             # If config is not approved at all, return only wrapper tools
             if not self.config_approved:
                 logger.info("Config not approved - returning only wrapper tools")
                 return wrapper_tools
-            
+
             # Config is approved (at least partially) - return approved downstream tools
             all_tools = wrapper_tools.copy()
 
             for spec in self.tool_specs:
                 # Check if this specific tool is approved
-                if (hasattr(self, 'approval_status') and 
-                    self.approval_status.get("tools", {}).get(spec.name, False)):
-                    
+                if hasattr(self, "approval_status") and self.approval_status.get("tools", {}).get(
+                    spec.name, False
+                ):
                     tool_kwargs = {
                         "name": spec.name,
                         "description": spec.description,
@@ -336,9 +319,7 @@ class MCPWrapperServer:
             )
 
             if not self.config_approved:
-                logger.warning(
-                    f"Blocking prompt '{name}' - server configuration not approved"
-                )
+                logger.warning(f"Blocking prompt '{name}' - server configuration not approved")
 
                 return types.GetPromptResult(
                     description="Server configuration not approved",
@@ -353,16 +334,13 @@ class MCPWrapperServer:
                 for content in result.messages:
                     if content.content:
                         if self.visualize_ansi_codes:
-                            content.content = make_ansi_escape_codes_visible(
-                                content.content
-                            )
+                            content.content = make_ansi_escape_codes_visible(content.content)
                         text_parts.append(content.content)
 
                 return types.GetPromptResult(
                     description=result.description,
                     messages=[
-                        types.PromptMessage(role="user", content=text)
-                        for text in text_parts
+                        types.PromptMessage(role="user", content=text) for text in text_parts
                     ],
                 )
 
@@ -378,9 +356,7 @@ class MCPWrapperServer:
             Handle tool use requests - either approve config, proxy to downstream server,
             handle quarantine release, or block if config not approved.
             """
-            logger.info(
-                f"Tool call with name {name} and config_approved {self.config_approved}"
-            )
+            logger.info(f"Tool call with name {name} and config_approved {self.config_approved}")
 
             # Handle wrapper tools
             if name == "context-protector-block":
@@ -393,10 +369,10 @@ class MCPWrapperServer:
                 raise ValueError("Child MCP server not connected")
 
             # Check if this specific tool is approved using granular approval system
-            if not hasattr(self, 'approval_status'):
+            if not hasattr(self, "approval_status"):
                 logger.warning(f"Blocking tool '{name}' - approval status not initialized")
                 blocked_response = {
-                    "status": "blocked", 
+                    "status": "blocked",
                     "reason": "Server approval status not initialized. Try reconnecting.",
                 }
                 error_json = json.dumps(blocked_response)
@@ -406,7 +382,7 @@ class MCPWrapperServer:
             if self.approval_status.get("is_new_server", False):
                 logger.warning(f"Blocking tool '{name}' - new server not approved")
                 blocked_response = {
-                    "status": "blocked", 
+                    "status": "blocked",
                     "reason": "Server configuration not approved. Use the 'context-protector-block' tool for approval instructions.",
                 }
                 error_json = json.dumps(blocked_response)
@@ -418,14 +394,14 @@ class MCPWrapperServer:
                     # Server was previously approved but instructions changed
                     logger.warning(f"Blocking tool '{name}' - server instructions have changed")
                     blocked_response = {
-                        "status": "blocked", 
+                        "status": "blocked",
                         "reason": "Server instructions have changed and need re-approval. Use the 'context-protector-block' tool for approval instructions.",
                     }
                 else:
                     # Server was never approved
                     logger.warning(f"Blocking tool '{name}' - server not approved")
                     blocked_response = {
-                        "status": "blocked", 
+                        "status": "blocked",
                         "reason": "Server configuration not approved. Use the 'context-protector-block' tool for approval instructions.",
                     }
                 error_json = json.dumps(blocked_response)
@@ -438,7 +414,7 @@ class MCPWrapperServer:
             if name in tools_dict and not tools_dict[name]:
                 logger.warning(f"Blocking tool '{name}' - tool not approved")
                 blocked_response = {
-                    "status": "blocked", 
+                    "status": "blocked",
                     "reason": f"Tool '{name}' is not approved. Use the 'context-protector-block' tool for approval instructions.",
                 }
                 error_json = json.dumps(blocked_response)
@@ -449,10 +425,7 @@ class MCPWrapperServer:
                 tool_result = await self._proxy_tool_to_downstream(name, arguments)
 
                 # If tool_result is a dict with structured content, handle it properly
-                if (
-                    isinstance(tool_result, dict)
-                    and "structured_content" in tool_result
-                ):
+                if isinstance(tool_result, dict) and "structured_content" in tool_result:
                     # Check if we have non-text content that needs to be preserved
                     has_non_text_content = False
                     if "content_list" in tool_result and tool_result["content_list"]:
@@ -494,7 +467,7 @@ class MCPWrapperServer:
     async def _handle_context_protector_block(self) -> List[types.TextContent]:
         """
         Handle the context-protector-block tool call.
-        
+
         Returns:
             Information about blocked tools and instructions for approving the server configuration
         """
@@ -503,28 +476,32 @@ class MCPWrapperServer:
         blocked_tools = 0
         blocked_new_tools = 0
         blocked_changed_tools = 0
-        
-        if hasattr(self, 'approval_status'):
+
+        if hasattr(self, "approval_status"):
             tools_status = self.approval_status.get("tools", {})
             total_tools = len(tools_status)
             blocked_tools = sum(1 for approved in tools_status.values() if not approved)
-            
+
             if self.approval_status.get("is_new_server", False):
                 blocked_new_tools = blocked_tools
             else:
                 blocked_changed_tools = blocked_tools
-        
+
         instructions = f"""
 context-protector status:
 
 {blocked_tools} out of {total_tools} tools are currently blocked
 """
-        
+
         if blocked_new_tools > 0:
-            instructions += f"- {blocked_new_tools} tools blocked because they are from a new server\n"
+            instructions += (
+                f"- {blocked_new_tools} tools blocked because they are from a new server\n"
+            )
         if blocked_changed_tools > 0:
-            instructions += f"- {blocked_changed_tools} tools blocked because their configuration has changed\n"
-        
+            instructions += (
+                f"- {blocked_changed_tools} tools blocked because their configuration has changed\n"
+            )
+
         instructions += """
 
 To approve this server configuration, run the wrapper in review mode:
@@ -536,7 +513,7 @@ Once approved, you can use all the server's tools through this wrapper.
 
 Note: This tool is only available when tools are blocked due to security restrictions.
 """
-        
+
         return [types.TextContent(type="text", text=instructions.strip())]
 
     async def _handle_quarantine_release(
@@ -555,9 +532,7 @@ Note: This tool is only available when tools are blocked due to security restric
             ValueError: If the UUID is invalid or not found, or if the response is not available for release
         """
         if "uuid" not in arguments:
-            raise ValueError(
-                "Missing required parameter 'uuid' for quarantine_release tool"
-            )
+            raise ValueError("Missing required parameter 'uuid' for quarantine_release tool")
 
         response_id = arguments["uuid"]
         logger.info(f"Processing quarantine_release request for UUID: {response_id}")
@@ -577,18 +552,18 @@ Note: This tool is only available when tools are blocked due to security restric
             }
 
             self.quarantine.delete_response(response_id)
-            logger.info(
-                f"Released response {response_id} from quarantine and deleted it"
-            )
+            logger.info(f"Released response {response_id} from quarantine and deleted it")
 
             json_response = json.dumps(original_tool_info)
             wrapped_response = {"status": "completed", "response": json_response}
             final_response = json.dumps(wrapped_response)
             return [types.TextContent(type="text", text=final_response)]
         else:
-            error = f"Response {response_id} is not marked for release. " + \
-                    f"Please use the CLI to review and release it first: " + \
-                    f"context-protector.sh --review-quarantine --quarantine-id {response_id}"
+            error = (
+                f"Response {response_id} is not marked for release. "
+                + f"Please use the CLI to review and release it first: "
+                + f"context-protector.sh --review-quarantine --quarantine-id {response_id}"
+            )
             return [types.TextContent(type="text", text=error)]
 
     async def _proxy_tool_to_downstream(self, name: str, arguments: dict) -> str:
@@ -597,9 +572,7 @@ Note: This tool is only available when tools are blocked due to security restric
             raise ValueError("No client connection to downstream server")
 
         try:
-            logger.info(
-                f"Forwarding tool call to downstream: {name} with args {arguments}"
-            )
+            logger.info(f"Forwarding tool call to downstream: {name} with args {arguments}")
             result = await self.session.call_tool(name, arguments)
 
             # Extract content, structured content, and preserve all content types
@@ -613,9 +586,7 @@ Note: This tool is only available when tools are blocked due to security restric
                 for content in result.content:
                     if content.type == "text" and content.text:
                         # Apply ANSI escape code processing if enabled
-                        processed_text = self._make_ansi_escape_codes_visible(
-                            content.text
-                        )
+                        processed_text = self._make_ansi_escape_codes_visible(content.text)
                         text_parts.append(processed_text)
                         # Create processed text content for the response
                         processed_content.append(
@@ -629,9 +600,7 @@ Note: This tool is only available when tools are blocked due to security restric
                     response_text = " ".join(text_parts)
             else:
                 # No content from downstream, use default text
-                response_text = (
-                    f"Tool call to '{name}' succeeded but returned no content"
-                )
+                response_text = f"Tool call to '{name}' succeeded but returned no content"
                 processed_content = [types.TextContent(type="text", text=response_text)]
 
             # Extract structured content if present
@@ -652,9 +621,7 @@ Note: This tool is only available when tools are blocked due to security restric
 
             # Scan the tool response with guardrail provider if configured
             if self.use_guardrails and self.guardrail_provider is not None:
-                guardrail_alert = self._scan_tool_response(
-                    name, arguments, response_text
-                )
+                guardrail_alert = self._scan_tool_response(name, arguments, response_text)
                 if guardrail_alert:
                     # Log the alert but don't block the response yet
                     logger.error(
@@ -718,9 +685,7 @@ Note: This tool is only available when tools are blocked due to security restric
         To review this response and release it from the quarantine, run contextprotector with the arguments `--review-quarantine{" --quarantine-id " + quarantine_id if quarantine_id else ""}`.
         """
 
-    def _convert_parameters_to_schema(
-        self, parameters: dict, required: List[str]
-    ) -> dict:
+    def _convert_parameters_to_schema(self, parameters: dict, required: List[str]) -> dict:
         """Convert parameters format to JSON Schema for MCP Tool"""
         properties = {}
 
@@ -806,7 +771,7 @@ Note: This tool is only available when tools are blocked due to security restric
             diff = old_config.compare(self.current_config)
             if diff.has_differences():
                 logger.warning(f"Configuration differences detected: {diff}")
-                
+
                 # Update the database with new unapproved config
                 self.config_db.save_unapproved_config(
                     self.connection_type, self._get_server_identifier(), self.current_config
@@ -819,18 +784,22 @@ Note: This tool is only available when tools are blocked due to security restric
             self.config_approved = False
         else:
             # Check if we have any approved tools
-            approved_tool_count = sum(1 for approved in self.approval_status["tools"].values() if approved)
+            approved_tool_count = sum(
+                1 for approved in self.approval_status["tools"].values() if approved
+            )
             self.config_approved = approved_tool_count > 0
-            
+
         logger.info(f"Tool update processed - approval status: {self.config_approved}")
-        if hasattr(self, 'approval_status'):
-            approved_tools = [name for name, approved in self.approval_status["tools"].items() if approved]
+        if hasattr(self, "approval_status"):
+            approved_tools = [
+                name for name, approved in self.approval_status["tools"].items() if approved
+            ]
             logger.info(f"Approved tools: {approved_tools}")
 
     async def _forward_notification_to_upstream(self, method: str, params=None):
         """
         Forward a notification to the upstream client.
-        
+
         Args:
             method: The notification method (e.g., "notifications/progress")
             params: Optional notification parameters
@@ -838,18 +807,16 @@ Note: This tool is only available when tools are blocked due to security restric
         if not self.server_session:
             logger.warning("No server session available to forward notification")
             return
-            
+
         try:
             # Create appropriate notification type based on method
             if method == "notifications/progress":
                 notification = types.ProgressNotification(
-                    method=method,
-                    params=params if params else None
+                    method=method, params=params if params else None
                 )
             elif method == "notifications/message":
                 notification = types.LoggingMessageNotification(
-                    method=method,
-                    params=params if params else None
+                    method=method, params=params if params else None
                 )
             elif method == "notifications/tools/list_changed":
                 notification = types.ToolListChangedNotification(method=method)
@@ -859,24 +826,20 @@ Note: This tool is only available when tools are blocked due to security restric
                 notification = types.ResourceListChangedNotification(method=method)
             elif method == "notifications/resources/updated":
                 notification = types.ResourceUpdatedNotification(
-                    method=method,
-                    params=params if params else None
+                    method=method, params=params if params else None
                 )
             elif method == "notifications/cancelled":
                 notification = types.CancelledNotification(
-                    method=method,
-                    params=params if params else None
+                    method=method, params=params if params else None
                 )
             elif method == "notifications/initialized":
                 notification = types.InitializedNotification(method=method)
             else:
                 # Fallback for any other valid notifications
                 notification = types.JSONRPCNotification(
-                    jsonrpc="2.0",
-                    method=method,
-                    params=params
+                    jsonrpc="2.0", method=method, params=params
                 )
-            
+
             await self.server_session.send_notification(notification)
             logger.info(f"Forwarded {method} to upstream client")
         except Exception as e:
@@ -893,7 +856,7 @@ Note: This tool is only available when tools are blocked due to security restric
         if isinstance(message, types.ServerNotification):
             spec_compliant_notifications = {
                 "notifications/tools/list_changed",
-                "notifications/prompts/list_changed", 
+                "notifications/prompts/list_changed",
                 "notifications/resources/list_changed",
                 "notifications/progress",
                 "notifications/message",
@@ -931,7 +894,7 @@ Note: This tool is only available when tools are blocked due to security restric
         else:
             logger.info(f"Received non-notification message: {type(message)}")
 
-    async def update_prompts(self, send_notification: bool=False):
+    async def update_prompts(self, send_notification: bool = False):
         """
         Update prompts from the downstream server.
 
@@ -956,12 +919,14 @@ Note: This tool is only available when tools are blocked due to security restric
                 logger.info("No prompts available from downstream server")
                 self.prompts = []
             if send_notification:
-                await self._forward_notification_to_upstream("notifications/prompts/list_changed", None)
+                await self._forward_notification_to_upstream(
+                    "notifications/prompts/list_changed", None
+                )
         except Exception as e:
             out = traceback.format_exc()
             logger.warning(f"Error updating prompts from downstream server: {e} {out}")
 
-    async def update_resources(self, send_notification: bool=False):
+    async def update_resources(self, send_notification: bool = False):
         """
         Update resources from the downstream server.
 
@@ -988,23 +953,25 @@ Note: This tool is only available when tools are blocked due to security restric
                 logger.info("No resources available from downstream server")
                 self.resources = []
             if send_notification:
-                await self._forward_notification_to_upstream("notifications/resources/list_changed", None)
+                await self._forward_notification_to_upstream(
+                    "notifications/resources/list_changed", None
+                )
         except Exception as e:
             logger.warning(f"Error updating resources from downstream server: {e}")
 
-    async def update_tools(self, send_notification: bool=False):
+    async def update_tools(self, send_notification: bool = False):
         """Update tools from the downstream server."""
         try:
             downstream_tools = await self.session.list_tools()
 
             assert downstream_tools.tools
-            logger.info(
-                f"Received {len(downstream_tools.tools)} tools after update notification"
-            )
+            logger.info(f"Received {len(downstream_tools.tools)} tools after update notification")
 
             await self._handle_tool_updates(downstream_tools.tools)
             if send_notification:
-                await self._forward_notification_to_upstream("notifications/tools/list_changed", None)
+                await self._forward_notification_to_upstream(
+                    "notifications/tools/list_changed", None
+                )
         except Exception as e:
             logger.warning(f"Error handling tool update notification: {e}")
 
@@ -1034,9 +1001,7 @@ Note: This tool is only available when tools are blocked due to security restric
             downstream_prompts = await self.session.list_prompts()
             if downstream_prompts and downstream_prompts.prompts:
                 self.prompts = downstream_prompts.prompts
-                logger.info(
-                    f"Received {len(self.prompts)} prompts during initialization"
-                )
+                logger.info(f"Received {len(self.prompts)} prompts during initialization")
         except Exception as e:
             logger.info(f"Downstream server does not support prompts: {e}")
 
@@ -1045,9 +1010,7 @@ Note: This tool is only available when tools are blocked due to security restric
             downstream_resources = await self.session.list_resources()
             if downstream_resources and downstream_resources.resources:
                 self.resources = downstream_resources.resources
-                logger.info(
-                    f"Received {len(self.resources)} resources during initialization"
-                )
+                logger.info(f"Received {len(self.resources)} resources during initialization")
         except Exception as e:
             logger.info(f"Downstream server does not support resources: {e}")
 
@@ -1057,24 +1020,32 @@ Note: This tool is only available when tools are blocked due to security restric
         self.approval_status = self.config_db.get_server_approval_status(
             self.connection_type, self._get_server_identifier(), self.current_config
         )
-        
+
         if self.approval_status["is_new_server"]:
             logger.info("New server detected - saving as unapproved")
             # Save the config as unapproved for later review
-            self.config_db.save_unapproved_config(self.connection_type, self._get_server_identifier(), self.current_config)
+            self.config_db.save_unapproved_config(
+                self.connection_type, self._get_server_identifier(), self.current_config
+            )
             self.config_approved = False
         elif not self.approval_status["instructions_approved"]:
             logger.info("Server instructions have changed - server blocked until re-approval")
             # Save the updated config as unapproved
-            self.config_db.save_unapproved_config(self.connection_type, self._get_server_identifier(), self.current_config)
+            self.config_db.save_unapproved_config(
+                self.connection_type, self._get_server_identifier(), self.current_config
+            )
             self.config_approved = False
         else:
             # Instructions are approved, check if we have any approved tools
-            approved_tool_count = sum(1 for approved in self.approval_status["tools"].values() if approved)
+            approved_tool_count = sum(
+                1 for approved in self.approval_status["tools"].values() if approved
+            )
             total_tool_count = len(self.approval_status["tools"])
-            
+
             if approved_tool_count > 0:
-                logger.info(f"Server partially approved - {approved_tool_count}/{total_tool_count} tools approved")
+                logger.info(
+                    f"Server partially approved - {approved_tool_count}/{total_tool_count} tools approved"
+                )
                 self.config_approved = True  # Allow partial operation
             else:
                 logger.info("Server instructions approved but no tools approved yet")
@@ -1102,9 +1073,7 @@ Note: This tool is only available when tools are blocked due to security restric
 
             self.server_identifier = self.child_command
 
-            self.saved_config = self.config_db.get_server_config(
-                "stdio", self.server_identifier
-            )
+            self.saved_config = self.config_db.get_server_config("stdio", self.server_identifier)
 
             command_parts = self.child_command.split()
             if not command_parts:
@@ -1144,9 +1113,7 @@ Note: This tool is only available when tools are blocked due to security restric
 
             self.server_identifier = self.server_url
 
-            self.saved_config = self.config_db.get_server_config(
-                "sse", self.server_identifier
-            )
+            self.saved_config = self.config_db.get_server_config("sse", self.server_identifier)
 
             # Add MCP-Protocol-Version header for SSE client
             headers = {"MCP-Protocol-Version": "2025-06-18"}
@@ -1165,9 +1132,7 @@ Note: This tool is only available when tools are blocked due to security restric
 
     async def _connect_via_streamable_http(self):
         """Connect to a downstream server via streamable HTTP."""
-        logger.info(
-            f"Connecting to downstream server via streamable HTTP: {self.server_url}"
-        )
+        logger.info(f"Connecting to downstream server via streamable HTTP: {self.server_url}")
 
         # Set up imports
         from mcp import ClientSession
@@ -1178,15 +1143,11 @@ Note: This tool is only available when tools are blocked due to security restric
 
             self.server_identifier = self.server_url
 
-            self.saved_config = self.config_db.get_server_config(
-                "http", self.server_identifier
-            )
+            self.saved_config = self.config_db.get_server_config("http", self.server_identifier)
 
             # Add MCP-Protocol-Version header for streamable HTTP client
             headers = {"MCP-Protocol-Version": "2025-06-18"}
-            self.client_context = streamablehttp_client(
-                self.server_url, headers=headers
-            )
+            self.client_context = streamablehttp_client(self.server_url, headers=headers)
             streams_and_session_id = await self.client_context.__aenter__()
             self.streams = (streams_and_session_id[0], streams_and_session_id[1])
 
@@ -1197,9 +1158,7 @@ Note: This tool is only available when tools are blocked due to security restric
             ).__aenter__()
 
         except Exception as e:
-            logger.error(
-                f"Error connecting to downstream server via streamable HTTP: {e}"
-            )
+            logger.error(f"Error connecting to downstream server via streamable HTTP: {e}")
             raise
 
     def _create_server_config(self) -> MCPServerConfig:
@@ -1256,12 +1215,12 @@ Note: This tool is only available when tools are blocked due to security restric
 
     def _setup_notification_handlers(self):
         """Setup handlers for client → server notifications to forward to downstream server."""
-        
+
         @self.server.progress_notification()
         async def handle_progress_notification(notification: types.ProgressNotification):
             """Forward progress notifications from upstream client to downstream server."""
             logger.info("Forwarding progress notification from client to downstream server")
-            
+
             if self.session:
                 try:
                     # Forward the notification to the downstream server's session
@@ -1269,55 +1228,63 @@ Note: This tool is only available when tools are blocked due to security restric
                     await self._forward_notification_to_downstream(notification)
                 except Exception as e:
                     logger.warning(f"Failed to forward progress notification to downstream: {e}")
-        
+
         # Handle other client notifications by registering them manually
         # Since there may not be decorators for all notification types, we'll register directly
-        
+
         async def handle_cancelled_notification(notification: types.CancelledNotification):
             """Forward cancelled notifications from upstream client to downstream server."""
-            logger.info("Forwarding cancelled notification from client to downstream server") 
-            
+            logger.info("Forwarding cancelled notification from client to downstream server")
+
             if self.session:
                 try:
                     await self._forward_notification_to_downstream(notification)
                 except Exception as e:
                     logger.warning(f"Failed to forward cancelled notification to downstream: {e}")
-        
+
         async def handle_initialized_notification(notification: types.InitializedNotification):
             """Forward initialized notifications from upstream client to downstream server."""
             logger.info("Forwarding initialized notification from client to downstream server")
-            
+
             if self.session:
                 try:
                     await self._forward_notification_to_downstream(notification)
                 except Exception as e:
                     logger.warning(f"Failed to forward initialized notification to downstream: {e}")
-        
+
         async def handle_message_notification(notification: types.LoggingMessageNotification):
             """Forward log message notifications from upstream client to downstream server."""
             logger.info("Forwarding message notification from client to downstream server")
-            
+
             if self.session:
                 try:
                     await self._forward_notification_to_downstream(notification)
                 except Exception as e:
                     logger.warning(f"Failed to forward message notification to downstream: {e}")
-        
+
         # Register the handlers manually in the notification_handlers dict
-        self.server.notification_handlers[types.CancelledNotification] = handle_cancelled_notification
-        self.server.notification_handlers[types.InitializedNotification] = handle_initialized_notification
-        self.server.notification_handlers[types.LoggingMessageNotification] = handle_message_notification
+        self.server.notification_handlers[types.CancelledNotification] = (
+            handle_cancelled_notification
+        )
+        self.server.notification_handlers[types.InitializedNotification] = (
+            handle_initialized_notification
+        )
+        self.server.notification_handlers[types.LoggingMessageNotification] = (
+            handle_message_notification
+        )
 
     async def _forward_notification_to_downstream(self, notification):
         """Forward a notification from upstream client to downstream server."""
         if not self.session:
             logger.warning("No downstream session available to forward notification")
             return
-            
+
         try:
             # ClientSession does have send_notification - use it to forward to downstream
             await self.session.send_notification(notification)
-            logger.info(f"Successfully forwarded notification {notification.method} to downstream server")
+            logger.info(
+                f"Successfully forwarded notification {notification.method} to downstream server"
+            )
         except Exception as e:
             logger.error(f"Error forwarding notification {notification.method} to downstream: {e}")
 
@@ -1400,9 +1367,7 @@ Note: This tool is only available when tools are blocked due to security restric
                 self.session = None
                 self.streams = None
                 self.child_process = None
-                logger.info(
-                    f"Closed MCP client connection (type: {self.connection_type})"
-                )
+                logger.info(f"Closed MCP client connection (type: {self.connection_type})")
             except Exception as e:
                 logger.error(f"Error closing MCP client: {e}")
 
@@ -1514,16 +1479,12 @@ async def review_server_config(
 
         print("\n===== TOOL LIST =====")
         for tool_spec in wrapper.tool_specs:
-            print(
-                f"• {tool_spec.name}: {make_ansi_escape_codes_visible(tool_spec.description)}"
-            )
+            print(f"• {tool_spec.name}: {make_ansi_escape_codes_visible(tool_spec.description)}")
         print("=====================\n")
 
         guardrail_alert = None
         if wrapper.guardrail_provider is not None:
-            guardrail_alert = wrapper.guardrail_provider.check_server_config(
-                wrapper.current_config
-            )
+            guardrail_alert = wrapper.guardrail_provider.check_server_config(wrapper.current_config)
 
         if guardrail_alert:
             print("\n==== GUARDRAIL CHECK: ALERT ====")
@@ -1532,9 +1493,7 @@ async def review_server_config(
             print("==================================\n")
 
         response = (
-            input("Do you want to trust this server configuration? (yes/no): ")
-            .strip()
-            .lower()
+            input("Do you want to trust this server configuration? (yes/no): ").strip().lower()
         )
         if response in ("yes", "y"):
             # First approve instructions
@@ -1543,7 +1502,7 @@ async def review_server_config(
                 wrapper._get_server_identifier(),
                 wrapper.current_config.instructions,
             )
-            
+
             # Then approve each tool individually
             for tool in wrapper.current_config.tools:
                 wrapper.config_db.approve_tool(
@@ -1552,7 +1511,7 @@ async def review_server_config(
                     tool.name,
                     tool,
                 )
-            
+
             # Finally set the server as approved
             wrapper.config_db.save_server_config(
                 wrapper.connection_type,
@@ -1560,9 +1519,7 @@ async def review_server_config(
                 wrapper.current_config,
                 ApprovalStatus.APPROVED,
             )
-            print(
-                f"\nThe server configuration for {identifier} has been trusted and saved."
-            )
+            print(f"\nThe server configuration for {identifier} has been trusted and saved.")
         else:
             print(f"\nThe server configuration for {identifier} has NOT been trusted.")
 

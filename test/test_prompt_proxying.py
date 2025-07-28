@@ -78,9 +78,7 @@ class TestPromptProxying:
             # Verify prompt details
             greeting_prompt = next(p for p in prompts.prompts if p.name == "greeting")
             assert "friendly greeting" in greeting_prompt.description
-            assert any(
-                arg.name == "name" and arg.required for arg in greeting_prompt.arguments
-            )
+            assert any(arg.name == "name" and arg.required for arg in greeting_prompt.arguments)
 
         # Run first part of the test
         await run_with_wrapper(callback1, self.config_path)
@@ -112,9 +110,7 @@ class TestPromptProxying:
         # Second callback - after approval
         async def callback2(session):
             # Now dispatch a prompt
-            greeting_result = await session.get_prompt(
-                "greeting", {"name": "Test User"}
-            )
+            greeting_result = await session.get_prompt("greeting", {"name": "Test User"})
 
             # Verify the prompt response
             assert len(greeting_result.messages) == 1
@@ -174,16 +170,12 @@ class TestPromptProxying:
             assert "help" not in prompt_names
 
             # Verify we can still use tools without re-approval
-            tool_result = await session.call_tool(
-                "test_tool", {"message": "after prompt change"}
-            )
+            tool_result = await session.call_tool("test_tool", {"message": "after prompt change"})
             response_text = tool_result.content[0].text
             assert "Echo: after prompt change" in response_text
 
             # Verify we can dispatch the new prompt
-            farewell_result = await session.get_prompt(
-                "farewell", {"name": "Test User"}
-            )
+            farewell_result = await session.get_prompt("farewell", {"name": "Test User"})
             assert "Goodbye, Test User!" in farewell_result.messages[0].content.text
 
             # Verify we can use the updated version of an existing prompt
@@ -224,9 +216,7 @@ class TestPromptProxying:
         # Part 2: After approval
         async def callback2(session):
             # Now prompt should work
-            greeting_result = await session.get_prompt(
-                "greeting", {"name": "Test User"}
-            )
+            greeting_result = await session.get_prompt("greeting", {"name": "Test User"})
             assert len(greeting_result.messages) > 0
             assert "Hello, Test User!" in greeting_result.messages[0].content.text
 

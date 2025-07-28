@@ -80,9 +80,7 @@ async def test_quarantine_release_tool_lists_in_tools(setup_quarantine_test):
     wrapper.tool_specs = []
 
     # Get the list_tools handler and call it directly
-    tools_response = await wrapper.server.request_handlers[types.ListToolsRequest](
-        wrapper.server
-    )
+    tools_response = await wrapper.server.request_handlers[types.ListToolsRequest](wrapper.server)
     tools = tools_response.root.tools
 
     # Verify that quarantine_release tool is included
@@ -107,9 +105,7 @@ async def test_quarantine_release_success(setup_quarantine_test):
     )
 
     # Call the quarantine_release tool handler
-    result = await wrapper._handle_quarantine_release(
-        {"uuid": test_data["released_id"]}
-    )
+    result = await wrapper._handle_quarantine_release({"uuid": test_data["released_id"]})
 
     # Verify the result
     assert len(result) == 1

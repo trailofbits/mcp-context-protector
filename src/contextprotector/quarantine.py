@@ -57,11 +57,7 @@ class QuarantinedToolResponse:
         """Create a QuarantinedToolResponse from a dictionary."""
         if "timestamp" in data and isinstance(data["timestamp"], str):
             data["timestamp"] = datetime.datetime.fromisoformat(data["timestamp"])
-        if (
-            "released_at" in data
-            and isinstance(data["released_at"], str)
-            and data["released_at"]
-        ):
+        if "released_at" in data and isinstance(data["released_at"], str) and data["released_at"]:
             data["released_at"] = datetime.datetime.fromisoformat(data["released_at"])
         return cls(**data)
 
@@ -121,8 +117,7 @@ class ToolResponseQuarantine:
         with ToolResponseQuarantine._file_lock:
             data = {
                 "responses": [
-                    response.to_dict()
-                    for response in self.quarantined_responses.values()
+                    response.to_dict() for response in self.quarantined_responses.values()
                 ]
             }
 

@@ -71,9 +71,7 @@ def review_response_list(
     # Prompt user to select a response to review
     while True:
         try:
-            choice = input(
-                "Enter the number of the response to review (or 'q' to quit): "
-            )
+            choice = input("Enter the number of the response to review (or 'q' to quit): ")
             if choice.lower() in ("q", "quit", "exit"):
                 return
 
@@ -93,16 +91,12 @@ def review_response_list(
                 else:
                     print("\nError retrieving response from quarantine.")
             else:
-                print(
-                    f"\nInvalid choice. Please enter a number between 1 and {len(responses)}."
-                )
+                print(f"\nInvalid choice. Please enter a number between 1 and {len(responses)}.")
         except ValueError:
             print("\nPlease enter a valid number.")
 
 
-def review_response(
-    quarantine: ToolResponseQuarantine, response: QuarantinedToolResponse
-) -> None:
+def review_response(quarantine: ToolResponseQuarantine, response: QuarantinedToolResponse) -> None:
     """
     Review a specific quarantined response and prompt for release.
 
@@ -122,9 +116,7 @@ def review_response(
     print("=======================================\n")
 
     while True:
-        choice = input(
-            "Do you want to release this response from quarantine? [y/n]: "
-        ).lower()
+        choice = input("Do you want to release this response from quarantine? [y/n]: ").lower()
         if choice in ("y", "yes"):
             quarantine.release_response(response.id)
             print(f"\nResponse {response.id} has been released from quarantine.")

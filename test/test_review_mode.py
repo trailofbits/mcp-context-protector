@@ -42,9 +42,7 @@ async def test_review_mode_already_trusted():
     with patch.object(MCPWrapperServer, "wrap_stdio", return_value=mock_wrapper):
         # Create mock for the utility function
         mock_approve_func = AsyncMock(return_value=None)
-        with patch.object(
-            approve_server_config_using_review, "__call__", mock_approve_func
-        ):
+        with patch.object(approve_server_config_using_review, "__call__", mock_approve_func):
             # Capture stdout for assertion
             with patch("sys.stdout", new=StringIO()) as fake_stdout:
                 # Call the review function directly since we're testing its logic
@@ -76,9 +74,7 @@ async def test_review_mode_new_server_approval():
     mock_wrapper.server_identifier = "test_command"
     mock_wrapper.saved_config = None
     mock_wrapper.current_config = MCPServerConfig()
-    mock_wrapper.tool_specs = [
-        AsyncMock(name="tool1", description="Tool 1 description")
-    ]
+    mock_wrapper.tool_specs = [AsyncMock(name="tool1", description="Tool 1 description")]
     mock_wrapper.guardrail_alert = None
     mock_wrapper.guardrail_provider = None
     mock_wrapper.connect = AsyncMock(return_value=None)
@@ -134,9 +130,7 @@ async def test_review_mode_modified_server_rejection():
     # Set up the compare method to return our mock diff directly, not as a coroutine
     saved_config.compare = MagicMock(return_value=mock_diff)
 
-    mock_wrapper.tool_specs = [
-        AsyncMock(name="tool1", description="Tool 1 description")
-    ]
+    mock_wrapper.tool_specs = [AsyncMock(name="tool1", description="Tool 1 description")]
     mock_wrapper.guardrail_alert = None
     mock_wrapper.connect = AsyncMock(return_value=None)
     mock_wrapper.stop_child_process = AsyncMock(return_value=None)
@@ -181,9 +175,7 @@ async def test_review_mode_with_guardrail_alert():
     mock_wrapper.server_identifier = "test_command"
     mock_wrapper.saved_config = None
     mock_wrapper.current_config = MCPServerConfig()
-    mock_wrapper.tool_specs = [
-        MagicMock(name="tool1", description="Tool 1 description")
-    ]
+    mock_wrapper.tool_specs = [MagicMock(name="tool1", description="Tool 1 description")]
 
     # Create a mock guardrail alert - use regular MagicMock
     mock_wrapper.guardrail_alert = MagicMock()
@@ -204,9 +196,7 @@ async def test_review_mode_with_guardrail_alert():
             # Capture stdout for assertion
             with patch("sys.stdout", new=StringIO()) as fake_stdout:
                 # Call the review function
-                await review_server_config(
-                    "stdio", "test_command", temp_path, mock_provider
-                )
+                await review_server_config("stdio", "test_command", temp_path, mock_provider)
 
                 # Check output
                 output = fake_stdout.getvalue()

@@ -124,16 +124,10 @@ class PromptTestServer:
                 # Use the session to send a prompt list changed notification
                 if self._session:
                     loop = asyncio.get_running_loop()
-                    asyncio.run_coroutine_threadsafe(
-                        self._session.send_prompt_list_changed(), loop
-                    )
+                    asyncio.run_coroutine_threadsafe(self._session.send_prompt_list_changed(), loop)
                     print("Sent prompt_list_changed notification", file=sys.stderr)
 
-                return [
-                    types.TextContent(
-                        type="text", text=f"Toggled to {prompt_state} prompts"
-                    )
-                ]
+                return [types.TextContent(type="text", text=f"Toggled to {prompt_state} prompts")]
 
             return [types.TextContent(type="text", text="Unknown tool")]
 

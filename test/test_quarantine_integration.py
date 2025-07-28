@@ -32,9 +32,7 @@ async def test_quarantine_integration(temp_quarantine_file):
     provider = AlwaysAlertGuardrailProvider()
 
     # Create a wrapper server with the provider and a temporary quarantine
-    wrapper = MCPWrapperServer(
-        guardrail_provider=provider, quarantine_path=temp_quarantine_file
-    )
+    wrapper = MCPWrapperServer(guardrail_provider=provider, quarantine_path=temp_quarantine_file)
 
     # Create a mock session
     wrapper.session = MagicMock()
@@ -44,9 +42,7 @@ async def test_quarantine_integration(temp_quarantine_file):
     original_response = "This is a potentially harmful tool response."
 
     async def mock_call_tool(name, arguments):
-        return CallToolResult(
-            content=[TextContent(type="text", text=original_response)]
-        )
+        return CallToolResult(content=[TextContent(type="text", text=original_response)])
 
     wrapper.session.call_tool = mock_call_tool
 
@@ -101,16 +97,12 @@ async def test_quarantine_disabled_when_no_guardrails():
     original_response = "This is a normal tool response."
 
     async def mock_call_tool(name, arguments):
-        return CallToolResult(
-            content=[TextContent(type="text", text=original_response)]
-        )
+        return CallToolResult(content=[TextContent(type="text", text=original_response)])
 
     wrapper.session.call_tool = mock_call_tool
 
     # Call the tool
-    response = await wrapper._proxy_tool_to_downstream(
-        "normal_tool", {"param": "value"}
-    )
+    response = await wrapper._proxy_tool_to_downstream("normal_tool", {"param": "value"})
 
     # Verify that the original response is returned in the structured format
     assert isinstance(response, dict)

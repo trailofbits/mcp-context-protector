@@ -85,9 +85,7 @@ def load_guardrail_providers() -> Dict[str, Type[GuardrailProvider]]:
                         providers[provider_name] = obj
                         logger.info(f"Loaded guardrail provider: {provider_name}")
                     else:
-                        logger.debug(
-                            f"Skipped test-only guardrail provider: {provider_name}"
-                        )
+                        logger.debug(f"Skipped test-only guardrail provider: {provider_name}")
 
         except Exception as e:
             logger.error(f"Error loading guardrail provider module {name}: {e}")

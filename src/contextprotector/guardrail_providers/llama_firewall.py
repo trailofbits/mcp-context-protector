@@ -47,9 +47,7 @@ class LlamaFirewallProvider(GuardrailProvider):
         Returns:
             Optional GuardrailAlert if guardrail is triggered, or None if the configuration is safe
         """
-        logger.info(
-            f"LlamaFirewallProvider checking config with {len(config.tools)} tools"
-        )
+        logger.info(f"LlamaFirewallProvider checking config with {len(config.tools)} tools")
 
         try:
             lf = LlamaFirewall(
@@ -102,9 +100,7 @@ class LlamaFirewallProvider(GuardrailProvider):
                 data={"error": str(e)},
             )
 
-    def check_tool_response(
-        self, tool_response: ToolResponse
-    ) -> Optional[GuardrailAlert]:
+    def check_tool_response(self, tool_response: ToolResponse) -> Optional[GuardrailAlert]:
         """
         Check the provided tool response against Llama Firewall guardrails.
 
@@ -114,9 +110,7 @@ class LlamaFirewallProvider(GuardrailProvider):
         Returns:
             Optional GuardrailAlert if guardrail is triggered, or None if the response is safe
         """
-        logger.info(
-            f"LlamaFirewallProvider checking tool response from: {tool_response.tool_name}"
-        )
+        logger.info(f"LlamaFirewallProvider checking tool response from: {tool_response.tool_name}")
 
         try:
             lf = LlamaFirewall(scanners={Role.TOOL: [ScannerType.PROMPT_GUARD]})
@@ -150,9 +144,7 @@ class LlamaFirewallProvider(GuardrailProvider):
                     "tool_output_length": len(tool_response.tool_output),
                 },
             )
-            logger.info(
-                f"Returning tool response alert with explanation: {alert.explanation}"
-            )
+            logger.info(f"Returning tool response alert with explanation: {alert.explanation}")
             return alert
 
         except Exception as e:

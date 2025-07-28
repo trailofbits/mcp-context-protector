@@ -206,9 +206,7 @@ async def test_initial_tools():
 
         # Test that the echo tool functions correctly
         input_message = "Hello from dynamic server test"
-        result = await session.call_tool(
-            name="echo", arguments={"message": input_message}
-        )
+        result = await session.call_tool(name="echo", arguments={"message": input_message})
 
         # Parse the response
         assert isinstance(result, types.CallToolResult)
@@ -234,9 +232,7 @@ async def test_preconfigured_tools():
 
         # Test the echo tool
         input_message = "Hello from preconfigured server"
-        result = await session.call_tool(
-            name="echo", arguments={"message": input_message}
-        )
+        result = await session.call_tool(name="echo", arguments={"message": input_message})
         response = json.loads(result.content[0].text)
         assert response["echo_message"] == input_message
 
@@ -267,9 +263,7 @@ async def test_sighup_adds_tool():
 
         # Try echo tool first - should work
         input_message = "Hello from dynamic server!"
-        result = await session.call_tool(
-            name="echo", arguments={"message": input_message}
-        )
+        result = await session.call_tool(name="echo", arguments={"message": input_message})
         response = json.loads(result.content[0].text)
         assert response["echo_message"] == input_message
 
@@ -328,9 +322,7 @@ async def test_multiple_sighups():
         assert sorted(tool_names) == ["calculator", "counter", "echo", "echo4"]
 
         # Test echo4
-        result = await session.call_tool(
-            name="echo4", arguments={"message": "Testing echo4"}
-        )
+        result = await session.call_tool(name="echo4", arguments={"message": "Testing echo4"})
         response = json.loads(result.content[0].text)
         assert response["echo_message"] == "Testing echo4"
         assert response["tool_number"] == 4

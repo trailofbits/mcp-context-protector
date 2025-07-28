@@ -1,5 +1,5 @@
 [project]
-name = "contextprotector"
+name = "context-protector"
 dynamic = ["version"]
 description = "MCP security wrapper"
 readme = "README.md"
@@ -34,16 +34,16 @@ lint = [
     "types-toml",
     "interrogate",
 ]
-dev = ["contextprotector[doc,test,lint]", "twine", "build"]
+dev = ["context-protector[doc,test,lint]", "twine", "build"]
 
 [project.scripts]
-"contextprotector" = "contextprotector.__main__:main"
+"context-protector" = "contextprotector.__main__:main"
 
 [project.urls]
-Homepage = "https://pypi.org/project/contextprotector"
-Documentation = "https://trailofbits.github.io/contextprotector/"
-Issues = "https://github.com/trailofbits/contextprotector/issues"
-Source = "https://github.com/trailofbits/contextprotector"
+Homepage = "https://pypi.org/project/context-protector"
+Documentation = "https://github.com/trailofbits/mcp-context-protector/README.md"
+Issues = "https://github.com/trailofbits/mcp-context-protector/issues"
+Source = "https://github.com/trailofbits/mcp-context-protector"
 
 [tool.coverage.run]
 # don't attempt code coverage for the CLI entrypoints

@@ -62,7 +62,6 @@ async def test_echo_tool_through_wrapper(sse_server_fixture):
     """Test that the echo tool correctly works through the MCP wrapper using SSE transport."""
 
     async def callback(session):
-
         input_message = "Hello from Wrapped SSE Server!"
 
         # List available tools
@@ -72,9 +71,7 @@ async def test_echo_tool_through_wrapper(sse_server_fixture):
         assert sorted([t.name for t in tools.tools]) == ["context-protector-block"]
 
         # First try calling the echo tool - expect to get blocked
-        result = await session.call_tool(
-            name="echo", arguments={"message": input_message}
-        )
+        result = await session.call_tool(name="echo", arguments={"message": input_message})
         assert len(result.content) == 1
         assert isinstance(result.content[0], types.TextContent)
         result_dict = json.loads(result.content[0].text)
@@ -88,9 +85,7 @@ async def test_echo_tool_through_wrapper(sse_server_fixture):
         # After approval, reconnect and try again
 
         # Call the echo tool again - should work now
-        result = await session.call_tool(
-            name="echo", arguments={"message": input_message}
-        )
+        result = await session.call_tool(name="echo", arguments={"message": input_message})
         assert isinstance(result, types.CallToolResult)
         assert len(result.content) == 1
         assert isinstance(result.content[0], types.TextContent)
@@ -105,9 +100,7 @@ async def test_echo_tool_through_wrapper(sse_server_fixture):
 
         # Try with a different message to ensure consistent behavior
         second_message = "Testing with a second message"
-        result2 = await session.call_tool(
-            name="echo", arguments={"message": second_message}
-        )
+        result2 = await session.call_tool(name="echo", arguments={"message": second_message})
         response_json2 = json.loads(result2.content[0].text)
         response_data2 = json.loads(response_json2["response"])
         assert response_data2["echo_message"] == second_message
@@ -149,9 +142,7 @@ async def test_invalid_tool_through_wrapper(sse_server_fixture):
 
     async def callback2(session):
         # Now try to call a tool that doesn't exist
-        result = await session.call_tool(
-            name="nonexistent_tool", arguments={"foo": "bar"}
-        )
+        result = await session.call_tool(name="nonexistent_tool", arguments={"foo": "bar"})
         assert isinstance(result, types.CallToolResult)
         response_json = json.loads(result.content[0].text)
 

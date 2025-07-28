@@ -103,14 +103,10 @@ async def send_sighup_and_wait(session, expected_tools, tracker):
 
     # Wait for the notification to be received
     notification_received = await tracker.wait_for_notification(timeout=2.0)
-    assert (
-        notification_received
-    ), "No tool update notification was received after sending SIGHUP"
+    assert notification_received, "No tool update notification was received after sending SIGHUP"
 
     # Additional verification: check that updates_received counter was incremented
-    assert (
-        tracker.updates_received > 0
-    ), "Tool update tracker did not receive any notifications"
+    assert tracker.updates_received > 0, "Tool update tracker did not receive any notifications"
 
     # Verify that the tools list now contains the expected tools
     await verify_tools(session, expected_tools)
@@ -178,9 +174,7 @@ async def start_dynamic_server(callback: callable, initial_tool_count=None):
     async with stdio_client(server_params) as (read, write):
         assert read is not None and write is not None
         # Create the session with the tracker's message handler
-        async with ClientSession(
-            read, write, message_handler=tracker.handle_message
-        ) as session:
+        async with ClientSession(read, write, message_handler=tracker.handle_message) as session:
             await session.initialize()
 
             # Get the server PID from the pidfile
@@ -256,9 +250,7 @@ async def test_initial_tools():
 
         # Test the echo tool
         input_message = "Hello, dynamic server!"
-        result = await session.call_tool(
-            name="echo", arguments={"message": input_message}
-        )
+        result = await session.call_tool(name="echo", arguments={"message": input_message})
 
         assert isinstance(result, types.CallToolResult)
         assert len(result.content) == 1
@@ -294,9 +286,7 @@ async def test_preconfigured_tools():
 
         # Test the echo tool
         input_message = "Hello, preconfigured server!"
-        result = await session.call_tool(
-            name="echo", arguments={"message": input_message}
-        )
+        result = await session.call_tool(name="echo", arguments={"message": input_message})
         response = json.loads(result.content[0].text)
         assert response == {"echo_message": input_message}
 
@@ -344,15 +334,11 @@ async def test_sighup_adds_tool():
         await send_sighup_and_wait(session, ["echo", "calculator"], tracker)
 
         # Log notification details for debugging
-        print(
-            f"Tool update notification received after {tracker.updates_received} updates"
-        )
+        print(f"Tool update notification received after {tracker.updates_received} updates")
 
         # The latest_tools in the notification should include the calculator tool
         tool_names = [tool.name for tool in tracker.latest_tools]
-        assert (
-            "calculator" in tool_names
-        ), "Calculator tool not found in the update notification"
+        assert "calculator" in tool_names, "Calculator tool not found in the update notification"
 
         # Test the calculator tool
         result = await session.call_tool(
@@ -397,9 +383,7 @@ async def test_notification_on_sighup():
             tracker: The notification tracker for monitoring tool updates
         """
         # Verify no notifications yet
-        assert (
-            tracker.updates_received == 0
-        ), "Should have no notifications before SIGHUP"
+        assert tracker.updates_received == 0, "Should have no notifications before SIGHUP"
 
         # Send SIGHUP
         os.kill(SERVER_PID, signal.SIGHUP)
@@ -422,9 +406,7 @@ async def test_notification_on_sighup():
         os.kill(SERVER_PID, signal.SIGHUP)
 
         notification_received = await tracker.wait_for_notification(timeout=2.0)
-        assert (
-            notification_received
-        ), "No second notification received within timeout period"
+        assert notification_received, "No second notification received within timeout period"
         assert tracker.updates_received == 2, "Expected two notifications total"
 
         # Get updated tools list
@@ -467,14 +449,10 @@ async def test_preconfigured_with_sighup():
         assert response == {"count": 3}
 
         # Send another SIGHUP to add echo4 tool
-        await send_sighup_and_wait(
-            session, ["echo", "calculator", "counter", "echo4"], tracker
-        )
+        await send_sighup_and_wait(session, ["echo", "calculator", "counter", "echo4"], tracker)
 
         # Test the echo4 tool
-        result = await session.call_tool(
-            name="echo4", arguments={"message": "Testing echo4"}
-        )
+        result = await session.call_tool(name="echo4", arguments={"message": "Testing echo4"})
         response = json.loads(result.content[0].text)
         assert response["echo_message"] == "Testing echo4"
         assert response["tool_number"] == 4
@@ -511,9 +489,7 @@ async def test_multiple_sighups():
         await send_sighup_and_wait(session, ["echo", "calculator"], tracker)
 
         # Verify notification for first SIGHUP
-        assert (
-            tracker.updates_received == 1
-        ), "Expected 1 notification after first SIGHUP"
+        assert tracker.updates_received == 1, "Expected 1 notification after first SIGHUP"
         tools = await session.list_tools()
         tool_names1 = [tool.name for tool in tools.tools]
         assert "calculator" in tool_names1, "Calculator tool missing after first SIGHUP"
@@ -526,9 +502,7 @@ async def test_multiple_sighups():
         await send_sighup_and_wait(session, ["echo", "calculator", "counter"], tracker)
 
         # Verify notification for second SIGHUP
-        assert (
-            tracker.updates_received == 2
-        ), "Expected 2 notifications total after second SIGHUP"
+        assert tracker.updates_received == 2, "Expected 2 notifications total after second SIGHUP"
         tools = await session.list_tools()
         tool_names2 = [tool.name for tool in tools.tools]
         assert "counter" in tool_names2, "Counter tool missing after second SIGHUP"
@@ -546,14 +520,10 @@ async def test_multiple_sighups():
         tracker.notification_event.clear()
 
         # Send third SIGHUP to add echo4 tool
-        await send_sighup_and_wait(
-            session, ["echo", "calculator", "counter", "echo4"], tracker
-        )
+        await send_sighup_and_wait(session, ["echo", "calculator", "counter", "echo4"], tracker)
 
         # Verify notification for third SIGHUP
-        assert (
-            tracker.updates_received == 3
-        ), "Expected 3 notifications total after third SIGHUP"
+        assert tracker.updates_received == 3, "Expected 3 notifications total after third SIGHUP"
         tools = await session.list_tools()
         tool_names3 = [tool.name for tool in tools.tools]
         assert "echo4" in tool_names3, "Echo4 tool missing after third SIGHUP"
