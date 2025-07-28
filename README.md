@@ -1,11 +1,5 @@
 # context-protector
 
-<!--- BADGES: START --->
-[![CI](https://github.com/trailofbits/contextprotector/actions/workflows/tests.yml/badge.svg)](https://github.com/trailofbits/contextprotector/actions/workflows/tests.yml)
-[![PyPI version](https://badge.fury.io/py/contextprotector.svg)](https://pypi.org/project/contextprotector)
-[![Packaging status](https://repology.org/badge/tiny-repos/python:contextprotector.svg)](https://repology.org/project/python:contextprotector/versions)
-<!--- BADGES: END --->
-
 ## Overview
 
 context-protector is a security wrapper for MCP servers that addresses risks associated with running untrusted MCP servers, including line jumping, unexpected server configuration changes, and other prompt injection attacks. Implementing these security controls through a wrapper (rather than through a scanner that runs before a tool is installed or by adding security features to an MCP host app) streamlines enforcement and ensures universal compatibility with all MCP apps.
@@ -77,7 +71,7 @@ To review the response and release it from the quarantine, run the app with the 
 
 ## Configuring context-protector
 
-`context-protector` is packaged with `uv` and can be run with `uv run contextprotector`. To start a server through the wrapper, run the `context-protector.sh` launcher script with the arguments `--command <COMMAND>` or `--url <URL>`:
+`context-protector` is packaged with `uv` and can be run with `uv run context-protector`. To start a server through the wrapper, run the `context-protector.sh` launcher script with the arguments `--command <COMMAND>` or `--url <URL>`:
 
 ```
 # Start the wrapper with an stdio server
@@ -105,7 +99,7 @@ context-protector.sh --review-quarantine --quarantine-id <ID>
 ## Usage
 
 ```
-usage: contextprotector [-h] [--command COMMAND] [--url URL] [--sse-url SSE_URL] [--list-guardrail-providers] [--review-server] [--review-quarantine]
+usage: context-protector [-h] [--command COMMAND] [--url URL] [--sse-url SSE_URL] [--list-guardrail-providers] [--review-server] [--review-quarantine]
                         [--review-all-servers] [--server-config-file SERVER_CONFIG_FILE] [--guardrail-provider GUARDRAIL_PROVIDER] [--visualize-ansi-codes]
                         [--quarantine-id QUARANTINE_ID] [--quarantine-path QUARANTINE_PATH]
 
