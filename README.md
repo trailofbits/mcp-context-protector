@@ -1,4 +1,4 @@
-# contextprotector
+# context-protector
 
 <!--- BADGES: START --->
 [![CI](https://github.com/trailofbits/contextprotector/actions/workflows/tests.yml/badge.svg)](https://github.com/trailofbits/contextprotector/actions/workflows/tests.yml)
@@ -31,7 +31,7 @@ cd context-protector
 uv sync
 ```
 
-To make it easier to launch `context-protector`, we recommend updating `context-protector.sh` to contain the full path to `uv`. Some MCP clients, including Claude Desktop, replace the `PATH` environment variable with a minimal set of paths when launching MCP servers.
+To make it easier to launch `context-protector`, we recommend updating `context-protector.sh` to contain the full path to `uv`. Some MCP clients, including Claude Desktop, replace the `PATH` environment variable with a minimal set of paths when launching MCP servers, which can make your `claude_desktop_config.json` file unwieldy and hard to maintain. Including a full path to `uv` in the launcher helps mitigate this problem.
 
 Now configure your client to run your MCP servers through `context-protector`, and tool configuration pinning will automatically be enabled. Here's a sample Claude Desktop config:
 
@@ -53,7 +53,7 @@ Now configure your client to run your MCP servers through `context-protector`, a
 | Line jumping  | Server configuration blocking, approval and pinning; guardrail evaluation of server instructions and tool descriptions    |
 | Server configuration changes/rug pulls | Server configuration pinning     |
 | User deception through ANSI control characters    | ANSI control character sanitization    |
-| Other prompt injection attacks  | Tool response guardrails and quarantining. |
+| Other prompt injection attacks  | Tool response guardrails and quarantining |
 
 
 
@@ -77,7 +77,7 @@ To review the response and release it from the quarantine, run the app with the 
 
 ## Configuring context-protector
 
-`context-protector` is packaged with `uv` and can be run with To start a server through the wrapper, run the `context-protector.sh` launcher script with the arguments `--command <COMMAND>` or `--url <URL>`:
+`context-protector` is packaged with `uv` and can be run with `uv run contextprotector`. To start a server through the wrapper, run the `context-protector.sh` launcher script with the arguments `--command <COMMAND>` or `--url <URL>`:
 
 ```
 # Start the wrapper with an stdio server
