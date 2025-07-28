@@ -180,8 +180,7 @@ async def test_zero_information_leakage_unapproved_config():
     try:
         # Use the prompt_test_server which has multiple tools and prompts
         # This gives us a good test case with real downstream server metadata to verify is hidden
-        venv_python = "/Users/cliffsmith/context-protector/venv/bin/python"
-        server_command = f"{venv_python} -m contextprotector.tests.prompt_test_server"
+        server_command = "python -m contextprotector.tests.prompt_test_server"
 
         # Run the test with unapproved config - this should show zero information leakage
         await run_with_wrapper_session(test_callback, "stdio", server_command, temp_file.name)
@@ -237,8 +236,7 @@ async def test_information_visible_after_approval():
     # Create temporary config file
     temp_file = tempfile.NamedTemporaryFile(delete=False)
     try:
-        venv_python = "/Users/cliffsmith/context-protector/venv/bin/python"
-        server_command = f"{venv_python} -m contextprotector.tests.prompt_test_server"
+        server_command = "python -m contextprotector.tests.prompt_test_server"
 
         # Approve the server configuration first
         await approve_server_config_using_review("stdio", server_command, temp_file.name)

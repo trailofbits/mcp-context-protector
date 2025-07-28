@@ -125,9 +125,8 @@ async def test_notification_forwarding():
     # Create temporary config file
     temp_file = tempfile.NamedTemporaryFile(delete=False)
     try:
-        # Build command for the notification test server using venv python
-        venv_python = "/Users/cliffsmith/context-protector/venv/bin/python"
-        server_command = f"{venv_python} -m contextprotector.tests.notification_test_server"
+        # Build command for the notification test server
+        server_command = "python -m contextprotector.tests.notification_test_server"
 
         # First run to get blocked and trigger config approval
         try:
@@ -204,8 +203,7 @@ async def test_notification_forwarding_without_invalid():
     # Create temporary config file
     temp_file = tempfile.NamedTemporaryFile(delete=False)
     try:
-        venv_python = "/Users/cliffsmith/context-protector/venv/bin/python"
-        server_command = f"{venv_python} -m contextprotector.tests.notification_test_server"
+        server_command = "python -m contextprotector.tests.notification_test_server"
 
         # First run may fail due to unapproved config
         try:
@@ -323,8 +321,7 @@ async def test_client_to_server_notification_forwarding():
     # Create temporary config file
     temp_file = tempfile.NamedTemporaryFile(delete=False)
     try:
-        venv_python = "/Users/cliffsmith/context-protector/venv/bin/python"
-        server_command = f"{venv_python} -m contextprotector.tests.notification_test_server"
+        server_command = "python -m contextprotector.tests.notification_test_server"
 
         # Approve the server configuration first
         await approve_server_config_using_review("stdio", server_command, temp_file.name)
