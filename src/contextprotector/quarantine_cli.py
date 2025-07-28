@@ -1,11 +1,10 @@
-#!/usr/bin/env python3
 """
 CLI interface for reviewing and managing quarantined tool responses.
 """
 
 import json
 import logging
-from typing import Optional, List, Dict, Any
+from typing import List, Dict, Any
 
 from .mcp_wrapper import make_ansi_escape_codes_visible
 from .quarantine import ToolResponseQuarantine, QuarantinedToolResponse
@@ -15,14 +14,16 @@ logger = logging.getLogger("quarantine_cli")
 
 
 async def review_quarantine(
-    quarantine_path: Optional[str] = None, quarantine_id: Optional[str] = None
+    quarantine_path: str | None = None, quarantine_id: str | None = None
 ) -> None:
     """
     Review quarantined tool responses and optionally release them.
 
     Args:
+    ----
         quarantine_path: Optional path to the quarantine database file
         quarantine_id: Optional ID of a specific quarantined response to review
+
     """
     quarantine = ToolResponseQuarantine(quarantine_path)
 
@@ -51,14 +52,16 @@ async def review_quarantine(
 
 
 def review_response_list(
-    quarantine: ToolResponseQuarantine, responses: List[Dict[str, Any]]
+    quarantine: ToolResponseQuarantine, responses: list[dict[str, Any]]
 ) -> None:
     """
     Display a list of quarantined responses and let the user choose one to review.
 
     Args:
+    ----
         quarantine: The quarantine database instance
-        responses: List of quarantined responses
+        responses: list of quarantined responses
+
     """
     print("\n===== QUARANTINED TOOL RESPONSES =====")
     for i, response_data in enumerate(responses):
@@ -101,8 +104,10 @@ def review_response(quarantine: ToolResponseQuarantine, response: QuarantinedToo
     Review a specific quarantined response and prompt for release.
 
     Args:
+    ----
         quarantine: The quarantine database instance
         response: The quarantined response to review
+
     """
     print("\n===== QUARANTINED RESPONSE DETAILS =====")
     print(f"ID: {response.id}")

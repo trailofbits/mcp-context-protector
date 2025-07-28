@@ -48,7 +48,7 @@ class TestResourceProxying:
         """Clean up after test."""
         os.unlink(self.config_path)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_initial_resource_listing(self):
         """Test that resources are correctly listed from the downstream server."""
 
@@ -68,7 +68,7 @@ class TestResourceProxying:
 
         await run_with_wrapper(callback, self.config_path)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_resource_content_access(self):
         """Test that resource content can be accessed without config approval."""
 
@@ -86,7 +86,7 @@ class TestResourceProxying:
 
         await run_with_wrapper(callback, self.config_path)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_resource_changes(self):
         """
         Test that changes to resources are correctly proxied without affecting
@@ -149,7 +149,7 @@ class TestResourceProxying:
         # Run the test with the approved config
         await run_with_wrapper(callback, self.config_path)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_resource_access_with_parameters(self):
         """Test that resources can be accessed with parameters."""
 

@@ -11,7 +11,6 @@ import tempfile
 import pytest
 from pathlib import Path
 
-import mcp.types as types
 from contextprotector.mcp_config import (
     MCPConfigDatabase,
     MCPServerConfig,
@@ -30,7 +29,7 @@ def get_server_command(server_filename: str) -> str:
     return f"python {server_path}"
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_granular_tool_filtering_in_list_tools():
     """Test that list_tools() only shows approved tools in mixed approval scenarios."""
 
@@ -128,7 +127,7 @@ async def test_granular_tool_filtering_in_list_tools():
     )
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_tool_modification_blocks_only_modified_tool():
     """Test that modifying a tool blocks only that tool while others remain available."""
 
@@ -192,20 +191,20 @@ async def test_tool_modification_blocks_only_modified_tool():
     status = db.get_server_approval_status("stdio", "multi_tool_server", modified_config)
 
     # Instructions should still be approved
-    assert status["instructions_approved"] == True
+    assert status["instructions_approved"]
 
     # Stable tool should still be approved
-    assert status["tools"]["stable_tool"] == True
+    assert status["tools"]["stable_tool"]
 
     # Modified tool should NOT be approved anymore
-    assert status["tools"]["modified_tool"] == False
+    assert not status["tools"]["modified_tool"]
 
     print(
         "✅ Tool modification correctly detected - stable tool remains approved, modified tool needs re-approval"
     )
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_instruction_change_blocks_everything():
     """Test that changing server instructions blocks ALL tools, demonstrating whole-server blocking."""
 
@@ -248,9 +247,9 @@ async def test_instruction_change_blocks_everything():
 
     # Verify everything is approved initially
     status = db.get_server_approval_status("stdio", "instruction_test_server", config)
-    assert status["instructions_approved"] == True
-    assert status["tools"]["tool_one"] == True
-    assert status["tools"]["tool_two"] == True
+    assert status["instructions_approved"]
+    assert status["tools"]["tool_one"]
+    assert status["tools"]["tool_two"]
 
     # Step 2: Change ONLY the instructions (tools unchanged)
     modified_config = MCPServerConfig()
@@ -262,11 +261,11 @@ async def test_instruction_change_blocks_everything():
     status = db.get_server_approval_status("stdio", "instruction_test_server", modified_config)
 
     # Instructions should NOT be approved (changed)
-    assert status["instructions_approved"] == False
+    assert not status["instructions_approved"]
 
     # Tools should still be individually approved (they didn't change)
-    assert status["tools"]["tool_one"] == True
-    assert status["tools"]["tool_two"] == True
+    assert status["tools"]["tool_one"]
+    assert status["tools"]["tool_two"]
 
     # But the wrapper logic should block everything due to instruction change
     # (this is enforced in the wrapper's connection logic and call_tool logic)
@@ -276,7 +275,7 @@ async def test_instruction_change_blocks_everything():
     )
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_tool_removal_workflow():
     """Test that removing tools doesn't require reapproval and remaining tools work."""
 
@@ -327,10 +326,10 @@ async def test_tool_removal_workflow():
     status = db.get_server_approval_status("stdio", "removal_test_server", reduced_config)
 
     # Instructions should still be approved (unchanged)
-    assert status["instructions_approved"] == True
+    assert status["instructions_approved"]
 
     # Remaining tool should still be approved
-    assert status["tools"]["keep_this_tool"] == True
+    assert status["tools"]["keep_this_tool"]
 
     # Removed tool should not be in the status (not tracked anymore)
     assert "remove_this_tool" not in status["tools"]
@@ -340,7 +339,7 @@ async def test_tool_removal_workflow():
     )
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_new_server_complete_blocking():
     """Test that completely new servers are totally blocked until approved."""
 

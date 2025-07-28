@@ -65,7 +65,7 @@ async def verify_tools(session, expected_tool_names):
 
     Args:
         session: The client session to check
-        expected_tool_names: List of tool names that should be present
+        expected_tool_names: list of tool names that should be present
 
     Returns:
         tools_list: The list of tools from the server
@@ -89,7 +89,7 @@ async def send_sighup_and_wait(session, expected_tools, tracker):
 
     Args:
         session: The client session to check
-        expected_tools: List of tool names that should be present after the update
+        expected_tools: list of tool names that should be present after the update
         tracker: The ToolUpdateTracker instance to check for notifications
 
     Returns:
@@ -225,7 +225,7 @@ def cleanup_after_test():
     cleanup_files()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 @pytest.mark.timeout(5)
 async def test_initial_tools():
     """
@@ -262,7 +262,7 @@ async def test_initial_tools():
     await start_dynamic_server(callback)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 @pytest.mark.timeout(5)
 async def test_preconfigured_tools():
     """
@@ -306,7 +306,7 @@ async def test_preconfigured_tools():
     await start_dynamic_server(callback, initial_tool_count=3)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_sighup_adds_tool():
     """
     Test that sending SIGHUP adds a new tool and triggers a tool update notification.
@@ -361,7 +361,7 @@ async def test_sighup_adds_tool():
     await start_dynamic_server(callback)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_notification_on_sighup():
     """
     Explicit test focusing on notifications being sent when SIGHUP is received.
@@ -418,7 +418,7 @@ async def test_notification_on_sighup():
     await start_dynamic_server(callback)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_preconfigured_with_sighup():
     """
     Test that a server with preconfigured tools correctly responds to SIGHUP.
@@ -461,7 +461,7 @@ async def test_preconfigured_with_sighup():
     await start_dynamic_server(callback, initial_tool_count=2)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_multiple_sighups():
     """
     Test that multiple SIGHUPs add multiple tools and trigger notifications for each.

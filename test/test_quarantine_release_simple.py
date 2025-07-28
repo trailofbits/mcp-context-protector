@@ -64,7 +64,7 @@ def setup_quarantine_test():
         os.unlink(tmp_file.name)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_quarantine_release_success(setup_quarantine_test):
     """Test successfully releasing a quarantined response."""
     test_data = setup_quarantine_test
@@ -99,7 +99,7 @@ async def test_quarantine_release_success(setup_quarantine_test):
     assert quarantine.get_response(test_data["released_id"]) is None
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_quarantine_release_unreleased_fails(setup_quarantine_test):
     """Test that attempting to release an unreleased response fails."""
     test_data = setup_quarantine_test
@@ -125,7 +125,7 @@ async def test_quarantine_release_unreleased_fails(setup_quarantine_test):
     assert quarantine.get_response(test_data["unreleased_id"]) is not None
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_quarantine_release_invalid_uuid(setup_quarantine_test):
     """Test that attempting to release with an invalid UUID fails."""
     test_data = setup_quarantine_test

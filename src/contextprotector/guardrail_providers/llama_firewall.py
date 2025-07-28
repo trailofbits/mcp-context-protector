@@ -13,7 +13,6 @@ from llamafirewall import (
     UserMessage,
     ToolMessage,
 )
-from typing import Optional
 
 from ..mcp_config import MCPServerConfig
 from ..guardrail_types import GuardrailAlert, GuardrailProvider, ToolResponse
@@ -37,15 +36,18 @@ class LlamaFirewallProvider(GuardrailProvider):
         """Get the provider name."""
         return "Llama Firewall"
 
-    def check_server_config(self, config: MCPServerConfig) -> Optional[GuardrailAlert]:
+    def check_server_config(self, config: MCPServerConfig) -> GuardrailAlert | None:
         """
         Check the provided server configuration against Llama Firewall guardrails.
 
         Args:
+        ----
             config: The MCPServerConfig to check
 
         Returns:
+        -------
             Optional GuardrailAlert if guardrail is triggered, or None if the configuration is safe
+
         """
         logger.info(f"LlamaFirewallProvider checking config with {len(config.tools)} tools")
 
@@ -100,15 +102,18 @@ class LlamaFirewallProvider(GuardrailProvider):
                 data={"error": str(e)},
             )
 
-    def check_tool_response(self, tool_response: ToolResponse) -> Optional[GuardrailAlert]:
+    def check_tool_response(self, tool_response: ToolResponse) -> GuardrailAlert | None:
         """
         Check the provided tool response against Llama Firewall guardrails.
 
         Args:
+        ----
             tool_response: The ToolResponse to check
 
         Returns:
+        -------
             Optional GuardrailAlert if guardrail is triggered, or None if the response is safe
+
         """
         logger.info(f"LlamaFirewallProvider checking tool response from: {tool_response.tool_name}")
 

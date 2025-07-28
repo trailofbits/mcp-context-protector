@@ -29,7 +29,7 @@ class NotificationTestServer:
         """Register all handlers with the server."""
 
         @self.server.list_tools()
-        async def list_tools() -> List[types.Tool]:
+        async def list_tools() -> list[types.Tool]:
             """Return list of available tools."""
             return [
                 types.Tool(
@@ -59,7 +59,7 @@ class NotificationTestServer:
             ]
 
         @self.server.call_tool()
-        async def call_tool(name: str, arguments: dict) -> List[types.TextContent]:
+        async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
             """Handle tool calls."""
             if name == "send_notifications":
                 include_invalid = arguments.get("include_invalid", True)
@@ -175,12 +175,12 @@ class NotificationTestServer:
         )
 
         @self.server.list_prompts()
-        async def list_prompts() -> List[types.Prompt]:
+        async def list_prompts() -> list[types.Prompt]:
             """Return list of available prompts (empty for test server)."""
             return []
 
         @self.server.list_resources()
-        async def list_resources() -> List[types.Resource]:
+        async def list_resources() -> list[types.Resource]:
             """Return list of available resources (empty for test server)."""
             return []
 

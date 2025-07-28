@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
+# ruff: noqa: T201
 import asyncio
 import base64
 import logging
 import json
 import re
 import traceback
-from typing import List, Optional, Literal, Dict, Any
+from typing import List, Literal, Dict, Any
 
 import mcp.types as types
 from mcp.server.lowlevel import Server, NotificationOptions
@@ -37,7 +38,7 @@ class MCPWrapperServer:
         cls,
         command: str,
         config_path: str = None,
-        guardrail_provider: Optional[GuardrailProvider] = None,
+        guardrail_provider: GuardrailProvider | None = None,
         visualize_ansi_codes: bool = False,
         quarantine_path: str = None,
     ):
@@ -45,13 +46,16 @@ class MCPWrapperServer:
         Create a wrapper server that connects to a child process via stdio.
 
         Args:
+        ----
             command: The command to run as a child process
             config_path: Optional path to the wrapper config file
             guardrail_provider: Optional guardrail provider object to use
             visualize_ansi_codes: Whether to make ANSI escape codes visible in tool outputs
 
         Returns:
+        -------
             An instance of MCPWrapperServer configured for stdio
+
         """
         instance = cls(config_path, guardrail_provider, visualize_ansi_codes, quarantine_path)
         instance.connection_type = "stdio"
@@ -63,7 +67,7 @@ class MCPWrapperServer:
         cls,
         url: str,
         config_path: str = None,
-        guardrail_provider: Optional[GuardrailProvider] = None,
+        guardrail_provider: GuardrailProvider | None = None,
         visualize_ansi_codes: bool = False,
         quarantine_path: str = None,
     ):
@@ -71,13 +75,16 @@ class MCPWrapperServer:
         Create a wrapper server that connects to a remote MCP server via HTTP.
 
         Args:
+        ----
             url: The URL to connect to for a remote MCP server
             config_path: Optional path to the wrapper config file
             guardrail_provider: Optional guardrail provider object to use
             visualize_ansi_codes: Whether to make ANSI escape codes visible in tool outputs
 
         Returns:
+        -------
             An instance of MCPWrapperServer configured for HTTP
+
         """
         instance = cls(config_path, guardrail_provider, visualize_ansi_codes, quarantine_path)
         instance.connection_type = "sse"
@@ -89,7 +96,7 @@ class MCPWrapperServer:
         cls,
         url: str,
         config_path: str = None,
-        guardrail_provider: Optional[GuardrailProvider] = None,
+        guardrail_provider: GuardrailProvider | None = None,
         visualize_ansi_codes: bool = False,
         quarantine_path: str = None,
     ):
@@ -97,13 +104,16 @@ class MCPWrapperServer:
         Create a wrapper server that connects to a remote MCP server via streamable HTTP.
 
         Args:
+        ----
             url: The URL to connect to for a remote MCP server
             config_path: Optional path to the wrapper config file
             guardrail_provider: Optional guardrail provider object to use
             visualize_ansi_codes: Whether to make ANSI escape codes visible in tool outputs
 
         Returns:
+        -------
             An instance of MCPWrapperServer configured for streamable HTTP
+
         """
         instance = cls(config_path, guardrail_provider, visualize_ansi_codes, quarantine_path)
         instance.connection_type = "http"
@@ -113,7 +123,7 @@ class MCPWrapperServer:
     def __init__(
         self,
         config_path: str = None,
-        guardrail_provider: Optional[GuardrailProvider] = None,
+        guardrail_provider: GuardrailProvider | None = None,
         visualize_ansi_codes: bool = False,
         quarantine_path: str = None,
     ):
@@ -122,10 +132,12 @@ class MCPWrapperServer:
         Use wrap_stdio or wrap_http class methods instead of calling this directly.
 
         Args:
+        ----
             config_path: Optional path to the wrapper config file
             guardrail_provider: Optional guardrail provider object to use for checking configs
             visualize_ansi_codes: Whether to make ANSI escape codes visible in tool outputs
             quarantine_path: Optional path to the quarantine database file
+
         """
         self.child_command = None
         self.server_url = None
@@ -156,7 +168,7 @@ class MCPWrapperServer:
         self._setup_notification_handlers()
 
         @self.server.list_prompts()
-        async def list_prompts() -> List[types.Prompt]:
+        async def list_prompts() -> list[types.Prompt]:
             """
             Return prompts from the downstream server, or an empty list if server config is not approved.
             When config isn't approved, we don't reveal any prompts to clients.
@@ -168,7 +180,7 @@ class MCPWrapperServer:
             return self.prompts
 
         @self.server.list_resources()
-        async def list_resources() -> List[types.Resource]:
+        async def list_resources() -> list[types.Resource]:
             """
             Return resources from the downstream server.
             Unlike prompts and tools, resources are always available regardless of config approval.
@@ -183,10 +195,13 @@ class MCPWrapperServer:
             Resources are always accessible regardless of server config approval status.
 
             Args:
+            ----
                 name: The name/id of the resource
 
             Returns:
+            -------
                 The resource content from the downstream server
+
             """
             logger.info(f"Proxying resource request: {name}")
 
@@ -222,7 +237,7 @@ class MCPWrapperServer:
                 raise ValueError(f"Error fetching resource from downstream server: {str(e)}")
 
         @self.server.list_tools()
-        async def list_tools() -> List[types.Tool]:
+        async def list_tools() -> list[types.Tool]:
             """Return tool specs based on granular approval status."""
 
             wrapper_tools = []
@@ -309,7 +324,7 @@ class MCPWrapperServer:
             return all_tools
 
         @self.server.get_prompt()
-        async def get_prompt(name: str, arguments: dict) -> List[types.TextContent]:
+        async def get_prompt(name: str, arguments: dict) -> list[types.TextContent]:
             """
             Handle prompt dispatch requests - proxy to downstream server if config is approved.
             If the server config isn't approved, return an empty message list.
@@ -351,7 +366,7 @@ class MCPWrapperServer:
                 raise ValueError(f"Error from downstream server: {str(e)}")
 
         @self.server.call_tool()
-        async def call_tool(name: str, arguments: dict) -> List[types.TextContent]:
+        async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
             """
             Handle tool use requests - either approve config, proxy to downstream server,
             handle quarantine release, or block if config not approved.
@@ -464,12 +479,14 @@ class MCPWrapperServer:
                 logger.error(f"Error from child MCP server: {e}")
                 raise ValueError(f"Error from child MCP server: {str(e)}")
 
-    async def _handle_context_protector_block(self) -> List[types.TextContent]:
+    async def _handle_context_protector_block(self) -> list[types.TextContent]:
         """
         Handle the context-protector-block tool call.
 
         Returns:
+        -------
             Information about blocked tools and instructions for approving the server configuration
+
         """
         # Count blocked tools and categorize them
         total_tools = 0
@@ -517,19 +534,23 @@ Note: This tool is only available when tools are blocked due to security restric
         return [types.TextContent(type="text", text=instructions.strip())]
 
     async def _handle_quarantine_release(
-        self, arguments: Dict[str, Any]
-    ) -> List[types.TextContent]:
+        self, arguments: dict[str, Any]
+    ) -> list[types.TextContent]:
         """
         Handle the quarantine_release tool call.
 
         Args:
+        ----
             arguments: The tool arguments containing the UUID of the quarantined response
 
         Returns:
+        -------
             The original tool response if found and available for release
 
         Raises:
+        ------
             ValueError: If the UUID is invalid or not found, or if the response is not available for release
+
         """
         if "uuid" not in arguments:
             raise ValueError("Missing required parameter 'uuid' for quarantine_release tool")
@@ -653,10 +674,10 @@ Note: This tool is only available when tools are blocked due to security restric
     def _create_tool_response(
         self,
         response_text: str,
-        structured_content: Optional[Dict[str, Any]],
-        content_list: List[types.Content],
+        structured_content: dict[str, Any | None],
+        content_list: list[types.Content],
         is_json_response: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create a tool response dict with text, structured content, and all content types."""
         return {
             "text": response_text,
@@ -671,7 +692,7 @@ Note: This tool is only available when tools are blocked due to security restric
         arguments: dict,
         response_text: str,
         guardrail_alert: GuardrailAlert,
-        quarantine_id: Optional[str],
+        quarantine_id: str | None,
     ) -> str:
         """Generates the response message sent to the client when a tool response is blocked by a guardrail."""
 
@@ -685,7 +706,7 @@ Note: This tool is only available when tools are blocked due to security restric
         To review this response and release it from the quarantine, run contextprotector with the arguments `--review-quarantine{" --quarantine-id " + quarantine_id if quarantine_id else ""}`.
         """
 
-    def _convert_parameters_to_schema(self, parameters: dict, required: List[str]) -> dict:
+    def _convert_parameters_to_schema(self, parameters: dict, required: list[str]) -> dict:
         """Convert parameters format to JSON Schema for MCP Tool"""
         properties = {}
 
@@ -707,10 +728,13 @@ Note: This tool is only available when tools are blocked due to security restric
         Convert MCP tool definitions to internal tool specs.
 
         Args:
-            tools: List of MCP tool definitions
+        ----
+            tools: list of MCP tool definitions
 
         Returns:
+        -------
             List of MCPToolSpec objects
+
         """
         tool_specs = []
 
@@ -754,7 +778,9 @@ Note: This tool is only available when tools are blocked due to security restric
         Handle tool update notifications from the downstream server.
 
         Args:
+        ----
             tools: Updated list of tools from the downstream server
+
         """
         self.tool_specs = self._convert_mcp_tools_to_specs(tools)
 
@@ -801,8 +827,10 @@ Note: This tool is only available when tools are blocked due to security restric
         Forward a notification to the upstream client.
 
         Args:
+        ----
             method: The notification method (e.g., "notifications/progress")
             params: Optional notification parameters
+
         """
         if not self.server_session:
             logger.warning("No server session available to forward notification")
@@ -851,7 +879,9 @@ Note: This tool is only available when tools are blocked due to security restric
         particularly tool update notifications.
 
         Args:
+        ----
             message: The message from the server, can be a notification or other message type
+
         """
         if isinstance(message, types.ServerNotification):
             spec_compliant_notifications = {
@@ -1295,39 +1325,35 @@ Note: This tool is only available when tools are blocked due to security restric
         instead of being interpreted by the terminal.
 
         Args:
+        ----
             text: The text that may contain ANSI escape sequences
 
         Returns:
+        -------
             Text with ANSI escape sequences made visible
+
         """
         if not self.visualize_ansi_codes:
             return text
 
         return make_ansi_escape_codes_visible(text)
 
-    def _print_server_config(self, config: MCPServerConfig):
-        """Print the server configuration to stdout."""
-        json_str = config.to_json()
-
-        approval_status = "APPROVED" if self.config_approved else "NOT APPROVED"
-
-        print(f"\n==== SERVER CONFIGURATION ({approval_status}) ====")
-        print(json_str)
-        print("=============================\n")
-
     def _scan_tool_response(
-        self, tool_name: str, tool_input: Dict[str, Any], tool_output: str
-    ) -> Optional[GuardrailAlert]:
+        self, tool_name: str, tool_input: dict[str, Any], tool_output: str
+    ) -> GuardrailAlert | None:
         """
         Scan a tool response with the configured guardrail provider.
 
         Args:
+        ----
             tool_name: The name of the tool that was called
             tool_input: The input parameters to the tool
             tool_output: The output returned by the tool
 
         Returns:
+        -------
             Optional GuardrailAlert if the guardrail is triggered, None otherwise
+
         """
         if not self.use_guardrails or self.guardrail_provider is None:
             return None
@@ -1422,9 +1448,9 @@ Note: This tool is only available when tools are blocked due to security restric
 async def review_server_config(
     connection_type: Literal["stdio", "http", "sse"],
     identifier: str,
-    config_path: Optional[str] = None,
-    guardrail_provider: Optional[GuardrailProvider] = None,
-    quarantine_path: Optional[str] = None,
+    config_path: str | None = None,
+    guardrail_provider: GuardrailProvider | None = None,
+    quarantine_path: str | None = None,
 ) -> None:
     """
     Review and approve server configuration for the given connection.
@@ -1434,11 +1460,13 @@ async def review_server_config(
     as trusted in the config database.
 
     Args:
+    ----
         connection_type: Type of connection ("stdio", "http", or "sse")
         identifier: The command or URL to connect to
         config_path: Optional path to config file
         guardrail_provider: Optional guardrail provider to use
         quarantine_path: Optional path to the quarantine database file
+
     """
     if connection_type == "stdio":
         wrapper = MCPWrapperServer.wrap_stdio(

@@ -47,7 +47,7 @@ app = FastMCP()
 
 
 # Echo handler function
-async def echo_handler(message: str) -> Dict[str, Any]:
+async def echo_handler(message: str) -> dict[str, Any]:
     """
     Echo handler function that returns the input message.
 
@@ -61,7 +61,7 @@ async def echo_handler(message: str) -> Dict[str, Any]:
 
 
 # Calculator handler for the dynamic tool
-async def calculator_handler(a: int, b: int, operation: str) -> Dict[str, Any]:
+async def calculator_handler(a: int, b: int, operation: str) -> dict[str, Any]:
     """
     Calculator handler function that performs the requested operation on two numbers.
 
@@ -90,7 +90,7 @@ async def calculator_handler(a: int, b: int, operation: str) -> Dict[str, Any]:
 
 
 # Counter tool handler - available based on num_tools
-async def counter_handler() -> Dict[str, Any]:
+async def counter_handler() -> dict[str, Any]:
     """
     Counter handler function that returns the current number of tools.
 
@@ -126,7 +126,7 @@ def add_dynamic_tool():
     else:
         # Create a wrapper function that calls the original echo handler
         # We need a new function for each dynamically added tool
-        async def numbered_echo_handler(message: str) -> Dict[str, Any]:
+        async def numbered_echo_handler(message: str) -> dict[str, Any]:
             result = await echo_handler(message)
             result["tool_number"] = num_tools
             return result

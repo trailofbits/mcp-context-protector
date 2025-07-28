@@ -46,7 +46,7 @@ class TestPromptProxying:
         """Clean up after test."""
         os.unlink(self.config_path)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_initial_prompt_listing(self):
         """Test that prompts are correctly listed from the downstream server after approval."""
 
@@ -89,7 +89,7 @@ class TestPromptProxying:
         # Run second part of the test
         await run_with_wrapper(callback2, self.config_path)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_prompt_dispatch(self):
         """Test that prompts can be dispatched through the wrapper."""
 
@@ -125,7 +125,7 @@ class TestPromptProxying:
         # Run second part of the test
         await run_with_wrapper(callback2, self.config_path)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_prompt_changes(self):
         """
         Test that changes to prompts are correctly proxied without affecting
@@ -187,7 +187,7 @@ class TestPromptProxying:
         # Run the test with the approved config
         await run_with_wrapper(callback, self.config_path)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_prompt_blocked_before_approval(self):
         """Test that prompts are blocked before server config is approved."""
 

@@ -23,7 +23,7 @@ from .test_utils import run_with_wrapper_session
 logger = logging.getLogger("test_config_approval_security")
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_zero_information_leakage_unapproved_config():
     """Test that ZERO downstream server information leaks when config is unapproved."""
 
@@ -193,7 +193,7 @@ async def test_zero_information_leakage_unapproved_config():
         os.unlink(temp_file.name)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_information_visible_after_approval():
     """Verify that downstream server information IS visible after config approval."""
 

@@ -21,7 +21,7 @@ echo_tool = Tool(
 
 
 # Echo handler function
-async def echo_handler(message: str) -> Dict[str, Any]:
+async def echo_handler(message: str) -> dict[str, Any]:
     """
     Echo handler function that returns the input message.
 

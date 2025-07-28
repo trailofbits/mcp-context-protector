@@ -4,7 +4,6 @@ Mock guardrail providers for testing guardrail functionality.
 """
 
 import logging
-from typing import Optional
 
 from ..mcp_config import MCPServerConfig
 from ..guardrail_types import GuardrailProvider, GuardrailAlert, ToolResponse
@@ -24,8 +23,10 @@ class MockGuardrailProvider(GuardrailProvider):
         Initialize the mock guardrail provider.
 
         Args:
+        ----
             trigger_alert: Whether to trigger an alert by default
             alert_text: The text to use for the alert
+
         """
         logger.info("Initializing MockGuardrailProvider")
         super().__init__()
@@ -37,13 +38,15 @@ class MockGuardrailProvider(GuardrailProvider):
         """Get the provider name."""
         return "Mock Guardrail Provider"
 
-    def set_trigger_alert(self, trigger: bool, alert_text: Optional[str] = None) -> None:
+    def set_trigger_alert(self, trigger: bool, alert_text: str | None = None) -> None:
         """
         Configure the provider to trigger an alert or not.
 
         Args:
+        ----
             trigger: Whether to trigger an alert
             alert_text: Optional new alert text to use
+
         """
         logger.info(f"Setting trigger_alert to {trigger}")
         self._trigger_alert = trigger
@@ -51,15 +54,18 @@ class MockGuardrailProvider(GuardrailProvider):
             self._alert_text = alert_text
             logger.info(f"Setting alert_text to '{alert_text}'")
 
-    def check_server_config(self, config: MCPServerConfig) -> Optional[GuardrailAlert]:
+    def check_server_config(self, config: MCPServerConfig) -> GuardrailAlert | None:
         """
         Check the server configuration based on the current trigger setting.
 
         Args:
+        ----
             config: The server configuration to check
 
         Returns:
+        -------
             GuardrailAlert if trigger is set, None otherwise
+
         """
         logger.info(f"Checking server config with {len(config.tools)} tools")
         logger.info(f"Trigger alert is set to: {self._trigger_alert}")
@@ -78,15 +84,18 @@ class MockGuardrailProvider(GuardrailProvider):
         logger.info("No alert triggered")
         return None
 
-    def check_tool_response(self, tool_response: ToolResponse) -> Optional[GuardrailAlert]:
+    def check_tool_response(self, tool_response: ToolResponse) -> GuardrailAlert | None:
         """
         Check the tool response based on the current trigger setting.
 
         Args:
+        ----
             tool_response: The tool response to check
 
         Returns:
+        -------
             GuardrailAlert if trigger is set, None otherwise
+
         """
         logger.info(f"Checking tool response for tool: {tool_response.tool_name}")
         logger.info(f"Trigger alert is set to: {self._trigger_alert}")
@@ -119,7 +128,9 @@ class AlwaysAlertGuardrailProvider(GuardrailProvider):
         Initialize the always-alert provider.
 
         Args:
+        ----
             alert_text: The text to use for the alert
+
         """
         logger.info("Initializing AlwaysAlertGuardrailProvider")
         super().__init__()
@@ -135,10 +146,13 @@ class AlwaysAlertGuardrailProvider(GuardrailProvider):
         Always returns a guardrail alert regardless of the config.
 
         Args:
+        ----
             config: The server configuration to check
 
         Returns:
+        -------
             GuardrailAlert with the configured text
+
         """
         logger.info(f"Always triggering alert with text: {self._alert_text}")
         return GuardrailAlert(
@@ -155,10 +169,13 @@ class AlwaysAlertGuardrailProvider(GuardrailProvider):
         Always returns a guardrail alert regardless of the tool response.
 
         Args:
+        ----
             tool_response: The tool response to check
 
         Returns:
+        -------
             GuardrailAlert with the configured text
+
         """
         logger.info(f"Always triggering alert for tool: {tool_response.tool_name}")
         return GuardrailAlert(
@@ -194,10 +211,13 @@ class NeverAlertGuardrailProvider(GuardrailProvider):
         Always returns None, indicating no guardrail alert.
 
         Args:
+        ----
             config: The server configuration to check
 
         Returns:
+        -------
             None, indicating no guardrail alert
+
         """
         logger.info("Never triggering alert, returning None")
         return None

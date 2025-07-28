@@ -195,7 +195,7 @@ async def get_tool_names(session):
     return sorted(tool_names)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_initial_tools():
     """Test that the dynamic server starts with the expected initial tools."""
 
@@ -221,7 +221,7 @@ async def test_initial_tools():
     await run_with_dynamic_server_session(callback)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_preconfigured_tools():
     """Test that the dynamic server can start with multiple tools via configuration file."""
 
@@ -252,7 +252,7 @@ async def test_preconfigured_tools():
     await run_with_dynamic_server_session(callback, initial_tool_count=3)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_sighup_adds_tool():
     """Test that sending SIGHUP adds a new tool."""
 
@@ -286,7 +286,7 @@ async def test_sighup_adds_tool():
     await run_with_dynamic_server_session(callback)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_multiple_sighups():
     """Test that multiple SIGHUPs add multiple tools."""
 

@@ -9,11 +9,9 @@ from a running server and verifies the granular approval behavior.
 import json
 import tempfile
 import pytest
-import asyncio
 from pathlib import Path
 
-import mcp.types as types
-from contextprotector.mcp_config import MCPConfigDatabase, ApprovalStatus
+from contextprotector.mcp_config import ApprovalStatus
 from .test_utils import run_with_wrapper_session, approve_server_config_using_review
 
 
@@ -24,7 +22,7 @@ def get_server_command(server_filename: str) -> str:
     return f"python {server_path}"
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_dynamic_tool_addition_with_existing_server():
     """Test granular blocking when tools are added dynamically using the existing dynamic server."""
 
@@ -112,13 +110,13 @@ async def test_dynamic_tool_addition_with_existing_server():
         )
 
         # Instructions should still be approved
-        assert approval_status["instructions_approved"] == True
+        assert approval_status["instructions_approved"]
 
         # Original tool should still be approved
-        assert approval_status["tools"]["echo"] == True
+        assert approval_status["tools"]["echo"]
 
         # New tool should NOT be approved
-        assert approval_status["tools"]["new_test_tool"] == False
+        assert not approval_status["tools"]["new_test_tool"]
 
         # This demonstrates the granular approval logic even if we can't test the full wrapper behavior
         # due to the simple server not actually having the new tool
@@ -135,7 +133,7 @@ async def test_dynamic_tool_addition_with_existing_server():
 # rather than complex dynamic server interactions, since the key behavior is in the approval system
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_instruction_change_blocks_all_tools():
     """Test that changing server instructions blocks ALL tools, not just individual ones."""
 
@@ -189,9 +187,9 @@ async def test_instruction_change_blocks_all_tools():
 
     # Verify initial approval status
     status = db.get_server_approval_status("stdio", "instruction_change_server", config)
-    assert status["instructions_approved"] == True
-    assert status["tools"]["tool1"] == True
-    assert status["tools"]["tool2"] == True
+    assert status["instructions_approved"]
+    assert status["tools"]["tool1"]
+    assert status["tools"]["tool2"]
 
     # Step 2: Change only the instructions
     modified_config = MCPServerConfig()
@@ -203,11 +201,11 @@ async def test_instruction_change_blocks_all_tools():
     status = db.get_server_approval_status("stdio", "instruction_change_server", modified_config)
 
     # Instructions should not be approved anymore
-    assert status["instructions_approved"] == False
+    assert not status["instructions_approved"]
 
     # Tools are still individually approved, but server-level logic should block everything
-    assert status["tools"]["tool1"] == True  # Tool approval unchanged
-    assert status["tools"]["tool2"] == True  # Tool approval unchanged
+    assert status["tools"]["tool1"]  # Tool approval unchanged
+    assert status["tools"]["tool2"]  # Tool approval unchanged
 
     # The wrapper should block everything when instructions are not approved,
     # even if individual tools are approved

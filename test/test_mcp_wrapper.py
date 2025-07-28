@@ -89,7 +89,7 @@ async def run_with_wrapper_session(callback, config_path=None):
             await callback(session)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_echo_tool_through_wrapper():
     """Test that the echo tool correctly works through the MCP wrapper."""
 

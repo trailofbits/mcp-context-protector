@@ -21,7 +21,7 @@ from contextprotector.mcp_config import MCPServerConfig
 from .test_utils import approve_server_config_using_review
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_review_mode_already_trusted():
     """Test review mode when config is already trusted."""
     # Create a temporary file for config storage
@@ -60,7 +60,7 @@ async def test_review_mode_already_trusted():
     os.unlink(temp_path)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_review_mode_new_server_approval():
     """Test review mode with a new server that gets approved."""
     # Create a temporary file for config storage
@@ -101,7 +101,7 @@ async def test_review_mode_new_server_approval():
     os.unlink(temp_path)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_review_mode_modified_server_rejection():
     """Test review mode with a modified server that gets rejected."""
     # Create a temporary file for config storage
@@ -160,7 +160,7 @@ async def test_review_mode_modified_server_rejection():
     os.unlink(temp_path)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_review_mode_with_guardrail_alert():
     """Test review mode with a configuration that triggers a guardrail alert."""
     # Create a temporary file for config storage

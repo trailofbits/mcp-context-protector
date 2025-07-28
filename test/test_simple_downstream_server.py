@@ -24,7 +24,7 @@ async def run_with_session(callback: callable):
             await callback(session)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_echo_tool():
     """Test that the echo tool correctly echoes the message."""
 

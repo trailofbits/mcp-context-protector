@@ -11,7 +11,7 @@ import pathlib
 import threading
 import datetime
 from dataclasses import dataclass, field, asdict
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Tuple
 
 
 @dataclass
@@ -20,6 +20,7 @@ class QuarantinedToolResponse:
     Class representing a quarantined tool response.
 
     Attributes:
+    ----------
         id: Unique identifier for the quarantined response
         tool_name: Name of the tool that was called
         tool_input: Input parameters to the tool
@@ -28,23 +29,24 @@ class QuarantinedToolResponse:
         timestamp: When the response was quarantined
         released: Whether the response has been released from quarantine
         released_at: When the response was released (if applicable)
+        
     """
 
     id: str
     tool_name: str
-    tool_input: Dict[str, Any]
+    tool_input: dict[str, Any]
     tool_output: Any
     reason: str
     timestamp: datetime.datetime = field(default_factory=datetime.datetime.now)
     released: bool = False
-    released_at: Optional[datetime.datetime] = None
+    released_at: datetime.datetime | None = None
 
     def release(self) -> None:
         """Mark this quarantined response as released."""
         self.released = True
         self.released_at = datetime.datetime.now()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to a dictionary representation for storage."""
         data = asdict(self)
         data["timestamp"] = self.timestamp.isoformat()
@@ -53,7 +55,7 @@ class QuarantinedToolResponse:
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "QuarantinedToolResponse":
+    def from_dict(cls, data: dict[str, Any]) -> "QuarantinedToolResponse":
         """Create a QuarantinedToolResponse from a dictionary."""
         if "timestamp" in data and isinstance(data["timestamp"], str):
             data["timestamp"] = datetime.datetime.fromisoformat(data["timestamp"])
@@ -72,15 +74,17 @@ class ToolResponseQuarantine:
 
     _file_lock = threading.RLock()  # Class-level lock for file operations
 
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: str | None = None):
         """
         Initialize the quarantine database.
 
         Args:
+        ---
             db_path: Path to the database file. If None, uses the default path.
+
         """
         self.db_path = db_path or self.get_default_db_path()
-        self.quarantined_responses = {}  # Dict[str, QuarantinedToolResponse]
+        self.quarantined_responses = {}  # dict[str, QuarantinedToolResponse]
         self._load()
 
     @staticmethod
@@ -89,7 +93,9 @@ class ToolResponseQuarantine:
         Get the default quarantine database path (~/.context-protector/quarantine.json).
 
         Returns:
+        -------
             The default database path as a string
+
         """
         home_dir = pathlib.Path.home()
         data_dir = home_dir / ".context-protector"
@@ -132,19 +138,23 @@ class ToolResponseQuarantine:
             os.replace(temp_path, self.db_path)
 
     def quarantine_response(
-        self, tool_name: str, tool_input: Dict[str, Any], tool_output: Any, reason: str
+        self, tool_name: str, tool_input: dict[str, Any], tool_output: Any, reason: str
     ) -> str:
         """
         Add a tool response to the quarantine.
 
         Args:
+        ----
+        ____
             tool_name: The name of the tool that was called
             tool_input: The input parameters to the tool
             tool_output: The output returned by the tool
             reason: The reason the response was quarantined
 
         Returns:
+        -------
             The unique ID of the quarantined response
+
         """
         # Reload the database first to avoid overwriting other changes
         self._load()
@@ -165,15 +175,18 @@ class ToolResponseQuarantine:
 
         return response_id
 
-    def get_response(self, response_id: str) -> Optional[QuarantinedToolResponse]:
+    def get_response(self, response_id: str) -> QuarantinedToolResponse | None:
         """
         Get a quarantined response by ID.
 
         Args:
+        ----
             response_id: The ID of the quarantined response
 
         Returns:
+        -------
             The quarantined response, or None if not found
+
         """
         return self.quarantined_responses.get(response_id)
 
@@ -182,10 +195,13 @@ class ToolResponseQuarantine:
         Release a quarantined response.
 
         Args:
+        ----
             response_id: The ID of the quarantined response
 
         Returns:
+        -------
             True if the response was released, False if it wasn't found
+
         """
         # Reload the database first to avoid overwriting other changes
         self._load()
@@ -199,15 +215,18 @@ class ToolResponseQuarantine:
 
         return False
 
-    def list_responses(self, include_released: bool = False) -> List[Dict[str, Any]]:
+    def list_responses(self, include_released: bool = False) -> list[dict[str, Any]]:
         """
         List all quarantined responses.
 
         Args:
+        ----
             include_released: Whether to include responses that have been released
 
         Returns:
+        -------
             A list of quarantined responses
+
         """
         responses = self.quarantined_responses.values()
         if not include_released:
@@ -224,12 +243,14 @@ class ToolResponseQuarantine:
             for response in responses
         ]
 
-    def get_response_pairs(self) -> List[Tuple[Dict[str, Any], Any]]:
+    def get_response_pairs(self) -> list[Tuple[dict[str, Any], Any]]:
         """
         Get all request-response pairs from quarantine.
 
         Returns:
+        -------
             A list of (request, response) tuples
+
         """
         return [
             (
@@ -248,10 +269,13 @@ class ToolResponseQuarantine:
         Delete a quarantined response.
 
         Args:
+        ----
             response_id: The ID of the quarantined response
 
         Returns:
+        -------
             True if the response was deleted, False if it wasn't found
+
         """
         # Reload the database first to avoid overwriting other changes
         self._load()
@@ -268,10 +292,13 @@ class ToolResponseQuarantine:
         Clear the quarantine, optionally only removing released responses.
 
         Args:
+        ----
             only_released: If True, only clear released responses
 
         Returns:
+        -------
             The number of responses cleared
+
         """
         # Reload the database first to avoid overwriting other changes
         self._load()

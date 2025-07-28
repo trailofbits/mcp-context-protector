@@ -6,7 +6,7 @@ import hashlib
 from dataclasses import dataclass, field
 from enum import Enum
 import pathlib
-from typing import Any, Dict, List, Optional, Union, TextIO, Literal
+from typing import Any, Dict, List, Union, TextIO, Literal
 
 
 class ParameterType(str, Enum):
@@ -28,11 +28,11 @@ class MCPToolSpec:
 
     name: str
     description: str
-    parameters: Dict[str, Any]
-    required: List[str]
-    output_schema: Optional[Dict[str, Any]] = None
+    parameters: dict[str, Any]
+    required: list[str]
+    output_schema: dict[str, Any | None] = None
 
-    def model_dump(self) -> Dict[str, Any]:
+    def model_dump(self) -> dict[str, Any]:
         """Convert to a dictionary representation."""
         result = {
             "name": self.name,
@@ -51,10 +51,10 @@ class MCPParameterDefinition:
     description: str
     type: ParameterType
     required: bool = True
-    default: Optional[Any] = None
-    enum: Optional[List[str]] = None
-    items: Optional[Dict[str, Any]] = None  # For array types
-    properties: Optional[Dict[str, Any]] = None  # For object types
+    default: Any | None = None
+    enum: list[str | None] = None
+    items: dict[str, Any | None] = None  # For array types
+    properties: dict[str, Any | None] = None  # For object types
 
     def __eq__(self, other):
         if not isinstance(other, MCPParameterDefinition):
@@ -75,8 +75,8 @@ class MCPParameterDefinition:
 class MCPToolDefinition:
     name: str
     description: str
-    parameters: List[MCPParameterDefinition]
-    output_schema: Optional[Dict[str, Any]] = None
+    parameters: list[MCPParameterDefinition]
+    output_schema: dict[str, Any | None] = None
 
     def __str__(self) -> str:
         """
@@ -139,12 +139,12 @@ class MCPToolDefinition:
 class ConfigDiff:
     """Class representing differences between two MCP server configurations."""
 
-    old_instructions: Optional[str] = field(default=None)
-    new_instructions: Optional[str] = field(default=None)
-    added_tools: Dict[str, MCPToolDefinition] = field(default_factory=dict)
-    added_tool_names: List[str] = field(default_factory=list)
-    removed_tools: List[str] = field(default_factory=list)
-    modified_tools: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    old_instructions: str | None = field(default=None)
+    new_instructions: str | None = field(default=None)
+    added_tools: dict[str, MCPToolDefinition] = field(default_factory=dict)
+    added_tool_names: list[str] = field(default_factory=list)
+    removed_tools: list[str] = field(default_factory=list)
+    modified_tools: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def has_differences(self) -> bool:
         """Check if there are any differences."""
@@ -220,7 +220,7 @@ class ConfigDiff:
 class MCPServerConfig:
     """Class representing an MCP server configuration."""
 
-    tools: List[MCPToolDefinition] = field(default_factory=list)
+    tools: list[MCPToolDefinition] = field(default_factory=list)
     instructions: str = field(default="")
 
     @classmethod
@@ -229,7 +229,9 @@ class MCPServerConfig:
         Get the default config path (~/.context-protector/config).
 
         Returns:
+        -------
             The default config path as a string
+
         """
         home_dir = pathlib.Path.home()
         data_dir = home_dir / ".context-protector"
@@ -238,11 +240,13 @@ class MCPServerConfig:
 
         return str(data_dir / "config")
 
-    def add_tool(self, tool: Union[MCPToolDefinition, Dict[str, Any]]) -> None:
+    def add_tool(self, tool: Union[MCPToolDefinition, dict[str, Any]]) -> None:
         """Add a tool to the server configuration.
 
         Args:
+        ----
             tool: Either a MCPToolDefinition object or a dictionary with tool properties
+
         """
         if isinstance(tool, dict):
             parameters = []
@@ -270,24 +274,27 @@ class MCPServerConfig:
         """Remove a tool from the server configuration by name."""
         self.tools = [tool for tool in self.tools if tool.name != tool_name]
 
-    def get_tool(self, tool_name: str) -> Optional[MCPToolDefinition]:
+    def get_tool(self, tool_name: str) -> MCPToolDefinition | None:
         """Get a tool from the server configuration by name."""
         for tool in self.tools:
             if tool.name == tool_name:
                 return tool
         return None
 
-    def to_json(self, path: str = None, fp: TextIO = None, indent: int = 2) -> Optional[str]:
+    def to_json(self, path: str = None, fp: TextIO = None, indent: int = 2) -> str | None:
         """
         Serialize the configuration to JSON.
 
         Args:
+        ----
             path: Optional file path to write the JSON to
             fp: Optional file-like object to write the JSON to
             indent: Number of spaces for indentation (default: 2)
 
         Returns:
+        -------
             JSON string if neither path nor fp is provided, None otherwise
+
         """
         config_dict = self.to_dict()
         json_str = json.dumps(config_dict, indent=indent)
@@ -310,15 +317,19 @@ class MCPServerConfig:
         Deserialize the configuration from JSON.
 
         Args:
+        ----
             json_str: JSON string to parse
             path: Optional file path to read the JSON from
             fp: Optional file-like object to read the JSON from
 
         Returns:
+        -------
             MCPServerConfig instance
 
         Raises:
+        ------
             ValueError: If no source is provided or multiple sources are provided
+
         """
         if sum(x is not None for x in (json_str, path, fp)) != 1:
             raise ValueError("Exactly one of json_str, path, or fp must be provided")
@@ -336,7 +347,7 @@ class MCPServerConfig:
             data = json.loads(json_str)
         return cls.from_dict(data)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert the server configuration to a dictionary."""
         return {
             "instructions": self.instructions,
@@ -367,7 +378,7 @@ class MCPServerConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Optional[Dict[str, Any]]) -> "MCPServerConfig":
+    def from_dict(cls, data: dict[str, Any | None]) -> "MCPServerConfig":
         """Create a server configuration from a dictionary."""
         config = cls()
 
@@ -529,10 +540,10 @@ class MCPServerEntry:
 
     type: Literal["stdio", "http", "sse"]
     identifier: str  # URL for HTTP/SSE servers, command for stdio servers
-    config: Optional[Dict[str, Any]] = None  # Serialized MCPServerConfig
+    config: dict[str, Any | None] = None  # Serialized MCPServerConfig
     approval_status: ApprovalStatus = ApprovalStatus.UNAPPROVED
-    approved_tools: Dict[str, str] = field(default_factory=dict)  # tool_name -> tool_signature_hash
-    approved_instructions_hash: Optional[str] = None  # Hash of approved instructions
+    approved_tools: dict[str, str] = field(default_factory=dict)  # tool_name -> tool_signature_hash
+    approved_instructions_hash: str | None = None  # Hash of approved instructions
 
     @staticmethod
     def create_key(server_type: str, identifier: str) -> str:
@@ -622,15 +633,17 @@ class MCPConfigDatabase:
 
     _file_lock = threading.RLock()  # Class-level lock for file operations
 
-    def __init__(self, config_path: Optional[str] = None):
+    def __init__(self, config_path: str | None = None):
         """
         Initialize the config database.
 
         Args:
+        ----
             config_path: Path to the config file. If None, uses the default path.
+
         """
         self.config_path = config_path or self.get_default_config_path()
-        self.servers = {}  # Dict[str, MCPServerEntry]
+        self.servers = {}  # dict[str, MCPServerEntry]
         self._load()
 
     @staticmethod
@@ -639,7 +652,9 @@ class MCPConfigDatabase:
         Get the default config database path (~/.context-protector/servers.json).
 
         Returns:
+        -------
             The default config path as a string
+
         """
         home_dir = pathlib.Path.home()
         data_dir = home_dir / ".context-protector"
@@ -706,16 +721,19 @@ class MCPConfigDatabase:
             # Atomically replace the old file with the new one
             os.replace(temp_path, self.config_path)
 
-    def get_server_config(self, server_type: str, identifier: str) -> Optional[MCPServerConfig]:
+    def get_server_config(self, server_type: str, identifier: str) -> MCPServerConfig | None:
         """
         Get a server configuration by type and identifier.
 
         Args:
+        ----
             server_type: The server type ('stdio', 'http', or 'sse')
             identifier: The server identifier (command or URL)
 
         Returns:
+        -------
             The server configuration, or None if not found
+
         """
         key = MCPServerEntry.create_key(server_type, identifier)
         entry = self.servers.get(key)
@@ -736,10 +754,12 @@ class MCPConfigDatabase:
         Save a server configuration to the database.
 
         Args:
+        ----
             server_type: The server type ('stdio', 'http', or 'sse')
             identifier: The server identifier (command or URL)
             config: The server configuration
             approval_status: The approval status for the configuration
+
         """
         # Reload the database first to avoid overwriting other changes
         self._load()
@@ -772,11 +792,14 @@ class MCPConfigDatabase:
         Remove a server configuration from the database.
 
         Args:
+        ----
             server_type: The server type ('stdio', 'http', or 'sse')
             identifier: The server identifier (command or URL)
 
         Returns:
+        -------
             True if the server was removed, False if it wasn't found
+
         """
         # Reload the database first to avoid overwriting other changes
         self._load()
@@ -789,12 +812,14 @@ class MCPConfigDatabase:
 
         return False
 
-    def list_servers(self) -> List[Dict[str, Any]]:
+    def list_servers(self) -> list[dict[str, Any]]:
         """
         List all server entries in the database.
 
         Returns:
+        -------
             A list of server entries
+
         """
         return [
             {
@@ -816,9 +841,11 @@ class MCPConfigDatabase:
         that hasn't been approved yet.
 
         Args:
+        ----
             server_type: The server type ('stdio', 'http', or 'sse')
             identifier: The server identifier (command or URL)
             config: The server configuration
+
         """
         self.save_server_config(server_type, identifier, config, ApprovalStatus.UNAPPROVED)
 
@@ -827,11 +854,14 @@ class MCPConfigDatabase:
         Mark a server configuration as approved.
 
         Args:
+        ----
             server_type: The server type ('stdio', 'http', or 'sse')
             identifier: The server identifier (command or URL)
 
         Returns:
+        -------
             True if the server was found and approved, False otherwise
+
         """
         # Reload the database first to avoid overwriting other changes
         self._load()
@@ -844,12 +874,14 @@ class MCPConfigDatabase:
 
         return False
 
-    def list_unapproved_servers(self) -> List[Dict[str, Any]]:
+    def list_unapproved_servers(self) -> list[dict[str, Any]]:
         """
         List all unapproved server entries in the database.
 
         Returns:
+        -------
             A list of unapproved server entries
+
         """
         return [
             {
@@ -867,11 +899,14 @@ class MCPConfigDatabase:
         Check if a server configuration is approved.
 
         Args:
+        ----
             server_type: The server type ('stdio', 'http', or 'sse')
             identifier: The server identifier (command or URL)
 
         Returns:
+        -------
             True if the server is approved, False otherwise
+
         """
         key = MCPServerEntry.create_key(server_type, identifier)
         if key in self.servers:
@@ -885,13 +920,16 @@ class MCPConfigDatabase:
         Approve a specific tool for a server.
 
         Args:
+        ----
             server_type: The server type ('stdio', 'http', or 'sse')
             identifier: The server identifier (command or URL)
             tool_name: The name of the tool to approve
             tool_definition: The tool definition to approve
 
         Returns:
+        -------
             True if the tool was approved, False if server not found
+
         """
         self._load()
 
@@ -907,12 +945,15 @@ class MCPConfigDatabase:
         Approve the instructions for a server.
 
         Args:
+        ----
             server_type: The server type ('stdio', 'http', or 'sse')
             identifier: The server identifier (command or URL)
             instructions: The instructions to approve
 
         Returns:
+        -------
             True if the instructions were approved, False if server not found
+
         """
         self._load()
 
@@ -932,13 +973,16 @@ class MCPConfigDatabase:
         Check if a specific tool is approved for a server.
 
         Args:
+        ----
             server_type: The server type ('stdio', 'http', or 'sse')
             identifier: The server identifier (command or URL)
             tool_name: The name of the tool to check
             tool_definition: The tool definition to check
 
         Returns:
+        -------
             True if the tool is approved, False otherwise
+
         """
         key = MCPServerEntry.create_key(server_type, identifier)
         if key in self.servers:
@@ -952,12 +996,15 @@ class MCPConfigDatabase:
         Check if the instructions are approved for a server.
 
         Args:
+        ----
             server_type: The server type ('stdio', 'http', or 'sse')
             identifier: The server identifier (command or URL)
             instructions: The instructions to check
 
         Returns:
+        -------
             True if the instructions are approved, False otherwise
+
         """
         key = MCPServerEntry.create_key(server_type, identifier)
         if key in self.servers:
@@ -968,17 +1015,20 @@ class MCPConfigDatabase:
 
     def get_server_approval_status(
         self, server_type: str, identifier: str, config: MCPServerConfig
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Get detailed approval status for a server and its components.
 
         Args:
+        ----
             server_type: The server type ('stdio', 'http', or 'sse')
             identifier: The server identifier (command or URL)
             config: The current server configuration
 
         Returns:
+        -------
             Dict with approval status details
+
         """
         key = MCPServerEntry.create_key(server_type, identifier)
 

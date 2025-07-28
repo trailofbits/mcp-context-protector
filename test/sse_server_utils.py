@@ -12,7 +12,6 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Optional
 
 import psutil
 import pytest_asyncio
@@ -22,9 +21,9 @@ class SSEServerManager:
     """Manages the lifecycle of an SSE server process for testing."""
 
     def __init__(self):
-        self.process: Optional[subprocess.Popen] = None
-        self.port: Optional[int] = None
-        self.pid: Optional[int] = None
+        self.process: subprocess.Popen | None = None
+        self.port: int | None = None
+        self.pid: int | None = None
 
     def get_ports_by_pid(self, pid: int) -> list[int]:
         """

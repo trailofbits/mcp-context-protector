@@ -50,7 +50,7 @@ class TestAnsiVisualization:
         """Clean up after test."""
         os.unlink(self.config_path)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_ansi_passthrough_default(self):
         """Test that ANSI escape codes are let through by default."""
 
@@ -100,7 +100,7 @@ class TestAnsiVisualization:
         # Run second part of the test with the approved config
         await run_with_ansi_visualization(callback2, self.config_path, visualize_ansi=False)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_ansi_visualization_enabled(self):
         """Test that ANSI escape codes are visualized when enabled."""
 

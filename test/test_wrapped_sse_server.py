@@ -13,7 +13,7 @@ import tempfile
 from mcp import types
 from contextprotector.mcp_config import MCPServerConfig
 from .test_utils import approve_server_config_using_review as _approve_config
-from .sse_server_utils import sse_server_fixture
+from .sse_server_utils import sse_server_fixture  # noqa: F401
 
 
 # Local helper function for backward compatibility
@@ -57,7 +57,7 @@ async def run_with_wrapper_session(callback, config_path=None):
     await _run_with_wrapper_session(callback, "sse", sse_url, config_path)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_echo_tool_through_wrapper(sse_server_fixture):
     """Test that the echo tool correctly works through the MCP wrapper using SSE transport."""
 
@@ -129,7 +129,7 @@ async def test_echo_tool_through_wrapper(sse_server_fixture):
     os.unlink(temp_file.name)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_invalid_tool_through_wrapper(sse_server_fixture):
     """Test error handling for invalid tools through the MCP wrapper using SSE transport."""
 

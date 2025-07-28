@@ -6,7 +6,7 @@ import sys
 import asyncio
 import subprocess
 from pathlib import Path
-from typing import Callable, Awaitable, Literal, Optional
+from typing import Callable, Awaitable, Literal
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
@@ -80,7 +80,7 @@ async def run_with_wrapper_session(
     identifier: str,
     config_path: str,
     visualize_ansi: bool = False,
-    guardrail_provider: Optional[str] = None,
+    guardrail_provider: str | None = None,
 ):
     """
     Run a test with a wrapper that connects to the specified downstream server.

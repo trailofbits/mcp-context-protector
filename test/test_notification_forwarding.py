@@ -27,7 +27,7 @@ class NotificationCapturingClient:
     """A client that captures notifications received from the server."""
 
     def __init__(self):
-        self.received_notifications: List[Dict[str, Any]] = []
+        self.received_notifications: list[dict[str, Any]] = []
         self.notification_event = asyncio.Event()
 
     async def handle_notification(self, notification):
@@ -44,7 +44,7 @@ class NotificationCapturingClient:
             logger.warning(f"Received unexpected notification format: {type(notification)}")
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_notification_forwarding():
     """Test that valid notifications are forwarded and invalid ones are filtered."""
 
@@ -149,7 +149,7 @@ async def test_notification_forwarding():
         os.unlink(temp_file.name)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_notification_forwarding_without_invalid():
     """Test notification forwarding when no invalid notifications are sent."""
 
@@ -223,7 +223,7 @@ async def test_notification_forwarding_without_invalid():
         os.unlink(temp_file.name)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_client_to_server_notification_forwarding():
     """Test that client → server notifications are forwarded to the downstream server."""
 

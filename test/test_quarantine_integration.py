@@ -25,7 +25,7 @@ def temp_quarantine_file():
         os.unlink(tmp_file.name)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_quarantine_integration(temp_quarantine_file):
     """Test that tool responses flagged by guardrails are properly quarantined."""
     # Create a guardrail provider that always triggers alerts
@@ -83,7 +83,7 @@ async def test_quarantine_integration(temp_quarantine_file):
     assert quarantined_response.released_at is not None
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_quarantine_disabled_when_no_guardrails():
     """Test that quarantine is not used when guardrails are disabled."""
     # Create a wrapper server without guardrails

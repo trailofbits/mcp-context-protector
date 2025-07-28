@@ -9,7 +9,7 @@ import inspect
 import pkgutil
 import logging
 import sys
-from typing import List, Dict, Optional, Type
+from typing import List, Dict, Type
 
 from . import guardrail_providers
 from .guardrail_types import GuardrailProvider
@@ -32,10 +32,13 @@ def _is_provider_class(obj) -> bool:
     Check if an object is a valid guardrail provider class.
 
     Args:
+    ----
         obj: The object to check
 
     Returns:
+    -------
         True if it's a valid provider class, False otherwise
+
     """
     if not inspect.isclass(obj):
         return False
@@ -49,7 +52,7 @@ def _is_provider_class(obj) -> bool:
     return has_name and has_check
 
 
-def load_guardrail_providers() -> Dict[str, Type[GuardrailProvider]]:
+def load_guardrail_providers() -> dict[str, Type[GuardrailProvider]]:
     """
     Load all guardrail providers from the guardrail_providers package.
 
@@ -58,7 +61,9 @@ def load_guardrail_providers() -> Dict[str, Type[GuardrailProvider]]:
     - A 'check_server_config' method
 
     Returns:
+    -------
         Dictionary mapping provider names to provider classes
+
     """
     providers = {}
 
@@ -93,25 +98,30 @@ def load_guardrail_providers() -> Dict[str, Type[GuardrailProvider]]:
     return providers
 
 
-def get_provider_names() -> List[str]:
+def get_provider_names() -> list[str]:
     """
     Get a list of available guardrail provider names.
 
     Returns:
+    -------
         List of provider names that were successfully loaded
+
     """
     return list(load_guardrail_providers().keys())
 
 
-def get_provider(name: str) -> Optional[GuardrailProvider]:
+def get_provider(name: str) -> GuardrailProvider | None:
     """
     Get a guardrail provider by name.
 
     Args:
+    ----
         name: The name of the provider
 
     Returns:
+    -------
         An instance of the provider, or None if not found
+
     """
     providers = load_guardrail_providers()
 

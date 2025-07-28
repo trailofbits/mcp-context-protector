@@ -44,7 +44,7 @@ def mock_session():
     return session
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_tool_scanning_no_alert():
     """Test tool response scanning when no alert is triggered."""
     # Create a guardrail provider that doesn't trigger alerts
@@ -71,7 +71,7 @@ async def test_tool_scanning_no_alert():
     assert not provider._trigger_alert
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_tool_scanning_with_alert():
     """Test tool response scanning when an alert is triggered."""
     # Create a guardrail provider that always triggers alerts
@@ -105,7 +105,7 @@ async def test_tool_scanning_with_alert():
     assert "Security risk detected" in args["reason"]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_tool_scanning_exception_handling():
     """Test that exceptions in the scanning process are properly handled."""
     # Create a guardrail provider that raises an exception during tool response checking
@@ -133,7 +133,7 @@ async def test_tool_scanning_exception_handling():
     provider.check_tool_response.assert_called_once()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_tool_vs_config_scanning_separation():
     """Test that tool response scanning and server config scanning are separate methods."""
     # Create a guardrail provider that tracks which methods were called
