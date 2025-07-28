@@ -56,7 +56,7 @@ class MCPParameterDefinition:
     items: dict[str, Any | None] = None  # For array types
     properties: dict[str, Any | None] = None  # For object types
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if not isinstance(other, MCPParameterDefinition):
             return False
         return (
@@ -109,7 +109,7 @@ class MCPToolDefinition:
 
         return "\n".join(lines)
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if not isinstance(other, MCPToolDefinition):
             return False
 

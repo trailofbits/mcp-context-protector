@@ -7,6 +7,7 @@ import os
 import json
 import tempfile
 import pytest
+from typing import Generator
 
 from contextprotector.quarantine import ToolResponseQuarantine
 from contextprotector.mcp_wrapper import MCPWrapperServer
@@ -14,7 +15,7 @@ from contextprotector.guardrail_providers.mock_provider import MockGuardrailProv
 
 
 @pytest.fixture
-def setup_quarantine_test():
+def setup_quarantine_test() -> Generator[tuple[ToolResponseQuarantine, str, str], None, None]:
     """Create a test quarantine with sample data."""
     # Create a temporary file for the quarantine
     tmp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -65,7 +66,7 @@ def setup_quarantine_test():
 
 
 @pytest.mark.asyncio()
-async def test_quarantine_release_success(setup_quarantine_test):
+async def test_quarantine_release_success(setup_quarantine_test) -> None:
     """Test successfully releasing a quarantined response."""
     test_data = setup_quarantine_test
 
@@ -100,7 +101,7 @@ async def test_quarantine_release_success(setup_quarantine_test):
 
 
 @pytest.mark.asyncio()
-async def test_quarantine_release_unreleased_fails(setup_quarantine_test):
+async def test_quarantine_release_unreleased_fails(setup_quarantine_test) -> None:
     """Test that attempting to release an unreleased response fails."""
     test_data = setup_quarantine_test
 
@@ -126,7 +127,7 @@ async def test_quarantine_release_unreleased_fails(setup_quarantine_test):
 
 
 @pytest.mark.asyncio()
-async def test_quarantine_release_invalid_uuid(setup_quarantine_test):
+async def test_quarantine_release_invalid_uuid(setup_quarantine_test) -> None:
     """Test that attempting to release with an invalid UUID fails."""
     test_data = setup_quarantine_test
 

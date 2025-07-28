@@ -24,13 +24,13 @@ logger = logging.getLogger("test_config_approval_security")
 
 
 @pytest.mark.asyncio()
-async def test_zero_information_leakage_unapproved_config():
+async def test_zero_information_leakage_unapproved_config() -> None:
     """Test that ZERO downstream server information leaks when config is unapproved."""
 
     # This test uses the prompt_test_server which has multiple tools and prompts
     # We verify that NONE of this information is exposed when config is unapproved
 
-    async def test_callback(session: ClientSession):
+    async def test_callback(session: ClientSession) -> None:
         """Test callback that verifies complete information isolation."""
 
         # 1. Test list_tools() - should ONLY return context-protector-block tool
@@ -194,12 +194,12 @@ async def test_zero_information_leakage_unapproved_config():
 
 
 @pytest.mark.asyncio()
-async def test_information_visible_after_approval():
+async def test_information_visible_after_approval() -> None:
     """Verify that downstream server information IS visible after config approval."""
 
     from .test_utils import approve_server_config_using_review
 
-    async def test_callback(session: ClientSession):
+    async def test_callback(session: ClientSession) -> None:
         """Test callback that verifies information is visible after approval."""
 
         # After approval, we should see the actual downstream server tools

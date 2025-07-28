@@ -23,7 +23,7 @@ def get_server_command(server_filename: str) -> str:
 
 
 @pytest.mark.asyncio()
-async def test_dynamic_tool_addition_with_existing_server():
+async def test_dynamic_tool_addition_with_existing_server() -> None:
     """Test granular blocking when tools are added dynamically using the existing dynamic server."""
 
     temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -32,7 +32,7 @@ async def test_dynamic_tool_addition_with_existing_server():
     # The key is testing the approval logic, not the dynamic server behavior
 
     # Step 1: Start with the simple server and approve it
-    async def callback_initial_approval(session):
+    async def callback_initial_approval(session) -> None:
         tools = await session.list_tools()
         # Should only have context-protector-block initially
         assert "context-protector-block" in [t.name for t in tools.tools]
@@ -56,7 +56,7 @@ async def test_dynamic_tool_addition_with_existing_server():
     )
 
     # Step 2: Verify echo tool works after approval
-    async def callback_initial_working(session):
+    async def callback_initial_working(session) -> None:
         tools = await session.list_tools()
         tool_names = [t.name for t in tools.tools]
 
@@ -103,7 +103,7 @@ async def test_dynamic_tool_addition_with_existing_server():
     db.save_unapproved_config("stdio", get_server_command("simple_downstream_server.py"), config)
 
     # Step 4: Test granular blocking - original tool works, new tool blocked
-    async def callback_after_addition(session):
+    async def callback_after_addition(session) -> None:
         # Check approval status
         approval_status = db.get_server_approval_status(
             "stdio", get_server_command("simple_downstream_server.py"), config
@@ -134,7 +134,7 @@ async def test_dynamic_tool_addition_with_existing_server():
 
 
 @pytest.mark.asyncio()
-async def test_instruction_change_blocks_all_tools():
+async def test_instruction_change_blocks_all_tools() -> None:
     """Test that changing server instructions blocks ALL tools, not just individual ones."""
 
     temp_file = tempfile.NamedTemporaryFile(delete=False)

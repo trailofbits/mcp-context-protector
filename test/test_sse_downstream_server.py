@@ -11,7 +11,7 @@ from mcp.types import CallToolResult, TextContent
 from .sse_server_utils import sse_server  # noqa: F401
 
 
-async def run_with_sse_client(callback):
+async def run_with_sse_client(callback) -> None:
     """
     Run a test with a client that connects to the SSE downstream server.
     """
@@ -36,10 +36,10 @@ async def run_with_sse_client(callback):
 
 
 @pytest.mark.asyncio()
-async def test_list_tools_via_sse(sse_server):
+async def test_list_tools_via_sse(sse_server) -> None:
     """Test that the tool listing works correctly via SSE transport."""
 
-    async def callback(session):
+    async def callback(session) -> None:
         # List available tools
         tools = await session.list_tools()
 
@@ -62,10 +62,10 @@ async def test_list_tools_via_sse(sse_server):
 
 
 @pytest.mark.asyncio()
-async def test_echo_tool_via_sse(sse_server):
+async def test_echo_tool_via_sse(sse_server) -> None:
     """Test that the echo tool works correctly via SSE transport."""
 
-    async def callback(session):
+    async def callback(session) -> None:
         # Test message to echo
         input_message = "Hello SSE MCP Server!"
 
@@ -91,10 +91,10 @@ async def test_echo_tool_via_sse(sse_server):
 
 
 @pytest.mark.asyncio()
-async def test_invalid_tool_call_via_sse(sse_server):
+async def test_invalid_tool_call_via_sse(sse_server) -> None:
     """Test error handling when an invalid tool is called via SSE transport."""
 
-    async def callback(session):
+    async def callback(session) -> None:
         # Try to call a tool that doesn't exist
         result = await session.call_tool(name="nonexistent_tool", arguments={"foo": "bar"})
         assert result.content and len(result.content) == 1

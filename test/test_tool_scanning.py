@@ -5,6 +5,7 @@ Tests for the tool response scanning feature.
 
 import logging
 import pytest
+from typing import Generator
 from unittest.mock import MagicMock
 
 from mcp.types import CallToolResult as ToolCallResult
@@ -20,12 +21,12 @@ logging.basicConfig(level=logging.INFO)
 
 
 @pytest.fixture
-def mock_session():
+def mock_session() -> Generator[MagicMock, None, None]:
     """Create a mock session for testing."""
     session = MagicMock()
 
     # Mock the call_tool method to return a ToolCallResult
-    async def mock_call_tool(name, arguments):
+    async def mock_call_tool(name, arguments) -> any:
         if name == "test_tool":
             return ToolCallResult(content=[TextContent(type="text", text="Test result")])
         elif name == "dangerous_tool":
@@ -45,7 +46,7 @@ def mock_session():
 
 
 @pytest.mark.asyncio()
-async def test_tool_scanning_no_alert():
+async def test_tool_scanning_no_alert() -> None:
     """Test tool response scanning when no alert is triggered."""
     # Create a guardrail provider that doesn't trigger alerts
     provider = MockGuardrailProvider(trigger_alert=False)
@@ -55,7 +56,7 @@ async def test_tool_scanning_no_alert():
     wrapper.session = MagicMock()
 
     # Mock the call_tool method to return a ToolCallResult
-    async def mock_call_tool(_name, _arguments):
+    async def mock_call_tool(_name, _arguments) -> ToolCallResult:
         return ToolCallResult(content=[TextContent(type="text", text="Safe result")])
 
     wrapper.session.call_tool = mock_call_tool
@@ -72,7 +73,7 @@ async def test_tool_scanning_no_alert():
 
 
 @pytest.mark.asyncio()
-async def test_tool_scanning_with_alert():
+async def test_tool_scanning_with_alert() -> None:
     """Test tool response scanning when an alert is triggered."""
     # Create a guardrail provider that always triggers alerts
     provider = AlwaysAlertGuardrailProvider()
@@ -83,7 +84,7 @@ async def test_tool_scanning_with_alert():
     wrapper.quarantine = MagicMock()
 
     # Mock the call_tool method to return a ToolCallResult
-    async def mock_call_tool(name, arguments):
+    async def mock_call_tool(name, arguments) -> ToolCallResult:
         return ToolCallResult(
             content=[TextContent(type="text", text="Potentially dangerous result")]
         )
@@ -106,7 +107,7 @@ async def test_tool_scanning_with_alert():
 
 
 @pytest.mark.asyncio()
-async def test_tool_scanning_exception_handling():
+async def test_tool_scanning_exception_handling() -> None:
     """Test that exceptions in the scanning process are properly handled."""
     # Create a guardrail provider that raises an exception during tool response checking
     provider = MockGuardrailProvider()
@@ -117,7 +118,7 @@ async def test_tool_scanning_exception_handling():
     wrapper.session = MagicMock()
 
     # Mock the call_tool method to return a ToolCallResult
-    async def mock_call_tool(name, arguments):
+    async def mock_call_tool(name, arguments) -> ToolCallResult:
         return ToolCallResult(content=[TextContent(type="text", text="Test result")])
 
     wrapper.session.call_tool = mock_call_tool
@@ -134,7 +135,7 @@ async def test_tool_scanning_exception_handling():
 
 
 @pytest.mark.asyncio()
-async def test_tool_vs_config_scanning_separation():
+async def test_tool_vs_config_scanning_separation() -> None:
     """Test that tool response scanning and server config scanning are separate methods."""
     # Create a guardrail provider that tracks which methods were called
     provider = MockGuardrailProvider(trigger_alert=False)
@@ -148,7 +149,7 @@ async def test_tool_vs_config_scanning_separation():
     wrapper.session = MagicMock()
 
     # Mock the call_tool method to return a ToolCallResult
-    async def mock_call_tool(name, arguments):
+    async def mock_call_tool(name, arguments) -> ToolCallResult:
         return ToolCallResult(content=[TextContent(type="text", text="Test result")])
 
     wrapper.session.call_tool = mock_call_tool

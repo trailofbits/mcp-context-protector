@@ -14,7 +14,7 @@ from pathlib import Path
 from contextprotector.mcp_config import MCPServerConfig
 
 
-async def approve_server_config_using_review(command, config_path):
+async def approve_server_config_using_review(command, config_path) -> None:
     """
     Run the --review-server process to approve a server configuration.
 
@@ -62,7 +62,7 @@ async def approve_server_config_using_review(command, config_path):
     ), f"Missing expected approval message in output: {stdout}"
 
 
-async def run_with_wrapper_session(callback, config_path=None):
+async def run_with_wrapper_session(callback, config_path=None) -> None:
     """
     Run a test with a wrapper session that connects to the simple downstream server.
     """
@@ -90,10 +90,10 @@ async def run_with_wrapper_session(callback, config_path=None):
 
 
 @pytest.mark.asyncio()
-async def test_echo_tool_through_wrapper():
+async def test_echo_tool_through_wrapper() -> None:
     """Test that the echo tool correctly works through the MCP wrapper."""
 
-    async def callback(session):
+    async def callback(session) -> None:
         input = "Marco (Polo)"
 
         # List available tools
@@ -111,7 +111,7 @@ async def test_echo_tool_through_wrapper():
         # Check that the call was blocked due to unapproved config
         assert isinstance(result_dict, dict) and result_dict["status"] == "blocked"
 
-    async def callback2(session):
+    async def callback2(session) -> None:
         input = "Marco (Polo)"
 
         # Call the echo tool again - should work now

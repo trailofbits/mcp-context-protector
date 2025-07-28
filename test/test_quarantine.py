@@ -14,7 +14,7 @@ from contextprotector.quarantine import QuarantinedToolResponse, ToolResponseQua
 class TestQuarantinedToolResponse(unittest.TestCase):
     """Tests for the QuarantinedToolResponse class."""
 
-    def test_init(self):
+    def test_init(self) -> None:
         """Test initialization of a quarantined tool response."""
         response = QuarantinedToolResponse(
             id="test-id",
@@ -32,7 +32,7 @@ class TestQuarantinedToolResponse(unittest.TestCase):
         self.assertFalse(response.released)
         self.assertIsNone(response.released_at)
 
-    def test_release(self):
+    def test_release(self) -> None:
         """Test releasing a quarantined tool response."""
         response = QuarantinedToolResponse(
             id="test-id",
@@ -50,7 +50,7 @@ class TestQuarantinedToolResponse(unittest.TestCase):
         self.assertTrue(response.released)
         self.assertIsNotNone(response.released_at)
 
-    def test_to_dict(self):
+    def test_to_dict(self) -> None:
         """Test conversion to dictionary."""
         now = datetime.now()
         response = QuarantinedToolResponse(
@@ -73,7 +73,7 @@ class TestQuarantinedToolResponse(unittest.TestCase):
         self.assertFalse(data["released"])
         self.assertIsNone(data["released_at"])
 
-    def test_from_dict(self):
+    def test_from_dict(self) -> None:
         """Test creation from dictionary."""
         now = datetime.now()
         released_at = now + timedelta(minutes=5)
@@ -104,18 +104,18 @@ class TestQuarantinedToolResponse(unittest.TestCase):
 class TestToolCallQuarantine(unittest.TestCase):
     """Tests for the ToolCallQuarantine class."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up a temporary file for testing."""
         self.temp_file = tempfile.NamedTemporaryFile(delete=False)
         self.temp_file.close()
         self.quarantine = ToolResponseQuarantine(self.temp_file.name)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         """Clean up the temporary file."""
         if os.path.exists(self.temp_file.name):
             os.unlink(self.temp_file.name)
 
-    def test_quarantine_response(self):
+    def test_quarantine_response(self) -> None:
         """Test quarantining a tool response."""
         response_id = self.quarantine.quarantine_response(
             tool_name="test-tool",
@@ -137,7 +137,7 @@ class TestToolCallQuarantine(unittest.TestCase):
         self.assertEqual(response.reason, "test reason")
         self.assertFalse(response.released)
 
-    def test_release_response(self):
+    def test_release_response(self) -> None:
         """Test releasing a quarantined response."""
         # Quarantine a response
         response_id = self.quarantine.quarantine_response(
@@ -167,7 +167,7 @@ class TestToolCallQuarantine(unittest.TestCase):
 
         self.assertFalse(result)
 
-    def test_list_responses(self):
+    def test_list_responses(self) -> None:
         """Test listing quarantined responses."""
         # Quarantine two responses
         response_id1 = self.quarantine.quarantine_response(
@@ -200,7 +200,7 @@ class TestToolCallQuarantine(unittest.TestCase):
         self.assertTrue(any(r["id"] == response_id1 for r in responses))
         self.assertTrue(any(r["id"] == response_id2 for r in responses))
 
-    def test_get_response_pairs(self):
+    def test_get_response_pairs(self) -> None:
         """Test getting request-response pairs."""
         # Quarantine two responses
         response_id1 = self.quarantine.quarantine_response(
@@ -231,7 +231,7 @@ class TestToolCallQuarantine(unittest.TestCase):
         self.assertEqual(request["input"], {"param": "value2"})
         self.assertEqual(response, "test output 2")
 
-    def test_delete_response(self):
+    def test_delete_response(self) -> None:
         """Test deleting a quarantined response."""
         # Quarantine a response
         response_id = self.quarantine.quarantine_response(
@@ -255,7 +255,7 @@ class TestToolCallQuarantine(unittest.TestCase):
 
         self.assertFalse(result)
 
-    def test_clear_quarantine(self):
+    def test_clear_quarantine(self) -> None:
         """Test clearing the quarantine."""
         # Quarantine two responses
         response_id1 = self.quarantine.quarantine_response(
@@ -296,7 +296,7 @@ class TestToolCallQuarantine(unittest.TestCase):
         response2 = self.quarantine.get_response(response_id2)
         self.assertIsNone(response2)
 
-    def test_file_persistence(self):
+    def test_file_persistence(self) -> None:
         """Test that responses are correctly persisted to the file."""
         # Quarantine a response
         response_id = self.quarantine.quarantine_response(

@@ -30,7 +30,7 @@ class NotificationCapturingClient:
         self.received_notifications: list[dict[str, Any]] = []
         self.notification_event = asyncio.Event()
 
-    async def handle_notification(self, notification):
+    async def handle_notification(self, notification) -> None:
         """Handle notifications received from the server."""
         if hasattr(notification, "root") and hasattr(notification.root, "method"):
             notification_data = {
@@ -45,7 +45,7 @@ class NotificationCapturingClient:
 
 
 @pytest.mark.asyncio()
-async def test_notification_forwarding():
+async def test_notification_forwarding() -> None:
     """Test that valid notifications are forwarded and invalid ones are filtered."""
 
     # Expected valid notifications (all specification-compliant notifications should be forwarded)
@@ -63,13 +63,13 @@ async def test_notification_forwarding():
 
     notification_client = NotificationCapturingClient()
 
-    async def test_callback(session: ClientSession):
+    async def test_callback(session: ClientSession) -> None:
         """Test callback that triggers notification sending and verifies receipt."""
 
         # Monkey patch the session to capture notifications
         original_handler = session._message_handler
 
-        async def capturing_handler(message):
+        async def capturing_handler(message) -> None:
             # First let the original handler process it
             if original_handler:
                 await original_handler(message)
@@ -150,7 +150,7 @@ async def test_notification_forwarding():
 
 
 @pytest.mark.asyncio()
-async def test_notification_forwarding_without_invalid():
+async def test_notification_forwarding_without_invalid() -> None:
     """Test notification forwarding when no invalid notifications are sent."""
 
     expected_valid_notifications = {
@@ -164,13 +164,13 @@ async def test_notification_forwarding_without_invalid():
 
     notification_client = NotificationCapturingClient()
 
-    async def test_callback(session: ClientSession):
+    async def test_callback(session: ClientSession) -> None:
         """Test callback that only sends valid notifications."""
 
         # Monkey patch the session to capture notifications
         original_handler = session._message_handler
 
-        async def capturing_handler(message):
+        async def capturing_handler(message) -> None:
             if original_handler:
                 await original_handler(message)
             await notification_client.handle_notification(message)
@@ -224,10 +224,10 @@ async def test_notification_forwarding_without_invalid():
 
 
 @pytest.mark.asyncio()
-async def test_client_to_server_notification_forwarding():
+async def test_client_to_server_notification_forwarding() -> None:
     """Test that client → server notifications are forwarded to the downstream server."""
 
-    async def test_callback(session: ClientSession):
+    async def test_callback(session: ClientSession) -> None:
         """Test callback that sends client notifications and verifies forwarding."""
 
         # First approve the server config by calling a tool

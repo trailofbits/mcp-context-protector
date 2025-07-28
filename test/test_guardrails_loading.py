@@ -18,7 +18,7 @@ logger = configure_logging()
 logger.info("Starting guardrails loading test")
 
 
-def test_load_guardrail_providers():
+def test_load_guardrail_providers() -> None:
     """Test that guardrail providers can be loaded correctly."""
     # Get provider names
     providers = get_provider_names()
@@ -32,13 +32,13 @@ def test_load_guardrail_providers():
     assert provider.name == "Llama Firewall"
 
 
-def test_get_nonexistent_provider():
+def test_get_nonexistent_provider() -> None:
     """Test that trying to get a non-existent provider returns None."""
     provider = get_provider("Non-Existent Provider")
     assert provider is None, "Should return None for non-existent provider"
 
 
-def test_provider_check_server_config():
+def test_provider_check_server_config() -> None:
     """Test that a provider can check a server config and log the results."""
     from contextprotector.mcp_config import MCPServerConfig, MCPToolDefinition
 

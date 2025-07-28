@@ -163,7 +163,7 @@ class MCPWrapperServer:
         self.quarantine = ToolResponseQuarantine(quarantine_path) if self.use_guardrails else None
         self._setup_handlers()
 
-    def _setup_handlers(self):
+    def _setup_handlers(self) -> None:
         """Setup MCP server handlers"""
         self._setup_notification_handlers()
 
@@ -723,7 +723,7 @@ Note: This tool is only available when tools are blocked due to security restric
 
         return {"type": "object", "required": required, "properties": properties}
 
-    def _convert_mcp_tools_to_specs(self, tools):
+    def _convert_mcp_tools_to_specs(self, tools) -> list[MCPToolSpec]:
         """
         Convert MCP tool definitions to internal tool specs.
 
@@ -773,7 +773,7 @@ Note: This tool is only available when tools are blocked due to security restric
 
         return tool_specs
 
-    async def _handle_tool_updates(self, tools):
+    async def _handle_tool_updates(self, tools) -> None:
         """
         Handle tool update notifications from the downstream server.
 
@@ -822,7 +822,7 @@ Note: This tool is only available when tools are blocked due to security restric
             ]
             logger.info(f"Approved tools: {approved_tools}")
 
-    async def _forward_notification_to_upstream(self, method: str, params=None):
+    async def _forward_notification_to_upstream(self, method: str, params=None) -> None:
         """
         Forward a notification to the upstream client.
 
@@ -873,7 +873,7 @@ Note: This tool is only available when tools are blocked due to security restric
         except Exception as e:
             logger.warning(f"Failed to forward {method} notification: {e}")
 
-    async def _handle_client_message(self, message):
+    async def _handle_client_message(self, message) -> None:
         """
         Message handler for the ClientSession to process notifications,
         particularly tool update notifications.
@@ -924,7 +924,7 @@ Note: This tool is only available when tools are blocked due to security restric
         else:
             logger.info(f"Received non-notification message: {type(message)}")
 
-    async def update_prompts(self, send_notification: bool = False):
+    async def update_prompts(self, send_notification: bool = False) -> None:
         """
         Update prompts from the downstream server.
 
@@ -956,7 +956,7 @@ Note: This tool is only available when tools are blocked due to security restric
             out = traceback.format_exc()
             logger.warning(f"Error updating prompts from downstream server: {e} {out}")
 
-    async def update_resources(self, send_notification: bool = False):
+    async def update_resources(self, send_notification: bool = False) -> None:
         """
         Update resources from the downstream server.
 
@@ -989,7 +989,7 @@ Note: This tool is only available when tools are blocked due to security restric
         except Exception as e:
             logger.warning(f"Error updating resources from downstream server: {e}")
 
-    async def update_tools(self, send_notification: bool = False):
+    async def update_tools(self, send_notification: bool = False) -> None:
         """Update tools from the downstream server."""
         try:
             downstream_tools = await self.session.list_tools()
@@ -1005,7 +1005,7 @@ Note: This tool is only available when tools are blocked due to security restric
         except Exception as e:
             logger.warning(f"Error handling tool update notification: {e}")
 
-    async def connect(self):
+    async def connect(self) -> None:
         """Initialize the connection to the downstream server."""
         if self.connection_type == "stdio":
             await self._connect_via_stdio()
@@ -1017,7 +1017,7 @@ Note: This tool is only available when tools are blocked due to security restric
             raise ValueError(f"Unknown connection type: {self.connection_type}")
         await self._initialize_config()
 
-    async def _initialize_config(self):
+    async def _initialize_config(self) -> None:
         """Setup tasks after connecting to a downstream server"""
         self.initialize_result = await self.session.initialize()
 
@@ -1090,7 +1090,7 @@ Note: This tool is only available when tools are blocked due to security restric
         else:
             raise ValueError(f"Unknown connection type: {self.connection_type}")
 
-    async def _connect_via_stdio(self):
+    async def _connect_via_stdio(self) -> None:
         """Connect to a downstream server via stdio."""
         logger.info(f"Connecting to downstream server via stdio: {self.child_command}")
 
@@ -1130,7 +1130,7 @@ Note: This tool is only available when tools are blocked due to security restric
             logger.error(f"Error connecting to downstream server via stdio: {e}")
             raise
 
-    async def _connect_via_http(self):
+    async def _connect_via_http(self) -> None:
         """Connect to a downstream server via SSE (Server-Sent Events)."""
         logger.info(f"Connecting to downstream server via SSE: {self.server_url}")
 
@@ -1160,7 +1160,7 @@ Note: This tool is only available when tools are blocked due to security restric
             logger.error(f"Error connecting to downstream server via SSE: {e}")
             raise
 
-    async def _connect_via_streamable_http(self):
+    async def _connect_via_streamable_http(self) -> None:
         """Connect to a downstream server via streamable HTTP."""
         logger.info(f"Connecting to downstream server via streamable HTTP: {self.server_url}")
 
@@ -1243,11 +1243,11 @@ Note: This tool is only available when tools are blocked due to security restric
 
         return config
 
-    def _setup_notification_handlers(self):
+    def _setup_notification_handlers(self) -> None:
         """Setup handlers for client → server notifications to forward to downstream server."""
 
         @self.server.progress_notification()
-        async def handle_progress_notification(notification: types.ProgressNotification):
+        async def handle_progress_notification(notification: types.ProgressNotification) -> None:
             """Forward progress notifications from upstream client to downstream server."""
             logger.info("Forwarding progress notification from client to downstream server")
 
@@ -1262,7 +1262,7 @@ Note: This tool is only available when tools are blocked due to security restric
         # Handle other client notifications by registering them manually
         # Since there may not be decorators for all notification types, we'll register directly
 
-        async def handle_cancelled_notification(notification: types.CancelledNotification):
+        async def handle_cancelled_notification(notification: types.CancelledNotification) -> None:
             """Forward cancelled notifications from upstream client to downstream server."""
             logger.info("Forwarding cancelled notification from client to downstream server")
 
@@ -1272,7 +1272,7 @@ Note: This tool is only available when tools are blocked due to security restric
                 except Exception as e:
                     logger.warning(f"Failed to forward cancelled notification to downstream: {e}")
 
-        async def handle_initialized_notification(notification: types.InitializedNotification):
+        async def handle_initialized_notification(notification: types.InitializedNotification) -> None:
             """Forward initialized notifications from upstream client to downstream server."""
             logger.info("Forwarding initialized notification from client to downstream server")
 
@@ -1282,7 +1282,7 @@ Note: This tool is only available when tools are blocked due to security restric
                 except Exception as e:
                     logger.warning(f"Failed to forward initialized notification to downstream: {e}")
 
-        async def handle_message_notification(notification: types.LoggingMessageNotification):
+        async def handle_message_notification(notification: types.LoggingMessageNotification) -> None:
             """Forward log message notifications from upstream client to downstream server."""
             logger.info("Forwarding message notification from client to downstream server")
 
@@ -1303,7 +1303,7 @@ Note: This tool is only available when tools are blocked due to security restric
             handle_message_notification
         )
 
-    async def _forward_notification_to_downstream(self, notification):
+    async def _forward_notification_to_downstream(self, notification) -> None:
         """Forward a notification from upstream client to downstream server."""
         if not self.session:
             logger.warning("No downstream session available to forward notification")
@@ -1383,7 +1383,7 @@ Note: This tool is only available when tools are blocked due to security restric
             logger.error(f"Error scanning tool response: {e}", exc_info=True)
             return None
 
-    async def stop_child_process(self):
+    async def stop_child_process(self) -> None:
         """Close connections to the downstream server."""
         if self.client_context:
             try:
@@ -1397,7 +1397,7 @@ Note: This tool is only available when tools are blocked due to security restric
             except Exception as e:
                 logger.error(f"Error closing MCP client: {e}")
 
-    async def run(self):
+    async def run(self) -> None:
         """Run the MCP wrapper server using stdio."""
         await self.connect()
 

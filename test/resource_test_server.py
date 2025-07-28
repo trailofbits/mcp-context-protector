@@ -32,7 +32,7 @@ class ResourceTestServer:
         # Register handlers
         self.register_handlers()
 
-    def register_handlers(self):
+    def register_handlers(self) -> None:
         """Register all handlers with the server."""
 
         @self.server.list_tools()
@@ -150,7 +150,7 @@ class ResourceTestServer:
                 ReadResourceContents(content="Unknown resource requested", mime_type="text/plain")
             ]
 
-    async def run(self):
+    async def run(self) -> None:
         """Run the server with session tracking."""
         async with stdio_server() as streams:
             init_options = InitializationOptions(
@@ -186,7 +186,7 @@ class ResourceTestServer:
                         )
 
 
-async def main():
+async def main() -> None:
     """Main entry point for the server."""
     server = ResourceTestServer()
     await server.run()

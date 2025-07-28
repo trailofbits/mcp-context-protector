@@ -22,7 +22,7 @@ from .test_utils import approve_server_config_using_review
 
 
 @pytest.mark.asyncio()
-async def test_review_mode_already_trusted():
+async def test_review_mode_already_trusted() -> None:
     """Test review mode when config is already trusted."""
     # Create a temporary file for config storage
     temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -61,7 +61,7 @@ async def test_review_mode_already_trusted():
 
 
 @pytest.mark.asyncio()
-async def test_review_mode_new_server_approval():
+async def test_review_mode_new_server_approval() -> None:
     """Test review mode with a new server that gets approved."""
     # Create a temporary file for config storage
     temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -102,7 +102,7 @@ async def test_review_mode_new_server_approval():
 
 
 @pytest.mark.asyncio()
-async def test_review_mode_modified_server_rejection():
+async def test_review_mode_modified_server_rejection() -> None:
     """Test review mode with a modified server that gets rejected."""
     # Create a temporary file for config storage
     temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -161,7 +161,7 @@ async def test_review_mode_modified_server_rejection():
 
 
 @pytest.mark.asyncio()
-async def test_review_mode_with_guardrail_alert():
+async def test_review_mode_with_guardrail_alert() -> None:
     """Test review mode with a configuration that triggers a guardrail alert."""
     # Create a temporary file for config storage
     temp_file = tempfile.NamedTemporaryFile(delete=False)

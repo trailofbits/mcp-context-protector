@@ -23,7 +23,7 @@ from contextprotector.mcp_config import (
 
 
 @pytest.mark.asyncio()
-async def test_granular_approval_database_logic():
+async def test_granular_approval_database_logic() -> None:
     """Test the granular approval logic at the database level."""
 
     temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -89,7 +89,7 @@ async def test_granular_approval_database_logic():
 
 
 @pytest.mark.asyncio()
-async def test_tool_modification_granular_blocking():
+async def test_tool_modification_granular_blocking() -> None:
     """Test that modifying a tool blocks only that tool, not other approved tools."""
 
     temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -163,7 +163,7 @@ async def test_tool_modification_granular_blocking():
 
 
 @pytest.mark.asyncio()
-async def test_tool_removal_no_reapproval_needed():
+async def test_tool_removal_no_reapproval_needed() -> None:
     """Test that removing a tool simply makes it disappear without requiring reapproval."""
 
     temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -224,7 +224,7 @@ async def test_tool_removal_no_reapproval_needed():
 
 
 @pytest.mark.asyncio()
-async def test_server_instructions_change_blocks_everything():
+async def test_server_instructions_change_blocks_everything() -> None:
     """Test that changing server instructions blocks the entire server."""
 
     temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -280,7 +280,7 @@ async def test_server_instructions_change_blocks_everything():
 
 
 @pytest.mark.asyncio()
-async def test_mixed_approval_states():
+async def test_mixed_approval_states() -> None:
     """Test behavior when some tools are approved and others are not."""
 
     temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -336,7 +336,7 @@ async def test_mixed_approval_states():
 
 
 @pytest.mark.asyncio()
-async def test_tool_parameter_modification_blocking():
+async def test_tool_parameter_modification_blocking() -> None:
     """Test that changing tool parameters blocks only that tool."""
 
     temp_file = tempfile.NamedTemporaryFile(delete=False)

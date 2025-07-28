@@ -22,7 +22,7 @@ PROMPT_TEST_SERVER_PATH = Path(__file__).resolve().parent / "prompt_test_server.
 
 
 # Local helper function for backward compatibility
-async def run_with_wrapper(callback, config_path: str):
+async def run_with_wrapper(callback, config_path: str) -> None:
     """
     Run a test with a wrapper connected to the prompt test server.
 
@@ -37,24 +37,24 @@ async def run_with_wrapper(callback, config_path: str):
 class TestPromptProxying:
     """Tests for prompt proxying functionality."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test by creating temp config file."""
         self.temp_file = tempfile.NamedTemporaryFile(delete=False)
         self.config_path = self.temp_file.name
 
-    def teardown_method(self):
+    def teardown_method(self) -> None:
         """Clean up after test."""
         os.unlink(self.config_path)
 
     @pytest.mark.asyncio()
-    async def test_initial_prompt_listing(self):
+    async def test_initial_prompt_listing(self) -> None:
         """Test that prompts are correctly listed from the downstream server after approval."""
 
         # Create the test command
         command = f"python {str(PROMPT_TEST_SERVER_PATH)}"
 
         # First callback - before approval
-        async def callback1(session):
+        async def callback1(session) -> None:
             # List available prompts before approval - should be empty
             initial_prompts = await session.list_prompts()
             assert len(initial_prompts.prompts) == 0
@@ -65,7 +65,7 @@ class TestPromptProxying:
             assert blocked_response["status"] == "blocked"
 
         # Second callback - after approval
-        async def callback2(session):
+        async def callback2(session) -> None:
             # Now list prompts after approval
             prompts = await session.list_prompts()
 
@@ -90,14 +90,14 @@ class TestPromptProxying:
         await run_with_wrapper(callback2, self.config_path)
 
     @pytest.mark.asyncio()
-    async def test_prompt_dispatch(self):
+    async def test_prompt_dispatch(self) -> None:
         """Test that prompts can be dispatched through the wrapper."""
 
         # Create the test command
         command = f"python {str(PROMPT_TEST_SERVER_PATH)}"
 
         # First callback - before approval, confirm blocking
-        async def callback1(session):
+        async def callback1(session) -> None:
             # List available tools - should only see context-protector-block when unapproved
             tools = await session.list_tools()
             assert "context-protector-block" in [t.name for t in tools.tools]
@@ -108,7 +108,7 @@ class TestPromptProxying:
             assert blocked_response["status"] == "blocked"
 
         # Second callback - after approval
-        async def callback2(session):
+        async def callback2(session) -> None:
             # Now dispatch a prompt
             greeting_result = await session.get_prompt("greeting", {"name": "Test User"})
 
@@ -126,7 +126,7 @@ class TestPromptProxying:
         await run_with_wrapper(callback2, self.config_path)
 
     @pytest.mark.asyncio()
-    async def test_prompt_changes(self):
+    async def test_prompt_changes(self) -> None:
         """
         Test that changes to prompts are correctly proxied without affecting
         the approval status of the server configuration.
@@ -147,7 +147,7 @@ class TestPromptProxying:
         await approve_server_config_using_review("stdio", command, self.config_path)
 
         # Now the main callback after approval
-        async def callback(session):
+        async def callback(session) -> None:
             # Initial prompts check
             initial_prompts = await session.list_prompts()
             assert len(initial_prompts.prompts) == 2
@@ -188,14 +188,14 @@ class TestPromptProxying:
         await run_with_wrapper(callback, self.config_path)
 
     @pytest.mark.asyncio()
-    async def test_prompt_blocked_before_approval(self):
+    async def test_prompt_blocked_before_approval(self) -> None:
         """Test that prompts are blocked before server config is approved."""
 
         # Create the test command
         command = f"python {str(PROMPT_TEST_SERVER_PATH)}"
 
         # Part 1: Before approval
-        async def callback1(session):
+        async def callback1(session) -> None:
             # Try to dispatch a prompt before approval
             result = await session.get_prompt("greeting", {"name": "Test User"})
 
@@ -214,7 +214,7 @@ class TestPromptProxying:
             # Note: server_config is no longer included to prevent information leakage
 
         # Part 2: After approval
-        async def callback2(session):
+        async def callback2(session) -> None:
             # Now prompt should work
             greeting_result = await session.get_prompt("greeting", {"name": "Test User"})
             assert len(greeting_result.messages) > 0

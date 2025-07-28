@@ -81,7 +81,7 @@ async def run_with_wrapper_session(
     config_path: str,
     visualize_ansi: bool = False,
     guardrail_provider: str | None = None,
-):
+) -> None:
     """
     Run a test with a wrapper that connects to the specified downstream server.
 

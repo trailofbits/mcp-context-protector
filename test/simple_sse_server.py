@@ -46,7 +46,7 @@ app.add_tool(echo_handler, "echo")
 
 
 # Function to write PID to file
-def write_pidfile(pidfile_path):
+def write_pidfile(pidfile_path) -> None:
     """Write the current process ID to the specified file."""
     if pidfile_path:
         with open(pidfile_path, "w") as f:

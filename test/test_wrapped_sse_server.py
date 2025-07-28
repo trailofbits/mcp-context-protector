@@ -17,7 +17,7 @@ from .sse_server_utils import sse_server_fixture  # noqa: F401
 
 
 # Local helper function for backward compatibility
-async def approve_server_config_using_review(url, config_path):
+async def approve_server_config_using_review(url, config_path) -> None:
     """
     Run the --review-server process to approve a server configuration.
 
@@ -31,7 +31,7 @@ async def approve_server_config_using_review(url, config_path):
 # Import global SERVER_PORT from sse_server_utils
 
 
-async def run_with_wrapper_session(callback, config_path=None):
+async def run_with_wrapper_session(callback, config_path=None) -> None:
     """
     Run a test with a wrapper session that connects to the SSE downstream server via URL.
 
@@ -58,10 +58,10 @@ async def run_with_wrapper_session(callback, config_path=None):
 
 
 @pytest.mark.asyncio()
-async def test_echo_tool_through_wrapper(sse_server_fixture):
+async def test_echo_tool_through_wrapper(sse_server_fixture) -> None:
     """Test that the echo tool correctly works through the MCP wrapper using SSE transport."""
 
-    async def callback(session):
+    async def callback(session) -> None:
         input_message = "Hello from Wrapped SSE Server!"
 
         # List available tools
@@ -80,7 +80,7 @@ async def test_echo_tool_through_wrapper(sse_server_fixture):
         assert isinstance(result_dict, dict) and result_dict["status"] == "blocked"
         # Note: server_config is no longer included to prevent information leakage
 
-    async def callback2(session):
+    async def callback2(session) -> None:
         input_message = "Hello from Wrapped SSE Server!"
         # After approval, reconnect and try again
 
@@ -130,17 +130,17 @@ async def test_echo_tool_through_wrapper(sse_server_fixture):
 
 
 @pytest.mark.asyncio()
-async def test_invalid_tool_through_wrapper(sse_server_fixture):
+async def test_invalid_tool_through_wrapper(sse_server_fixture) -> None:
     """Test error handling for invalid tools through the MCP wrapper using SSE transport."""
 
-    async def callback(session):
+    async def callback(session) -> None:
         # First try calling any tool to get blocked and receive the config
         result = await session.call_tool(name="echo", arguments={"message": "Test"})
         assert len(result.content) == 1
         result_dict = json.loads(result.content[0].text)
         assert result_dict["status"] == "blocked"
 
-    async def callback2(session):
+    async def callback2(session) -> None:
         # Now try to call a tool that doesn't exist
         result = await session.call_tool(name="nonexistent_tool", arguments={"foo": "bar"})
         assert isinstance(result, types.CallToolResult)

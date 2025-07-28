@@ -16,7 +16,7 @@ from contextprotector.mcp_config import (
 )
 
 
-def test_config_database_save_load():
+def test_config_database_save_load() -> None:
     """Test saving and loading configurations from the database."""
     # Create a temporary file for the config database
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
@@ -139,7 +139,7 @@ def test_config_database_save_load():
             os.unlink(config_path)
 
 
-def test_config_database_removes_server():
+def test_config_database_removes_server() -> None:
     """Test removing a server configuration from the database."""
     # Create a temporary file for the config database
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
@@ -183,7 +183,7 @@ def test_config_database_removes_server():
             os.unlink(config_path)
 
 
-def test_config_database_file_structure():
+def test_config_database_file_structure() -> None:
     """Test the structure of the config database file."""
     # Create a temporary file for the config database
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
@@ -225,7 +225,7 @@ def test_config_database_file_structure():
             os.unlink(config_path)
 
 
-def test_config_instructions_comparison():
+def test_config_instructions_comparison() -> None:
     """Test that changes in instructions are detected in configuration comparison."""
     # Create two configs with the same tools but different instructions
     config1 = MCPServerConfig()
@@ -259,7 +259,7 @@ def test_config_instructions_comparison():
     assert config1 == config2
 
 
-def test_config_database_default_path():
+def test_config_database_default_path() -> None:
     """Test that the default config path is in the expected location."""
     # Get the default path
     default_path = MCPConfigDatabase.get_default_config_path()

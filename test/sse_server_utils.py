@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import AsyncGenerator
 
 import psutil
 import pytest_asyncio
@@ -103,7 +104,7 @@ class SSEServerManager:
 
         return self.process
 
-    async def stop_server(self):
+    async def stop_server(self) -> None:
         """Stop the SSE downstream server process."""
         if self.process:
             self.process.terminate()
@@ -144,7 +145,7 @@ async def start_sse_server() -> subprocess.Popen:
     return process
 
 
-async def stop_sse_server():
+async def stop_sse_server() -> None:
     """Global function for backward compatibility."""
     global SERVER_PROCESS, SERVER_PORT, SERVER_PID
 
@@ -155,7 +156,7 @@ async def stop_sse_server():
 
 
 @pytest_asyncio.fixture
-async def sse_server_fixture():
+async def sse_server_fixture() -> AsyncGenerator[subprocess.Popen, None]:
     """Fixture to manage the SSE server lifecycle."""
     process = await start_sse_server()
     yield process
@@ -163,7 +164,7 @@ async def sse_server_fixture():
 
 
 @pytest_asyncio.fixture
-async def sse_server():
+async def sse_server() -> AsyncGenerator[subprocess.Popen, None]:
     """Alternative fixture name for backward compatibility."""
     process = await start_sse_server()
     yield process

@@ -9,7 +9,7 @@ from mcp.client.stdio import stdio_client
 from pathlib import Path
 
 
-async def run_with_session(callback: callable):
+async def run_with_session(callback: callable) -> None:
     dir = Path(__file__).resolve().parent
     server_params = StdioServerParameters(
         command="python",
@@ -25,10 +25,10 @@ async def run_with_session(callback: callable):
 
 
 @pytest.mark.asyncio()
-async def test_echo_tool():
+async def test_echo_tool() -> None:
     """Test that the echo tool correctly echoes the message."""
 
-    async def callback(session):
+    async def callback(session) -> None:
         input = "Marco (Polo)"
 
         # List available tools

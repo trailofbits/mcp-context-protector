@@ -23,12 +23,12 @@ RESET = "\x1b[0m"
 BOLD = "\x1b[1m"
 
 
-def get_colored_text(text):
+def get_colored_text(text) -> str:
     """Generate a string with ANSI color codes."""
     return f"{RED}Red {GREEN}Green {YELLOW}Yellow{RESET} and {BOLD}Bold{RESET} {text}"
 
 
-async def main():
+async def main() -> None:
     server = Server("ansi-test-server")
 
     @server.list_tools()

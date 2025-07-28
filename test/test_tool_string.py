@@ -6,7 +6,7 @@ Test for the MCPToolDefinition.__str__ method.
 from contextprotector.mcp_config import MCPToolDefinition, MCPParameterDefinition, ParameterType
 
 
-def test_tool_str():
+def test_tool_str() -> None:
     """Test that the string representation of a tool is formatted correctly."""
     # Create a tool with some parameters
     tool = MCPToolDefinition(

@@ -100,7 +100,7 @@ async def counter_handler() -> dict[str, Any]:
     return {"count": num_tools}
 
 
-def add_dynamic_tool():
+def add_dynamic_tool() -> None:
     """Add a new tool based on the current tool count."""
     global num_tools
 
@@ -139,7 +139,7 @@ def add_dynamic_tool():
         print(f"Added echo{num_tools} tool", file=sys.stderr)
 
 
-def initialize_tools(count):
+def initialize_tools(count) -> None:
     """
     Initialize the server with the specified number of tools.
 
@@ -162,7 +162,7 @@ def initialize_tools(count):
         add_dynamic_tool()
 
 
-def read_tool_count_from_file(toolcount_file):
+def read_tool_count_from_file(toolcount_file) -> int:
     """
     Read the tool count from the specified file.
 
@@ -184,7 +184,7 @@ def read_tool_count_from_file(toolcount_file):
     return 1
 
 
-def signal_handler(signum, frame):
+def signal_handler(signum, frame) -> None:
     """Signal handler for SIGHUP that adds a new tool."""
     global num_tools
 
@@ -207,7 +207,7 @@ def signal_handler(signum, frame):
     )
 
 
-def write_pidfile(pidfile_path):
+def write_pidfile(pidfile_path) -> None:
     """
     Write the current process ID to the specified pidfile.
 
@@ -240,7 +240,7 @@ async def my_run(
     # the initialization lifecycle, but can do so with any available node
     # rather than requiring initialization for each connection.
     stateless: bool = False,
-):
+) -> None:
     """
     Server startup function that allows us to send notifications.
 
@@ -276,7 +276,7 @@ async def my_run(
                     )
 
 
-def main():
+def main() -> None:
     """Main function to run the server with signal handling and pidfile."""
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Dynamic MCP server with signal handling")

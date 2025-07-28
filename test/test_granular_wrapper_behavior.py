@@ -30,7 +30,7 @@ def get_server_command(server_filename: str) -> str:
 
 
 @pytest.mark.asyncio()
-async def test_granular_tool_filtering_in_list_tools():
+async def test_granular_tool_filtering_in_list_tools() -> None:
     """Test that list_tools() only shows approved tools in mixed approval scenarios."""
 
     temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -87,7 +87,7 @@ async def test_granular_tool_filtering_in_list_tools():
     # Note: NOT approving greet tool
 
     # Step 3: Test that list_tools() shows granular filtering
-    async def test_granular_filtering(session):
+    async def test_granular_filtering(session) -> None:
         tools = await session.list_tools()
         tool_names = [t.name for t in tools.tools]
 
@@ -128,7 +128,7 @@ async def test_granular_tool_filtering_in_list_tools():
 
 
 @pytest.mark.asyncio()
-async def test_tool_modification_blocks_only_modified_tool():
+async def test_tool_modification_blocks_only_modified_tool() -> None:
     """Test that modifying a tool blocks only that tool while others remain available."""
 
     temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -205,7 +205,7 @@ async def test_tool_modification_blocks_only_modified_tool():
 
 
 @pytest.mark.asyncio()
-async def test_instruction_change_blocks_everything():
+async def test_instruction_change_blocks_everything() -> None:
     """Test that changing server instructions blocks ALL tools, demonstrating whole-server blocking."""
 
     temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -276,7 +276,7 @@ async def test_instruction_change_blocks_everything():
 
 
 @pytest.mark.asyncio()
-async def test_tool_removal_workflow():
+async def test_tool_removal_workflow() -> None:
     """Test that removing tools doesn't require reapproval and remaining tools work."""
 
     temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -340,13 +340,13 @@ async def test_tool_removal_workflow():
 
 
 @pytest.mark.asyncio()
-async def test_new_server_complete_blocking():
+async def test_new_server_complete_blocking() -> None:
     """Test that completely new servers are totally blocked until approved."""
 
     temp_file = tempfile.NamedTemporaryFile(delete=False)
 
     # Test connecting to a server that has never been seen before
-    async def test_new_server_blocking(session):
+    async def test_new_server_blocking(session) -> None:
         # New server should only show context-protector-block
         tools = await session.list_tools()
         tool_names = [t.name for t in tools.tools]
