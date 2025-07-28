@@ -11,7 +11,9 @@ import asyncio
 import logging
 import os
 import pytest
+import sys
 import tempfile
+from pathlib import Path
 from typing import List, Dict, Any
 
 from mcp import ClientSession, types
@@ -126,7 +128,8 @@ async def test_notification_forwarding():
     temp_file = tempfile.NamedTemporaryFile(delete=False)
     try:
         # Build command for the notification test server
-        server_command = "python -m contextprotector.tests.notification_test_server"
+        server_script = str(Path(__file__).resolve().parent.joinpath("notification_test_server.py"))
+        server_command = f"{sys.executable} {server_script}"
 
         # First run to get blocked and trigger config approval
         try:
@@ -203,7 +206,8 @@ async def test_notification_forwarding_without_invalid():
     # Create temporary config file
     temp_file = tempfile.NamedTemporaryFile(delete=False)
     try:
-        server_command = "python -m contextprotector.tests.notification_test_server"
+        server_script = str(Path(__file__).resolve().parent.joinpath("notification_test_server.py"))
+        server_command = f"{sys.executable} {server_script}"
 
         # First run may fail due to unapproved config
         try:
@@ -321,7 +325,8 @@ async def test_client_to_server_notification_forwarding():
     # Create temporary config file
     temp_file = tempfile.NamedTemporaryFile(delete=False)
     try:
-        server_command = "python -m contextprotector.tests.notification_test_server"
+        server_script = str(Path(__file__).resolve().parent.joinpath("notification_test_server.py"))
+        server_command = f"{sys.executable} {server_script}"
 
         # Approve the server configuration first
         await approve_server_config_using_review("stdio", server_command, temp_file.name)

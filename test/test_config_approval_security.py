@@ -12,7 +12,9 @@ import json
 import logging
 import os
 import pytest
+import sys
 import tempfile
+from pathlib import Path
 
 from mcp import ClientSession, types
 
@@ -180,7 +182,8 @@ async def test_zero_information_leakage_unapproved_config():
     try:
         # Use the prompt_test_server which has multiple tools and prompts
         # This gives us a good test case with real downstream server metadata to verify is hidden
-        server_command = "python -m contextprotector.tests.prompt_test_server"
+        server_script = str(Path(__file__).resolve().parent.joinpath("prompt_test_server.py"))
+        server_command = f"{sys.executable} {server_script}"
 
         # Run the test with unapproved config - this should show zero information leakage
         await run_with_wrapper_session(test_callback, "stdio", server_command, temp_file.name)
@@ -236,7 +239,8 @@ async def test_information_visible_after_approval():
     # Create temporary config file
     temp_file = tempfile.NamedTemporaryFile(delete=False)
     try:
-        server_command = "python -m contextprotector.tests.prompt_test_server"
+        server_script = str(Path(__file__).resolve().parent.joinpath("prompt_test_server.py"))
+        server_command = f"{sys.executable} {server_script}"
 
         # Approve the server configuration first
         await approve_server_config_using_review("stdio", server_command, temp_file.name)
