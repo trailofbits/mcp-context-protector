@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Simplified tests for the quarantine_release functionality.
 """
@@ -138,6 +137,6 @@ async def test_quarantine_release_invalid_uuid(setup_quarantine_test: any) -> No
     )
 
     # Call the quarantine_release tool handler with an invalid UUID
-    with pytest.raises(ValueError, match="No quarantined response found") as excinfo:
+    with pytest.raises(ValueError, match="No quarantined response found"):
         await wrapper._handle_quarantine_release({"uuid": "invalid-uuid"})
 

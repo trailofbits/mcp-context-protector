@@ -1,11 +1,10 @@
-#!/usr/bin/env python3
 import hashlib
 import json
 import pathlib
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Literal, TextIO, Union
+from typing import Any, Literal, TextIO
 
 
 class ParameterType(str, Enum):
@@ -78,8 +77,7 @@ class MCPToolDefinition:
     output_schema: dict[str, Any | None] = None
 
     def __str__(self) -> str:
-        """
-        Generate a string representation of the tool with its parameters.
+        """Generate a string representation of the tool with its parameters.
         Format is compact with parameters on a single line each.
         """
         lines = [f"Tool: {self.name}"]
@@ -195,17 +193,17 @@ class ConfigDiff:
                     lines.append(f"      - {changes['description']['old']}")
                     lines.append(f"      + {changes['description']['new']}")
 
-                if "added_params" in changes and changes["added_params"]:
+                if changes.get("added_params"):
                     lines.append("    Added parameters:")
                     for param in changes["added_params"]:
                         lines.append(f"      + {param}")
 
-                if "removed_params" in changes and changes["removed_params"]:
+                if changes.get("removed_params"):
                     lines.append("    Removed parameters:")
                     for param in changes["removed_params"]:
                         lines.append(f"      - {param}")
 
-                if "modified_params" in changes and changes["modified_params"]:
+                if changes.get("modified_params"):
                     lines.append("    Modified parameters:")
                     for param_name, param_changes in changes["modified_params"].items():
                         lines.append(f"      ~ {param_name}:")
@@ -224,10 +222,9 @@ class MCPServerConfig:
 
     @classmethod
     def get_default_config_path(cls) -> str:
-        """
-        Get the default config path (~/.context-protector/config).
+        """Get the default config path (~/.context-protector/config).
 
-        Returns:
+        Returns
         -------
             The default config path as a string
 
@@ -280,9 +277,8 @@ class MCPServerConfig:
                 return tool
         return None
 
-    def to_json(self, path: str = None, fp: TextIO = None, indent: int = 2) -> str | None:
-        """
-        Serialize the configuration to JSON.
+    def to_json(self, path: str | None = None, fp: TextIO = None, indent: int = 2) -> str | None:
+        """Serialize the configuration to JSON.
 
         Args:
         ----
@@ -310,10 +306,9 @@ class MCPServerConfig:
 
     @classmethod
     def from_json(
-        cls, json_str: str = None, path: str = None, fp: TextIO = None
+        cls, json_str: str | None = None, path: str | None = None, fp: TextIO = None
     ) -> "MCPServerConfig":
-        """
-        Deserialize the configuration from JSON.
+        """Deserialize the configuration from JSON.
 
         Args:
         ----
@@ -623,8 +618,7 @@ class MCPServerEntry:
 
 
 class MCPConfigDatabase:
-    """
-    Class for managing multiple server configurations in a single file.
+    """Class for managing multiple server configurations in a single file.
 
     This database stores server configurations indexed by their type and identifier.
     It provides thread-safe access to the configuration file to prevent race conditions.
@@ -632,9 +626,8 @@ class MCPConfigDatabase:
 
     _file_lock = threading.RLock()  # Class-level lock for file operations
 
-    def __init__(self, config_path: str | None = None):
-        """
-        Initialize the config database.
+    def __init__(self, config_path: str | None = None) -> None:
+        """Initialize the config database.
 
         Args:
         ----
@@ -647,10 +640,9 @@ class MCPConfigDatabase:
 
     @staticmethod
     def get_default_config_path() -> str:
-        """
-        Get the default config database path (~/.context-protector/servers.json).
+        """Get the default config database path (~/.context-protector/servers.json).
 
-        Returns:
+        Returns
         -------
             The default config path as a string
 
@@ -721,8 +713,7 @@ class MCPConfigDatabase:
             pathlib.Path(temp_path).replace(self.config_path)
 
     def get_server_config(self, server_type: str, identifier: str) -> MCPServerConfig | None:
-        """
-        Get a server configuration by type and identifier.
+        """Get a server configuration by type and identifier.
 
         Args:
         ----
@@ -749,8 +740,7 @@ class MCPConfigDatabase:
         config: MCPServerConfig,
         approval_status: ApprovalStatus = ApprovalStatus.APPROVED,
     ) -> None:
-        """
-        Save a server configuration to the database.
+        """Save a server configuration to the database.
 
         Args:
         ----
@@ -787,8 +777,7 @@ class MCPConfigDatabase:
         self._save()
 
     def remove_server_config(self, server_type: str, identifier: str) -> bool:
-        """
-        Remove a server configuration from the database.
+        """Remove a server configuration from the database.
 
         Args:
         ----
@@ -812,10 +801,9 @@ class MCPConfigDatabase:
         return False
 
     def list_servers(self) -> list[dict[str, Any]]:
-        """
-        List all server entries in the database.
+        """List all server entries in the database.
 
-        Returns:
+        Returns
         -------
             A list of server entries
 
@@ -833,8 +821,7 @@ class MCPConfigDatabase:
     def save_unapproved_config(
         self, server_type: str, identifier: str, config: MCPServerConfig
     ) -> None:
-        """
-        Save an unapproved server configuration to the database.
+        """Save an unapproved server configuration to the database.
 
         This is called when the wrapper encounters a new server configuration
         that hasn't been approved yet.
@@ -849,8 +836,7 @@ class MCPConfigDatabase:
         self.save_server_config(server_type, identifier, config, ApprovalStatus.UNAPPROVED)
 
     def approve_server_config(self, server_type: str, identifier: str) -> bool:
-        """
-        Mark a server configuration as approved.
+        """Mark a server configuration as approved.
 
         Args:
         ----
@@ -874,10 +860,9 @@ class MCPConfigDatabase:
         return False
 
     def list_unapproved_servers(self) -> list[dict[str, Any]]:
-        """
-        List all unapproved server entries in the database.
+        """List all unapproved server entries in the database.
 
-        Returns:
+        Returns
         -------
             A list of unapproved server entries
 
@@ -894,8 +879,7 @@ class MCPConfigDatabase:
         ]
 
     def is_server_approved(self, server_type: str, identifier: str) -> bool:
-        """
-        Check if a server configuration is approved.
+        """Check if a server configuration is approved.
 
         Args:
         ----
@@ -915,8 +899,7 @@ class MCPConfigDatabase:
     def approve_tool(
         self, server_type: str, identifier: str, tool_name: str, tool_definition: MCPToolDefinition
     ) -> bool:
-        """
-        Approve a specific tool for a server.
+        """Approve a specific tool for a server.
 
         Args:
         ----
@@ -940,8 +923,7 @@ class MCPConfigDatabase:
         return False
 
     def approve_instructions(self, server_type: str, identifier: str, instructions: str) -> bool:
-        """
-        Approve the instructions for a server.
+        """Approve the instructions for a server.
 
         Args:
         ----
@@ -968,8 +950,7 @@ class MCPConfigDatabase:
     def is_tool_approved(
         self, server_type: str, identifier: str, tool_name: str, tool_definition: MCPToolDefinition
     ) -> bool:
-        """
-        Check if a specific tool is approved for a server.
+        """Check if a specific tool is approved for a server.
 
         Args:
         ----
@@ -991,8 +972,7 @@ class MCPConfigDatabase:
     def are_instructions_approved(
         self, server_type: str, identifier: str, instructions: str
     ) -> bool:
-        """
-        Check if the instructions are approved for a server.
+        """Check if the instructions are approved for a server.
 
         Args:
         ----
@@ -1015,8 +995,7 @@ class MCPConfigDatabase:
     def get_server_approval_status(
         self, server_type: str, identifier: str, config: MCPServerConfig
     ) -> dict[str, Any]:
-        """
-        Get detailed approval status for a server and its components.
+        """Get detailed approval status for a server and its components.
 
         Args:
         ----

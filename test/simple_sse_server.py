@@ -81,6 +81,5 @@ if __name__ == "__main__":
             break
         except SystemExit:
             print(f"Warning: port {port} in use", file=sys.stderr)
-            pass
         except KeyboardInterrupt:
             sys.exit(0)

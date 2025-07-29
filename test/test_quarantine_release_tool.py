@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Tests for the quarantine_release tool functionality.
 """
@@ -8,11 +7,11 @@ import tempfile
 from collections.abc import Generator
 from pathlib import Path
 
-import mcp.types as types
 import pytest
 from contextprotector.guardrail_providers.mock_provider import MockGuardrailProvider
 from contextprotector.mcp_wrapper import MCPWrapperServer
 from contextprotector.quarantine import ToolResponseQuarantine
+from mcp import types
 
 
 @pytest.fixture()
@@ -167,7 +166,7 @@ async def test_quarantine_release_invalid_uuid(setup_quarantine_test: any) -> No
     )
 
     # Call the quarantine_release tool handler with an invalid UUID
-    with pytest.raises(ValueError, match="No quarantined response found") as excinfo:
+    with pytest.raises(ValueError, match="No quarantined response found"):
         await wrapper._handle_quarantine_release({"uuid": "invalid-uuid"})
 
 
@@ -183,5 +182,5 @@ async def test_quarantine_release_missing_uuid(setup_quarantine_test: any) -> No
     )
 
     # Call the quarantine_release tool handler without a UUID
-    with pytest.raises(ValueError, match="Missing required parameter") as excinfo:
+    with pytest.raises(ValueError, match="Missing required parameter"):
         await wrapper._handle_quarantine_release({})

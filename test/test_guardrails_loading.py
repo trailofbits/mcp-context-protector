@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Tests for the guardrails provider loading functionality.
 """
@@ -47,20 +46,20 @@ def test_provider_check_server_config() -> None:
     # Get the Llama Firewall provider
     provider = get_provider("Llama Firewall")
     assert provider is not None, "Failed to get Llama Firewall provider"
-    logger.info(f"Got provider: {provider.name}")
+    logger.info("Got provider: %s", provider.name)
 
     # Create a simple config to check
     config = MCPServerConfig()
     config.add_tool(MCPToolDefinition(name="test_tool", description="A test tool", parameters=[]))
-    logger.info(f"Created test config with {len(config.tools)} tools")
+    logger.info("Created test config with %d tools", len(config.tools))
 
     # Check the config and log the result
     logger.info("Checking server config with provider...")
     result = provider.check_server_config(config)
 
     if result:
-        logger.info(f"Provider returned alert: {result.explanation}")
-        logger.info(f"Alert data: {result.data}")
+        logger.info("Provider returned alert: %s", result.explanation)
+        logger.info("Alert data: %s", result.data)
     else:
         logger.info("Provider returned no alert (config is safe)")
 

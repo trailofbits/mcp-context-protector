@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 A simple MCP server that provides both tools and prompts for testing.
 """
@@ -14,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from contextlib import AsyncExitStack
 
-import mcp.types as types
+from mcp import types
 from mcp.server.lowlevel import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
 from mcp.server.session import ServerSession
@@ -22,7 +21,7 @@ from mcp.server.stdio import stdio_server
 
 
 class PromptTestServer:
-    def __init__(self):
+    def __init__(self) -> None:
         self.server = Server("prompt-test-server")
         self._session = None  # Will store the session object
 
@@ -87,30 +86,29 @@ class PromptTestServer:
                         ],
                     ),
                 ]
-            else:
-                # Alternate prompts (when toggled)
-                return [
-                    types.Prompt(
-                        name="greeting",
-                        description="A friendly greeting prompt (updated)",
-                        arguments=[
-                            types.PromptArgument(
-                                name="name", description="Name to greet", required=True
-                            )
-                        ],
-                    ),
-                    types.Prompt(
-                        name="farewell",
-                        description="A farewell message",
-                        arguments=[
-                            types.PromptArgument(
-                                name="name",
-                                description="Name to bid farewell to",
-                                required=True,
-                            )
-                        ],
-                    ),
-                ]
+            # Alternate prompts (when toggled)
+            return [
+                types.Prompt(
+                    name="greeting",
+                    description="A friendly greeting prompt (updated)",
+                    arguments=[
+                        types.PromptArgument(
+                            name="name", description="Name to greet", required=True
+                        )
+                    ],
+                ),
+                types.Prompt(
+                    name="farewell",
+                    description="A farewell message",
+                    arguments=[
+                        types.PromptArgument(
+                            name="name",
+                            description="Name to bid farewell to",
+                            required=True,
+                        )
+                    ],
+                ),
+            ]
 
         @self.server.call_tool()
         async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:

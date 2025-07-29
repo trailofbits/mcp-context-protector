@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Test for the MCPToolDefinition.__str__ method.
 """

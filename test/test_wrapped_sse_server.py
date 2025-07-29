@@ -53,14 +53,14 @@ async def run_with_wrapper_session(callback: Callable[[ClientSession], Awaitable
 
     # Build the URL for the SSE server
     sse_url = f"http://localhost:{sse_server_utils.SERVER_PORT}/sse"
-    logging.warning(f"Connecting wrapper to SSE server at: {sse_url}")
+    logging.warning("Connecting wrapper to SSE server at: %s", sse_url)
 
     # Use the shared utility function
     await _run_with_wrapper_session(callback, "sse", sse_url, config_path)
 
 
 @pytest.mark.asyncio()
-async def test_echo_tool_through_wrapper(sse_server_fixture) -> None: # noqa: ARG001 F811
+async def test_echo_tool_through_wrapper(sse_server_fixture: any) -> None: # noqa: ARG001 F811
     """Test that the echo tool correctly works through the MCP wrapper using SSE transport."""
 
     async def callback(session: ClientSession) -> None:
@@ -120,7 +120,7 @@ async def test_echo_tool_through_wrapper(sse_server_fixture) -> None: # noqa: AR
     await approve_server_config_using_review(sse_url, temp_file.name)
 
     with Path(temp_file.name).open("r") as f:
-        logging.error(f.read())
+        logging.exception(f.read())
     from contextprotector.mcp_config import MCPConfigDatabase
 
     cdb = MCPConfigDatabase(temp_file.name)
@@ -133,7 +133,7 @@ async def test_echo_tool_through_wrapper(sse_server_fixture) -> None: # noqa: AR
 
 
 @pytest.mark.asyncio()
-async def test_invalid_tool_through_wrapper(sse_server_fixture) -> None: # noqa: ARG001 F811
+async def test_invalid_tool_through_wrapper(sse_server_fixture: any) -> None: # noqa: ARG001 F811
     """Test error handling for invalid tools through the MCP wrapper using SSE transport."""
 
     async def callback(session: ClientSession) -> None:

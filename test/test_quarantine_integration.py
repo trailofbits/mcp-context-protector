@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Integration tests for the tool response quarantine functionality.
 """

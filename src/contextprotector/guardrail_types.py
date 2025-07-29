@@ -1,6 +1,4 @@
-#!/usr/bin/env python3
-"""
-Core guardrail types for context-protector.
+"""Core guardrail types for context-protector.
 Defines the base classes and data structures used by guardrail providers.
 """
 
@@ -13,10 +11,9 @@ logger = logging.getLogger("guardrail_types")
 
 @dataclass
 class ToolResponse:
-    """
-    Class representing a tool call and its response for guardrail analysis.
+    """Class representing a tool call and its response for guardrail analysis.
 
-    Attributes:
+    Attributes
     ----------
         tool_name: Name of the tool that was called
         tool_input: Input arguments passed to the tool
@@ -33,10 +30,9 @@ class ToolResponse:
 
 @dataclass
 class GuardrailAlert:
-    """
-    Class representing an alert triggered by a guardrail provider.
+    """Class representing an alert triggered by a guardrail provider.
 
-    Attributes:
+    Attributes
     ----------
         explanation: Human-readable explanation of why the guardrail was triggered
         data: Arbitrary data associated with the alert
@@ -56,8 +52,7 @@ class GuardrailProvider:
         raise NotImplementedError("Guardrail providers must implement the name property")
 
     def check_server_config(self, config) -> GuardrailAlert | None: # noqa: ARG002
-        """
-        Check a server configuration against the guardrail.
+        """Check a server configuration against the guardrail.
 
         Args:
         ----
@@ -71,8 +66,7 @@ class GuardrailProvider:
         return None
 
     def check_tool_response(self, tool_response: ToolResponse) -> GuardrailAlert | None: # noqa: ARG002
-        """
-        Check a tool response against the guardrail.
+        """Check a tool response against the guardrail.
 
         Args:
         ----

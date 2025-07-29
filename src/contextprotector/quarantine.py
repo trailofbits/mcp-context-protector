@@ -1,6 +1,4 @@
-#!/usr/bin/env python3
-"""
-Quarantine system for tool responses that have been flagged by guardrails.
+"""Quarantine system for tool responses that have been flagged by guardrails.
 Provides storage and retrieval of quarantined tool responses.
 """
 
@@ -10,15 +8,14 @@ import pathlib
 import threading
 import uuid
 from dataclasses import asdict, dataclass, field
-from typing import Any, Tuple
+from typing import Any
 
 
 @dataclass
 class QuarantinedToolResponse:
-    """
-    Class representing a quarantined tool response.
+    """Class representing a quarantined tool response.
 
-    Attributes:
+    Attributes
     ----------
         id: Unique identifier for the quarantined response
         tool_name: Name of the tool that was called
@@ -64,8 +61,7 @@ class QuarantinedToolResponse:
 
 
 class ToolResponseQuarantine:
-    """
-    Database for storing quarantined tool responses.
+    """Database for storing quarantined tool responses.
 
     This database stores tool responses that have been flagged by guardrails.
     It provides thread-safe access to the quarantine file to prevent race conditions.
@@ -73,12 +69,11 @@ class ToolResponseQuarantine:
 
     _file_lock = threading.RLock()  # Class-level lock for file operations
 
-    def __init__(self, db_path: str | None = None):
-        """
-        Initialize the quarantine database.
+    def __init__(self, db_path: str | None = None) -> None:
+        """Initialize the quarantine database.
 
         Args:
-        ---
+        ----
             db_path: Path to the database file. If None, uses the default path.
 
         """
@@ -88,10 +83,9 @@ class ToolResponseQuarantine:
 
     @staticmethod
     def get_default_db_path() -> str:
-        """
-        Get the default quarantine database path (~/.context-protector/quarantine.json).
+        """Get the default quarantine database path (~/.context-protector/quarantine.json).
 
-        Returns:
+        Returns
         -------
             The default database path as a string
 
@@ -139,8 +133,7 @@ class ToolResponseQuarantine:
     def quarantine_response(
         self, tool_name: str, tool_input: dict[str, Any], tool_output: Any, reason: str
     ) -> str:
-        """
-        Add a tool response to the quarantine.
+        """Add a tool response to the quarantine.
 
         Args:
         ----
@@ -175,8 +168,7 @@ class ToolResponseQuarantine:
         return response_id
 
     def get_response(self, response_id: str) -> QuarantinedToolResponse | None:
-        """
-        Get a quarantined response by ID.
+        """Get a quarantined response by ID.
 
         Args:
         ----
@@ -190,8 +182,7 @@ class ToolResponseQuarantine:
         return self.quarantined_responses.get(response_id)
 
     def release_response(self, response_id: str) -> bool:
-        """
-        Release a quarantined response.
+        """Release a quarantined response.
 
         Args:
         ----
@@ -215,8 +206,7 @@ class ToolResponseQuarantine:
         return False
 
     def list_responses(self, include_released: bool = False) -> list[dict[str, Any]]:
-        """
-        List all quarantined responses.
+        """List all quarantined responses.
 
         Args:
         ----
@@ -243,10 +233,9 @@ class ToolResponseQuarantine:
         ]
 
     def get_response_pairs(self) -> list[tuple[dict[str, Any], Any]]:
-        """
-        Get all request-response pairs from quarantine.
+        """Get all request-response pairs from quarantine.
 
-        Returns:
+        Returns
         -------
             A list of (request, response) tuples
 
@@ -264,8 +253,7 @@ class ToolResponseQuarantine:
         ]
 
     def delete_response(self, response_id: str) -> bool:
-        """
-        Delete a quarantined response.
+        """Delete a quarantined response.
 
         Args:
         ----
@@ -287,8 +275,7 @@ class ToolResponseQuarantine:
         return False
 
     def clear_quarantine(self, only_released: bool = False) -> int:
-        """
-        Clear the quarantine, optionally only removing released responses.
+        """Clear the quarantine, optionally only removing released responses.
 
         Args:
         ----

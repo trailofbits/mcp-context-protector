@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Tests for tool modification scenarios using the dynamic test server.
 

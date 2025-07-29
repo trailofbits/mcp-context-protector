@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Tests for granular tool-level approval system.
 
@@ -271,11 +270,10 @@ async def test_server_instructions_change_blocks_everything() -> None:
     assert approval_status["server_approved"]
 
     # The key test: instructions changed should block everything in wrapper logic
-    assert (
+    assert not (
         db.are_instructions_approved(
             "stdio", "test_instruction_server", modified_config.instructions
         )
-        == False
     )
 
 
@@ -329,9 +327,8 @@ async def test_mixed_approval_states() -> None:
 
     # Test that we can distinguish between approved and unapproved tools
     assert db.is_tool_approved("stdio", "test_mixed_server", "approved_tool", approved_tool)
-    assert (
+    assert not (
         db.is_tool_approved("stdio", "test_mixed_server", "unapproved_tool", unapproved_tool)
-        == False
     )
 
 
@@ -386,6 +383,6 @@ async def test_tool_parameter_modification_blocking() -> None:
     assert (
         db.is_tool_approved("stdio", "param_test_server", "param_test_tool", original_tool)
     )
-    assert (
-        db.is_tool_approved("stdio", "param_test_server", "param_test_tool", modified_tool) == False
+    assert not (
+        db.is_tool_approved("stdio", "param_test_server", "param_test_tool", modified_tool)
     )

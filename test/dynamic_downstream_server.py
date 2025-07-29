@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Dynamic downstream MCP server with signal handler to update tools.
 Uses fastmcp from the official Python SDK for MCP.

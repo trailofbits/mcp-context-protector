@@ -25,7 +25,7 @@ logger = logging.getLogger("test_notification_forwarding")
 class NotificationCapturingClient:
     """A client that captures notifications received from the server."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.received_notifications: list[dict[str, Any]] = []
         self.notification_event = asyncio.Event()
 
@@ -37,10 +37,10 @@ class NotificationCapturingClient:
                 "params": getattr(notification.root, "params", {}),
             }
             self.received_notifications.append(notification_data)
-            logger.info(f"Client received notification: {notification_data['method']}")
+            logger.info("Client received notification: %s", notification_data["method"])
             self.notification_event.set()
         else:
-            logger.warning(f"Received unexpected notification format: {type(notification)}")
+            logger.warning("Received unexpected notification format: %s", type(notification))
 
 
 @pytest.mark.asyncio()
@@ -101,8 +101,8 @@ async def test_notification_forwarding() -> None:
         # Verify we received the expected notifications
         received_methods = {notif["method"] for notif in notification_client.received_notifications}
 
-        logger.info(f"Expected valid notifications: {expected_valid_notifications}")
-        logger.info(f"Received notifications: {received_methods}")
+        logger.info("Expected valid notifications: %s", expected_valid_notifications)
+        logger.info("Received notifications: %s", received_methods)
 
         # Check that all valid notifications were received
         for expected_method in expected_valid_notifications:
@@ -135,7 +135,7 @@ async def test_notification_forwarding() -> None:
             await run_with_wrapper_session(test_callback, "stdio", server_command, temp_file.name)
         except Exception as e:
             # Expected to fail on first run due to unapproved config
-            logger.info(f"First run failed as expected: {e}")
+            logger.info("First run failed as expected: %s", e)
 
         # Approve the server configuration
         await approve_server_config_using_review("stdio", server_command, temp_file.name)
@@ -298,13 +298,13 @@ async def test_client_to_server_notification_forwarding() -> None:
         received_notifications = response_data["received_notifications"]
         received_count = response_data["count"]
 
-        logger.info(f"Downstream server received {received_count} notifications")
+        logger.info("Downstream server received %d notifications", received_count)
 
         # For now, verify that we received at least some client→server notifications
         # Note: Some notification types may have forwarding issues that need separate investigation
         received_methods = {notif["method"] for notif in received_notifications}
 
-        logger.info(f"Received notification methods: {received_methods}")
+        logger.info("Received notification methods: %s", received_methods)
 
         # At minimum, we should receive the initialized notification (which we know works)
         assert (
@@ -312,10 +312,10 @@ async def test_client_to_server_notification_forwarding() -> None:
         ), "Should receive initialized notification"
 
         # Verify we received at least one notification
-        assert received_count >= 1, f"Expected at least 1 notification, got {received_count}"
+        assert received_count >= 1, "Expected at least 1 notification, got %d" % received_count
 
         logger.info(
-            f"✅ Verified client→server notification forwarding works (received {received_count} notifications)"
+            "✅ Verified client→server notification forwarding works (received %d notifications)", received_count
         )
 
         # TODO: Investigate and fix forwarding issues for other notification types

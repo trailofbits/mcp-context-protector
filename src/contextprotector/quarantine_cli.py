@@ -1,5 +1,4 @@
-"""
-CLI interface for reviewing and managing quarantined tool responses.
+"""CLI interface for reviewing and managing quarantined tool responses.
 """
 
 import json
@@ -16,8 +15,7 @@ logger = logging.getLogger("quarantine_cli")
 async def review_quarantine(
     quarantine_path: str | None = None, quarantine_id: str | None = None
 ) -> None:
-    """
-    Review quarantined tool responses and optionally release them.
+    """Review quarantined tool responses and optionally release them.
 
     Args:
     ----
@@ -54,8 +52,7 @@ async def review_quarantine(
 def review_response_list(
     quarantine: ToolResponseQuarantine, responses: list[dict[str, Any]]
 ) -> None:
-    """
-    Display a list of quarantined responses and let the user choose one to review.
+    """Display a list of quarantined responses and let the user choose one to review.
 
     Args:
     ----
@@ -100,8 +97,7 @@ def review_response_list(
 
 
 def review_response(quarantine: ToolResponseQuarantine, response: QuarantinedToolResponse) -> None:
-    """
-    Review a specific quarantined response and prompt for release.
+    """Review a specific quarantined response and prompt for release.
 
     Args:
     ----

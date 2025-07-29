@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 A simple MCP server that returns ANSI-colored output.
 """
@@ -10,7 +9,7 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import mcp.types as types
+from mcp import types
 from mcp.server.lowlevel import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
 from mcp.server.stdio import stdio_server

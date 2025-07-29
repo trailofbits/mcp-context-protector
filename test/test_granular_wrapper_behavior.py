@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 End-to-end tests for granular approval behavior in the wrapper.
 
@@ -71,12 +70,9 @@ async def test_granular_tool_filtering_in_list_tools() -> None:
 
     # Find the tools in the config
     echo_tool = None
-    greet_tool = None
     for tool in config.tools:
         if tool.name == "echo":
             echo_tool = tool
-        elif tool.name == "greet":
-            greet_tool = tool
 
     # Approve instructions and only the echo tool
     db.approve_instructions(

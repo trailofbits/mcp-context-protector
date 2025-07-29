@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Tests for the resource proxying functionality in MCP wrapper.
 """
@@ -11,9 +10,8 @@ import tempfile
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
-import mcp.types as types
 import pytest
-from mcp import ClientSession
+from mcp import ClientSession, types
 
 # Configure path for imports
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))

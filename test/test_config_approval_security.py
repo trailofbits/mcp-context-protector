@@ -158,7 +158,7 @@ async def test_zero_information_leakage_unapproved_config() -> None:
             logger.info("✓ list_prompts() does not leak downstream server information")
         except Exception as e:
             # If prompts aren't supported by wrapper, that's fine
-            logger.info(f"list_prompts() not supported or failed: {e}")
+            logger.info("list_prompts() not supported or failed: %s", e)
 
         # 6. Test list_resources() - should return empty or minimal response
         try:
@@ -173,7 +173,7 @@ async def test_zero_information_leakage_unapproved_config() -> None:
             logger.info("✓ list_resources() does not leak downstream server information")
         except Exception as e:
             # If resources aren't supported by wrapper, that's fine
-            logger.info(f"list_resources() not supported or failed: {e}")
+            logger.info("list_resources() not supported or failed: %s", e)
 
         logger.info("🔒 SECURITY VERIFICATION COMPLETE: Zero information leakage confirmed")
 

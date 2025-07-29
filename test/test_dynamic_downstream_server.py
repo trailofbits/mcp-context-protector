@@ -26,7 +26,7 @@ TEMP_TOOLCOUNT_FILE = None
 class ToolUpdateTracker:
     """Helper class to track tool update notifications from the server."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.updates_received = 0
         self.latest_tools = []
         self.notification_event = asyncio.Event()

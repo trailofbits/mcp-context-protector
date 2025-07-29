@@ -21,7 +21,7 @@ import pytest_asyncio
 class SSEServerManager:
     """Manages the lifecycle of an SSE server process for testing."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.process: subprocess.Popen | None = None
         self.port: int | None = None
         self.pid: int | None = None
@@ -45,10 +45,10 @@ class SSEServerManager:
                     ports.append(conn.laddr.port)
             return ports
         except psutil.NoSuchProcess:
-            logging.warning(f"Process with PID {pid} not found.")
+            logging.warning("Process with PID %d not found.", pid)
             return []
         except psutil.AccessDenied:
-            logging.warning(f"Access denied to process with PID {pid}.")
+            logging.warning("Access denied to process with PID %d.", pid)
             return []
 
     async def start_server(self) -> subprocess.Popen:
@@ -76,7 +76,7 @@ class SSEServerManager:
                 pid = int(f.read().strip())
                 self.pid = pid
                 assert pid is not None
-                logging.warning(f"SSE Server started with PID: {pid}")
+                logging.warning("SSE Server started with PID: %d", pid)
 
                 # Find which port the server is listening on
                 max_attempts = 5
@@ -84,17 +84,17 @@ class SSEServerManager:
                     ports = self.get_ports_by_pid(pid)
                     if ports:
                         self.port = ports[0]  # Use the first port found
-                        logging.warning(f"SSE Server is listening on port: {self.port}")
+                        logging.warning("SSE Server is listening on port: %d", self.port)
                         break
 
                     logging.warning(
-                        f"Attempt {attempt + 1}/{max_attempts}: No ports found for PID {pid}, waiting..."
+                        "Attempt %d/%d: No ports found for PID %d, waiting...", attempt + 1, max_attempts, pid
                     )
                     await asyncio.sleep(1.0)
 
                 assert self.port is not None, "Could not determine port for SSE server"
         except (OSError, ValueError) as e:
-            pytest.fail(f"Failed to read PID file: {e}")
+            pytest.fail("Failed to read PID file: %s" % e)
 
         # Clean up the PID file
         try:
