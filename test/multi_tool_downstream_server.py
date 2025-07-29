@@ -3,7 +3,7 @@ Multi-tool downstream MCP server for testing granular approval.
 Has multiple tools that can be selectively approved/blocked.
 """
 
-from typing import Dict, Any
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 from mcp.types import Tool
@@ -33,12 +33,12 @@ greet_tool = Tool(
 
 
 # Handler functions
-async def echo_handler(message: str) -> Dict[str, Any]:
+async def echo_handler(message: str) -> dict[str, Any]:
     """Echo handler function that returns the input message."""
     return {"echo_message": message}
 
 
-async def greet_handler(name: str) -> Dict[str, Any]:
+async def greet_handler(name: str) -> dict[str, Any]:
     """Greet handler function that greets a person by name."""
     return {"greeting": f"Hello, {name}!"}
 

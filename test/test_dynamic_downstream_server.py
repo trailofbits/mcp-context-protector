@@ -5,13 +5,15 @@ Tests for the dynamic downstream MCP server with signal-based tool updates.
 import asyncio
 import json
 import os
-import pytest
 import signal
 import tempfile
 import time
+from collections.abc import Generator
+from pathlib import Path
+
+import pytest
 from mcp import ClientSession, StdioServerParameters, types
 from mcp.client.stdio import stdio_client
-from pathlib import Path
 
 # Global variable to store PID for sending signals
 SERVER_PID = None
@@ -24,12 +26,12 @@ TEMP_TOOLCOUNT_FILE = None
 class ToolUpdateTracker:
     """Helper class to track tool update notifications from the server."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.updates_received = 0
         self.latest_tools = []
         self.notification_event = asyncio.Event()
 
-    async def handle_message(self, message):
+    async def handle_message(self, message) -> None:
         """
         Message handler function that processes notifications from the server.
 
@@ -50,7 +52,7 @@ class ToolUpdateTracker:
         else:
             print(f"Received non-notification message: {type(message)}")
 
-    async def wait_for_notification(self, timeout=2.0):
+    async def wait_for_notification(self, timeout=2.0) -> bool:
         """Wait for a tool update notification to be received."""
         try:
             await asyncio.wait_for(self.notification_event.wait(), timeout=timeout)
@@ -59,13 +61,13 @@ class ToolUpdateTracker:
             return False
 
 
-async def verify_tools(session, expected_tool_names):
+async def verify_tools(session: ClientSession, expected_tool_names) -> types.ListToolsResult:
     """
     Verify that the session has the expected tools.
 
     Args:
         session: The client session to check
-        expected_tool_names: List of tool names that should be present
+        expected_tool_names: list of tool names that should be present
 
     Returns:
         tools_list: The list of tools from the server
@@ -83,13 +85,13 @@ async def verify_tools(session, expected_tool_names):
     return tools
 
 
-async def send_sighup_and_wait(session, expected_tools, tracker):
+async def send_sighup_and_wait(session: ClientSession, expected_tools, tracker) -> None:
     """
     Send SIGHUP to the server, verify a notification is received, then check tools were updated.
 
     Args:
         session: The client session to check
-        expected_tools: List of tool names that should be present after the update
+        expected_tools: list of tool names that should be present after the update
         tracker: The ToolUpdateTracker instance to check for notifications
 
     Returns:
@@ -116,7 +118,7 @@ async def send_sighup_and_wait(session, expected_tools, tracker):
     tracker.latest_tools = tools.tools
 
 
-def write_tool_count(count):
+def write_tool_count(count) -> str:
     """
     Write the specified tool count to a temporary file.
 
@@ -136,7 +138,7 @@ def write_tool_count(count):
     return TEMP_TOOLCOUNT_FILE
 
 
-async def start_dynamic_server(callback: callable, initial_tool_count=None):
+async def start_dynamic_server(callback: callable, initial_tool_count=None) -> None:
     """
     Start the dynamic server and run the provided callback with a client session.
 
@@ -172,7 +174,8 @@ async def start_dynamic_server(callback: callable, initial_tool_count=None):
     tracker = ToolUpdateTracker()
 
     async with stdio_client(server_params) as (read, write):
-        assert read is not None and write is not None
+        assert read is not None
+        assert write is not None
         # Create the session with the tracker's message handler
         async with ClientSession(read, write, message_handler=tracker.handle_message) as session:
             await session.initialize()
@@ -182,7 +185,7 @@ async def start_dynamic_server(callback: callable, initial_tool_count=None):
             attempts = 0
             while attempts < max_attempts:
                 try:
-                    with open(TEMP_PIDFILE, "r") as f:
+                    with Path(TEMP_PIDFILE).open("r") as f:
                         SERVER_PID = int(f.read().strip())
                     break
                 except (FileNotFoundError, ValueError):
@@ -196,25 +199,25 @@ async def start_dynamic_server(callback: callable, initial_tool_count=None):
             await callback(session, tracker)
 
 
-def cleanup_files():
+def cleanup_files() -> None:
     """Clean up the temporary files if they exist."""
     global TEMP_PIDFILE, TEMP_TOOLCOUNT_FILE
 
-    if TEMP_PIDFILE and os.path.exists(TEMP_PIDFILE):
+    if TEMP_PIDFILE and Path(TEMP_PIDFILE).exists():
         try:
-            os.unlink(TEMP_PIDFILE)
+            Path(TEMP_PIDFILE).unlink()
         except OSError:
             pass
 
-    if TEMP_TOOLCOUNT_FILE and os.path.exists(TEMP_TOOLCOUNT_FILE):
+    if TEMP_TOOLCOUNT_FILE and Path(TEMP_TOOLCOUNT_FILE).exists():
         try:
-            os.unlink(TEMP_TOOLCOUNT_FILE)
+            Path(TEMP_TOOLCOUNT_FILE).unlink()
         except OSError:
             pass
 
 
 @pytest.fixture(autouse=True)
-def cleanup_after_test():
+def _cleanup_after_test() -> Generator[None, None, None]:
     """
     Fixture to clean up resources after each test.
 
@@ -225,9 +228,9 @@ def cleanup_after_test():
     cleanup_files()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 @pytest.mark.timeout(5)
-async def test_initial_tools():
+async def test_initial_tools() -> None:
     """
     Test that the dynamic server starts with the initial echo tool.
 
@@ -238,7 +241,7 @@ async def test_initial_tools():
     The timeout ensures the test won't hang indefinitely if there's an issue.
     """
 
-    async def callback(session, tracker):
+    async def callback(session: ClientSession, _tracker: any) -> None:
         """
         Test callback that verifies the initial tool state and tests the echo tool.
 
@@ -262,9 +265,9 @@ async def test_initial_tools():
     await start_dynamic_server(callback)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 @pytest.mark.timeout(5)
-async def test_preconfigured_tools():
+async def test_preconfigured_tools() -> None:
     """
     Test that the server can start with a preconfigured number of tools.
 
@@ -273,7 +276,7 @@ async def test_preconfigured_tools():
     2. The tools are properly initialized and functional
     """
 
-    async def callback(session, tracker):
+    async def callback(session: ClientSession, _tracker: any) -> None:
         """
         Test callback that verifies multiple tools are available at startup.
 
@@ -306,8 +309,8 @@ async def test_preconfigured_tools():
     await start_dynamic_server(callback, initial_tool_count=3)
 
 
-@pytest.mark.asyncio
-async def test_sighup_adds_tool():
+@pytest.mark.asyncio()
+async def test_sighup_adds_tool() -> None:
     """
     Test that sending SIGHUP adds a new tool and triggers a tool update notification.
 
@@ -319,7 +322,7 @@ async def test_sighup_adds_tool():
     5. The notification contains the updated tool list
     """
 
-    async def callback(session, tracker):
+    async def callback(session: ClientSession, tracker) -> None:
         """
         Test callback that verifies tool updates after SIGHUP signal.
 
@@ -361,8 +364,8 @@ async def test_sighup_adds_tool():
     await start_dynamic_server(callback)
 
 
-@pytest.mark.asyncio
-async def test_notification_on_sighup():
+@pytest.mark.asyncio()
+async def test_notification_on_sighup() -> None:
     """
     Explicit test focusing on notifications being sent when SIGHUP is received.
 
@@ -374,7 +377,7 @@ async def test_notification_on_sighup():
     5. After each SIGHUP, the tool list is updated with the expected new tools
     """
 
-    async def callback(session, tracker):
+    async def callback(session: ClientSession, tracker) -> None:
         """
         Test callback that explicitly checks notification receipt after SIGHUP signals.
 
@@ -418,8 +421,8 @@ async def test_notification_on_sighup():
     await start_dynamic_server(callback)
 
 
-@pytest.mark.asyncio
-async def test_preconfigured_with_sighup():
+@pytest.mark.asyncio()
+async def test_preconfigured_with_sighup() -> None:
     """
     Test that a server with preconfigured tools correctly responds to SIGHUP.
 
@@ -429,7 +432,7 @@ async def test_preconfigured_with_sighup():
     3. Tool notifications work properly for servers with preconfigured tools
     """
 
-    async def callback(session, tracker):
+    async def callback(session: ClientSession, tracker) -> None:
         """
         Test callback that verifies SIGHUP behavior with preconfigured tools.
 
@@ -461,8 +464,8 @@ async def test_preconfigured_with_sighup():
     await start_dynamic_server(callback, initial_tool_count=2)
 
 
-@pytest.mark.asyncio
-async def test_multiple_sighups():
+@pytest.mark.asyncio()
+async def test_multiple_sighups() -> None:
     """
     Test that multiple SIGHUPs add multiple tools and trigger notifications for each.
 
@@ -474,7 +477,7 @@ async def test_multiple_sighups():
     5. The tools are added in the expected order based on the server implementation
     """
 
-    async def callback(session, tracker):
+    async def callback(session: ClientSession, tracker) -> None:
         """
         Test callback that verifies multiple SIGHUP signals add tools in sequence.
 

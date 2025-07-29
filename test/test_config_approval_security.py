@@ -10,12 +10,11 @@ This test verifies that when a configuration is not approved:
 
 import json
 import logging
-import os
-import pytest
 import sys
 import tempfile
 from pathlib import Path
 
+import pytest
 from mcp import ClientSession, types
 
 from .test_utils import run_with_wrapper_session
@@ -23,14 +22,14 @@ from .test_utils import run_with_wrapper_session
 logger = logging.getLogger("test_config_approval_security")
 
 
-@pytest.mark.asyncio
-async def test_zero_information_leakage_unapproved_config():
+@pytest.mark.asyncio()
+async def test_zero_information_leakage_unapproved_config() -> None:
     """Test that ZERO downstream server information leaks when config is unapproved."""
 
     # This test uses the prompt_test_server which has multiple tools and prompts
     # We verify that NONE of this information is exposed when config is unapproved
 
-    async def test_callback(session: ClientSession):
+    async def test_callback(session: ClientSession) -> None:
         """Test callback that verifies complete information isolation."""
 
         # 1. Test list_tools() - should ONLY return context-protector-block tool
@@ -87,7 +86,8 @@ async def test_zero_information_leakage_unapproved_config():
             blocked_data = json.loads(blocked_text)
 
             # Should be a ValueError response (from call_tool method blocking)
-            assert "status" in blocked_data and blocked_data["status"] == "blocked"
+            assert "status" in blocked_data
+            assert blocked_data["status"] == "blocked"
             assert "reason" in blocked_data
             assert "configuration not approved" in blocked_data["reason"].lower()
 
@@ -158,7 +158,7 @@ async def test_zero_information_leakage_unapproved_config():
             logger.info("✓ list_prompts() does not leak downstream server information")
         except Exception as e:
             # If prompts aren't supported by wrapper, that's fine
-            logger.info(f"list_prompts() not supported or failed: {e}")
+            logger.info("list_prompts() not supported or failed: %s", e)
 
         # 6. Test list_resources() - should return empty or minimal response
         try:
@@ -173,7 +173,7 @@ async def test_zero_information_leakage_unapproved_config():
             logger.info("✓ list_resources() does not leak downstream server information")
         except Exception as e:
             # If resources aren't supported by wrapper, that's fine
-            logger.info(f"list_resources() not supported or failed: {e}")
+            logger.info("list_resources() not supported or failed: %s", e)
 
         logger.info("🔒 SECURITY VERIFICATION COMPLETE: Zero information leakage confirmed")
 
@@ -190,16 +190,16 @@ async def test_zero_information_leakage_unapproved_config():
 
     finally:
         # Clean up temp file
-        os.unlink(temp_file.name)
+        Path(temp_file.name).unlink()
 
 
-@pytest.mark.asyncio
-async def test_information_visible_after_approval():
+@pytest.mark.asyncio()
+async def test_information_visible_after_approval() -> None:
     """Verify that downstream server information IS visible after config approval."""
 
     from .test_utils import approve_server_config_using_review
 
-    async def test_callback(session: ClientSession):
+    async def test_callback(session: ClientSession) -> None:
         """Test callback that verifies information is visible after approval."""
 
         # After approval, we should see the actual downstream server tools
@@ -250,4 +250,4 @@ async def test_information_visible_after_approval():
 
     finally:
         # Clean up temp file
-        os.unlink(temp_file.name)
+        Path(temp_file.name).unlink()

@@ -4,17 +4,18 @@ Tests for MCP wrapper with dynamic downstream server.
 Tests the behavior of the dynamic server with tool count configuration.
 """
 
-import sys
 import asyncio
 import json
 import os
 import signal
 import subprocess
+import sys
 import tempfile
 import time
+from collections.abc import Awaitable, Callable, Generator
 from pathlib import Path
-import pytest
 
+import pytest
 from mcp import ClientSession, StdioServerParameters, types
 from mcp.client.stdio import stdio_client
 
@@ -25,7 +26,7 @@ TEMP_TOOLCOUNT_FILE = None
 TEMP_CONFIG_FILE = None
 
 
-def write_tool_count(count):
+def write_tool_count(count: int) -> str:
     """
     Write the specified tool count to a temporary file.
 
@@ -45,7 +46,7 @@ def write_tool_count(count):
     return TEMP_TOOLCOUNT_FILE
 
 
-def create_approved_config(server_cmd):
+def create_approved_config(server_cmd: str) -> str:
     """
     Create a pre-approved configuration for the server to avoid blocking.
 
@@ -81,7 +82,7 @@ def create_approved_config(server_cmd):
     return TEMP_CONFIG_FILE
 
 
-async def run_with_dynamic_server_session(callback, initial_tool_count=None):
+async def run_with_dynamic_server_session(callback: Callable[[ClientSession], Awaitable[None]], initial_tool_count=None) -> None:
     """
     Run a test with a direct connection to the dynamic downstream server.
 
@@ -98,11 +99,11 @@ async def run_with_dynamic_server_session(callback, initial_tool_count=None):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pid") as tmp:
         TEMP_PIDFILE = tmp.name
 
-    dir = Path(__file__).resolve().parent
+    parent_dir = Path(__file__).resolve().parent
 
     # Construct the base command for the dynamic server
     args = [
-        str(dir.joinpath("dynamic_downstream_server.py")),
+        str(parent_dir.joinpath("dynamic_downstream_server.py")),
         "--pidfile",
         TEMP_PIDFILE,
     ]
@@ -120,7 +121,8 @@ async def run_with_dynamic_server_session(callback, initial_tool_count=None):
     )
 
     async with stdio_client(server_params) as (read, write):
-        assert read is not None and write is not None
+        assert read is not None
+        assert write is not None
         async with ClientSession(read, write) as session:
             assert session is not None
             await session.initialize()
@@ -130,7 +132,7 @@ async def run_with_dynamic_server_session(callback, initial_tool_count=None):
             attempts = 0
             while attempts < max_attempts:
                 try:
-                    with open(TEMP_PIDFILE, "r") as f:
+                    with Path(TEMP_PIDFILE).open("r") as f:
                         SERVER_PID = int(f.read().strip())
                     break
                 except (FileNotFoundError, ValueError):
@@ -144,26 +146,26 @@ async def run_with_dynamic_server_session(callback, initial_tool_count=None):
             await callback(session)
 
 
-def cleanup_files():
+def cleanup_files() -> None:
     """Clean up the temporary files if they exist."""
     global TEMP_PIDFILE, TEMP_TOOLCOUNT_FILE, TEMP_CONFIG_FILE
 
     for file_path in [TEMP_PIDFILE, TEMP_TOOLCOUNT_FILE, TEMP_CONFIG_FILE]:
-        if file_path and os.path.exists(file_path):
+        if file_path and Path(file_path).exists():
             try:
-                os.unlink(file_path)
+                Path(file_path).unlink()
             except OSError:
                 pass
 
 
 @pytest.fixture(autouse=True)
-def cleanup_after_test():
+def _cleanup_after_test() -> Generator[None, None, None]:
     """Fixture to clean up resources after each test."""
     yield
     cleanup_files()
 
 
-async def send_sighup_and_wait():
+async def send_sighup_and_wait() -> None:
     """
     Send SIGHUP to the dynamic server and wait a moment for processing.
 
@@ -180,7 +182,7 @@ async def send_sighup_and_wait():
     await asyncio.sleep(0.5)
 
 
-async def get_tool_names(session):
+async def get_tool_names(session) -> list[str]:
     """
     Get a sorted list of tool names from the session.
 
@@ -195,11 +197,11 @@ async def get_tool_names(session):
     return sorted(tool_names)
 
 
-@pytest.mark.asyncio
-async def test_initial_tools():
+@pytest.mark.asyncio()
+async def test_initial_tools() -> None:
     """Test that the dynamic server starts with the expected initial tools."""
 
-    async def callback(session):
+    async def callback(session: ClientSession) -> None:
         # Initial state should have echo tool
         tool_names = await get_tool_names(session)
         assert tool_names == ["echo"]
@@ -221,11 +223,11 @@ async def test_initial_tools():
     await run_with_dynamic_server_session(callback)
 
 
-@pytest.mark.asyncio
-async def test_preconfigured_tools():
+@pytest.mark.asyncio()
+async def test_preconfigured_tools() -> None:
     """Test that the dynamic server can start with multiple tools via configuration file."""
 
-    async def callback(session):
+    async def callback(session: ClientSession) -> None:
         # Initial state should have multiple tools
         tool_names = await get_tool_names(session)
         assert sorted(tool_names) == ["calculator", "counter", "echo"]
@@ -252,11 +254,11 @@ async def test_preconfigured_tools():
     await run_with_dynamic_server_session(callback, initial_tool_count=3)
 
 
-@pytest.mark.asyncio
-async def test_sighup_adds_tool():
+@pytest.mark.asyncio()
+async def test_sighup_adds_tool() -> None:
     """Test that sending SIGHUP adds a new tool."""
 
-    async def callback(session):
+    async def callback(session: ClientSession) -> None:
         # Check initial state - only echo tool should be present
         tool_names = await get_tool_names(session)
         assert tool_names == ["echo"]
@@ -286,11 +288,11 @@ async def test_sighup_adds_tool():
     await run_with_dynamic_server_session(callback)
 
 
-@pytest.mark.asyncio
-async def test_multiple_sighups():
+@pytest.mark.asyncio()
+async def test_multiple_sighups() -> None:
     """Test that multiple SIGHUPs add multiple tools."""
 
-    async def callback(session):
+    async def callback(session: ClientSession) -> None:
         # Check initial state with two tools
         tool_names = await get_tool_names(session)
         assert sorted(tool_names) == ["calculator", "echo"]

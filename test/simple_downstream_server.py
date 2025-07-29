@@ -3,7 +3,7 @@ Simple downstream MCP server with an echo tool.
 Uses fastmcp from the official Python SDK for MCP.
 """
 
-from typing import Dict, Any
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 from mcp.types import Tool
@@ -21,7 +21,7 @@ echo_tool = Tool(
 
 
 # Echo handler function
-async def echo_handler(message: str) -> Dict[str, Any]:
+async def echo_handler(message: str) -> dict[str, Any]:
     """
     Echo handler function that returns the input message.
 

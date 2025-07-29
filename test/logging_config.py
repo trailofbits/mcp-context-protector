@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Logging configuration for tests.
 """
@@ -7,7 +6,7 @@ import logging
 import sys
 
 
-def configure_logging():
+def configure_logging() -> None:
     """Configure logging for tests."""
     # Create a logger
     root_logger = logging.getLogger()

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Dynamic downstream MCP server with signal handler to update tools.
 Uses fastmcp from the official Python SDK for MCP.
@@ -27,17 +26,18 @@ To test:
 import argparse
 import asyncio
 import atexit
-from contextlib import AsyncExitStack
 import os
 import signal
 import sys
-from typing import Dict, Any
-import anyio
+from contextlib import AsyncExitStack
+from pathlib import Path
+from typing import Any
 
+import anyio
 from mcp.server.fastmcp import FastMCP
-from mcp.server.session import ServerSession
-from mcp.server.stdio import stdio_server as stdio_server
 from mcp.server.lowlevel import NotificationOptions
+from mcp.server.session import ServerSession
+from mcp.server.stdio import stdio_server
 
 # Global counter for the number of tools
 num_tools = 1
@@ -47,7 +47,7 @@ app = FastMCP()
 
 
 # Echo handler function
-async def echo_handler(message: str) -> Dict[str, Any]:
+async def echo_handler(message: str) -> dict[str, Any]:
     """
     Echo handler function that returns the input message.
 
@@ -61,7 +61,7 @@ async def echo_handler(message: str) -> Dict[str, Any]:
 
 
 # Calculator handler for the dynamic tool
-async def calculator_handler(a: int, b: int, operation: str) -> Dict[str, Any]:
+async def calculator_handler(a: int, b: int, operation: str) -> dict[str, Any]:
     """
     Calculator handler function that performs the requested operation on two numbers.
 
@@ -90,7 +90,7 @@ async def calculator_handler(a: int, b: int, operation: str) -> Dict[str, Any]:
 
 
 # Counter tool handler - available based on num_tools
-async def counter_handler() -> Dict[str, Any]:
+async def counter_handler() -> dict[str, Any]:
     """
     Counter handler function that returns the current number of tools.
 
@@ -100,7 +100,7 @@ async def counter_handler() -> Dict[str, Any]:
     return {"count": num_tools}
 
 
-def add_dynamic_tool():
+def add_dynamic_tool() -> None:
     """Add a new tool based on the current tool count."""
     global num_tools
 
@@ -126,7 +126,7 @@ def add_dynamic_tool():
     else:
         # Create a wrapper function that calls the original echo handler
         # We need a new function for each dynamically added tool
-        async def numbered_echo_handler(message: str) -> Dict[str, Any]:
+        async def numbered_echo_handler(message: str) -> dict[str, Any]:
             result = await echo_handler(message)
             result["tool_number"] = num_tools
             return result
@@ -139,7 +139,7 @@ def add_dynamic_tool():
         print(f"Added echo{num_tools} tool", file=sys.stderr)
 
 
-def initialize_tools(count):
+def initialize_tools(count) -> None:
     """
     Initialize the server with the specified number of tools.
 
@@ -162,7 +162,7 @@ def initialize_tools(count):
         add_dynamic_tool()
 
 
-def read_tool_count_from_file(toolcount_file):
+def read_tool_count_from_file(toolcount_file) -> int:
     """
     Read the tool count from the specified file.
 
@@ -173,18 +173,18 @@ def read_tool_count_from_file(toolcount_file):
         int: The number of tools to initialize, or 1 if the file doesn't exist or is invalid
     """
     try:
-        if toolcount_file and os.path.exists(toolcount_file):
-            with open(toolcount_file, "r") as f:
+        if toolcount_file and Path(toolcount_file).exists():
+            with Path(toolcount_file).open("r") as f:
                 count = int(f.read().strip())
                 return max(1, count)  # Ensure at least 1 tool
-    except (ValueError, FileNotFoundError, IOError) as e:
+    except (OSError, ValueError, FileNotFoundError) as e:
         print(f"Error reading tool count from {toolcount_file}: {e}", file=sys.stderr)
 
     # Default to 1 tool if file doesn't exist or has invalid content
     return 1
 
 
-def signal_handler(signum, frame):
+def signal_handler(_signum: any, _frame: any) -> None:
     """Signal handler for SIGHUP that adds a new tool."""
     global num_tools
 
@@ -207,7 +207,7 @@ def signal_handler(signum, frame):
     )
 
 
-def write_pidfile(pidfile_path):
+def write_pidfile(pidfile_path) -> None:
     """
     Write the current process ID to the specified pidfile.
 
@@ -217,11 +217,11 @@ def write_pidfile(pidfile_path):
     pid = os.getpid()
 
     try:
-        with open(pidfile_path, "w") as f:
+        with Path(pidfile_path).open("w") as f:
             f.write(str(pid))
 
         # Register cleanup function to remove pidfile on exit
-        atexit.register(lambda: os.remove(pidfile_path) if os.path.exists(pidfile_path) else None)
+        atexit.register(lambda: Path(pidfile_path).unlink() if Path(pidfile_path).exists() else None)
 
         print(f"PID {pid} written to {pidfile_path}", file=sys.stderr)
     except Exception as e:
@@ -239,8 +239,8 @@ async def my_run(
     # clients can perform initialization with any node. The client must still follow
     # the initialization lifecycle, but can do so with any available node
     # rather than requiring initialization for each connection.
-    stateless: bool = False,
-):
+    _stateless: bool = False,
+) -> None:
     """
     Server startup function that allows us to send notifications.
 
@@ -276,7 +276,7 @@ async def my_run(
                     )
 
 
-def main():
+def main() -> None:
     """Main function to run the server with signal handling and pidfile."""
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Dynamic MCP server with signal handling")

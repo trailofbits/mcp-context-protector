@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Tests for granular tool-level approval system.
 
@@ -9,25 +8,21 @@ This module tests the granular approval behaviors:
 - Mixed approval states → some tools work, others blocked
 """
 
-import json
 import tempfile
-import pytest
-from pathlib import Path
 
-import mcp.types as types
+import pytest
 from contextprotector.mcp_config import (
+    ApprovalStatus,
     MCPConfigDatabase,
+    MCPParameterDefinition,
     MCPServerConfig,
     MCPToolDefinition,
-    MCPParameterDefinition,
     ParameterType,
-    ApprovalStatus,
 )
-from .test_utils import run_with_wrapper_session, approve_server_config_using_review
 
 
-@pytest.mark.asyncio
-async def test_granular_approval_database_logic():
+@pytest.mark.asyncio()
+async def test_granular_approval_database_logic() -> None:
     """Test the granular approval logic at the database level."""
 
     temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -56,9 +51,9 @@ async def test_granular_approval_database_logic():
 
     # Verify initial approval
     status = db.get_server_approval_status("stdio", "test_server", config)
-    assert status["instructions_approved"] == True
-    assert status["tools"]["original_tool"] == True
-    assert status["server_approved"] == True
+    assert status["instructions_approved"]
+    assert status["tools"]["original_tool"]
+    assert status["server_approved"]
 
     # Step 2: Add a new tool to the configuration
     config_with_new_tool = MCPServerConfig()
@@ -80,20 +75,20 @@ async def test_granular_approval_database_logic():
     status = db.get_server_approval_status("stdio", "test_server", config_with_new_tool)
 
     # Instructions should still be approved (unchanged)
-    assert status["instructions_approved"] == True
+    assert status["instructions_approved"]
 
     # Original tool should still be approved
-    assert status["tools"]["original_tool"] == True
+    assert status["tools"]["original_tool"]
 
     # New tool should NOT be approved
-    assert status["tools"]["new_added_tool"] == False
+    assert not status["tools"]["new_added_tool"]
 
     # Server should still be considered approved (granular system)
-    assert status["server_approved"] == True
+    assert status["server_approved"]
 
 
-@pytest.mark.asyncio
-async def test_tool_modification_granular_blocking():
+@pytest.mark.asyncio()
+async def test_tool_modification_granular_blocking() -> None:
     """Test that modifying a tool blocks only that tool, not other approved tools."""
 
     temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -157,17 +152,17 @@ async def test_tool_modification_granular_blocking():
     )
 
     # Instructions should still be approved
-    assert approval_status["instructions_approved"] == True
+    assert approval_status["instructions_approved"]
 
     # tool1 should NOT be approved (was modified)
-    assert approval_status["tools"]["tool1"] == False
+    assert not approval_status["tools"]["tool1"]
 
     # tool2 should still be approved (unchanged)
-    assert approval_status["tools"]["tool2"] == True
+    assert approval_status["tools"]["tool2"]
 
 
-@pytest.mark.asyncio
-async def test_tool_removal_no_reapproval_needed():
+@pytest.mark.asyncio()
+async def test_tool_removal_no_reapproval_needed() -> None:
     """Test that removing a tool simply makes it disappear without requiring reapproval."""
 
     temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -218,17 +213,17 @@ async def test_tool_removal_no_reapproval_needed():
     approval_status = db.get_server_approval_status("stdio", "test_removal_server", reduced_config)
 
     # Instructions should still be approved
-    assert approval_status["instructions_approved"] == True
+    assert approval_status["instructions_approved"]
 
     # Remaining tool should still be approved
-    assert approval_status["tools"]["keep_tool"] == True
+    assert approval_status["tools"]["keep_tool"]
 
     # Removed tool should not be in the tools dict
     assert "remove_tool" not in approval_status["tools"]
 
 
-@pytest.mark.asyncio
-async def test_server_instructions_change_blocks_everything():
+@pytest.mark.asyncio()
+async def test_server_instructions_change_blocks_everything() -> None:
     """Test that changing server instructions blocks the entire server."""
 
     temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -266,25 +261,24 @@ async def test_server_instructions_change_blocks_everything():
     )
 
     # Instructions should NOT be approved (changed)
-    assert approval_status["instructions_approved"] == False
+    assert not approval_status["instructions_approved"]
 
     # Tool itself should still be approved (hasn't changed)
-    assert approval_status["tools"]["test_tool"] == True
+    assert approval_status["tools"]["test_tool"]
 
     # Server should still be considered approved in the database
-    assert approval_status["server_approved"] == True
+    assert approval_status["server_approved"]
 
     # The key test: instructions changed should block everything in wrapper logic
-    assert (
+    assert not (
         db.are_instructions_approved(
             "stdio", "test_instruction_server", modified_config.instructions
         )
-        == False
     )
 
 
-@pytest.mark.asyncio
-async def test_mixed_approval_states():
+@pytest.mark.asyncio()
+async def test_mixed_approval_states() -> None:
     """Test behavior when some tools are approved and others are not."""
 
     temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -327,20 +321,19 @@ async def test_mixed_approval_states():
     # Step 3: Test mixed approval status
     approval_status = db.get_server_approval_status("stdio", "test_mixed_server", config)
 
-    assert approval_status["instructions_approved"] == True
-    assert approval_status["tools"]["approved_tool"] == True
-    assert approval_status["tools"]["unapproved_tool"] == False
+    assert approval_status["instructions_approved"]
+    assert approval_status["tools"]["approved_tool"]
+    assert not approval_status["tools"]["unapproved_tool"]
 
     # Test that we can distinguish between approved and unapproved tools
-    assert db.is_tool_approved("stdio", "test_mixed_server", "approved_tool", approved_tool) == True
-    assert (
+    assert db.is_tool_approved("stdio", "test_mixed_server", "approved_tool", approved_tool)
+    assert not (
         db.is_tool_approved("stdio", "test_mixed_server", "unapproved_tool", unapproved_tool)
-        == False
     )
 
 
-@pytest.mark.asyncio
-async def test_tool_parameter_modification_blocking():
+@pytest.mark.asyncio()
+async def test_tool_parameter_modification_blocking() -> None:
     """Test that changing tool parameters blocks only that tool."""
 
     temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -388,8 +381,8 @@ async def test_tool_parameter_modification_blocking():
 
     # Test that modified tool is not approved
     assert (
-        db.is_tool_approved("stdio", "param_test_server", "param_test_tool", original_tool) == True
+        db.is_tool_approved("stdio", "param_test_server", "param_test_tool", original_tool)
     )
-    assert (
-        db.is_tool_approved("stdio", "param_test_server", "param_test_tool", modified_tool) == False
+    assert not (
+        db.is_tool_approved("stdio", "param_test_server", "param_test_tool", modified_tool)
     )

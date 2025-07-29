@@ -1,28 +1,29 @@
-#!/usr/bin/env python3
 """
 A simple MCP server that provides tools, prompts, and resources for testing.
 """
 
 import asyncio
-import anyio
+import json
 import sys
 from pathlib import Path
-import json
+
+import anyio
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import mcp.types as types
-from mcp.server.lowlevel import Server, NotificationOptions
-from mcp.server.models import InitializationOptions
-from mcp.server.stdio import stdio_server
-from mcp.server.session import ServerSession
 from contextlib import AsyncExitStack
+
+from mcp import types
+from mcp.server.lowlevel import NotificationOptions, Server
 from mcp.server.lowlevel.helper_types import ReadResourceContents
+from mcp.server.models import InitializationOptions
+from mcp.server.session import ServerSession
+from mcp.server.stdio import stdio_server
 
 
 class ResourceTestServer:
-    def __init__(self):
+    def __init__(self) -> None:
         self.server = Server("resource-test-server")
         self._session = None  # Will store the session object
 
@@ -32,7 +33,7 @@ class ResourceTestServer:
         # Register handlers
         self.register_handlers()
 
-    def register_handlers(self):
+    def register_handlers(self) -> None:
         """Register all handlers with the server."""
 
         @self.server.list_tools()
@@ -79,22 +80,21 @@ class ResourceTestServer:
                         mime_type="image/png",
                     ),
                 ]
-            else:
-                # Alternate resources (when toggled)
-                return [
-                    types.Resource(
-                        name="Sample data",
-                        uri="contextprotector://sample_data",
-                        description="Sample data resource (updated)",
-                        mime_type="application/json",
-                    ),
-                    types.Resource(
-                        name="Document resource",
-                        uri="contextprotector://document_resource",
-                        description="Sample document resource",
-                        mime_type="text/plain",
-                    ),
-                ]
+            # Alternate resources (when toggled)
+            return [
+                types.Resource(
+                    name="Sample data",
+                    uri="contextprotector://sample_data",
+                    description="Sample data resource (updated)",
+                    mime_type="application/json",
+                ),
+                types.Resource(
+                    name="Document resource",
+                    uri="contextprotector://document_resource",
+                    description="Sample document resource",
+                    mime_type="text/plain",
+                ),
+            ]
 
         @self.server.call_tool()
         async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
@@ -102,7 +102,7 @@ class ResourceTestServer:
             if name == "test_tool":
                 message = arguments.get("message", "")
                 return [types.TextContent(type="text", text=f"Echo: {message}")]
-            elif name == "toggle_resources":
+            if name == "toggle_resources":
                 # Toggle resources and notify clients
                 self.use_alternate_resources = not self.use_alternate_resources
                 resource_state = "alternate" if self.use_alternate_resources else "default"
@@ -137,11 +137,11 @@ class ResourceTestServer:
                     }
                 )
                 return [ReadResourceContents(content=content, mime_type="application/json")]
-            elif str(uri) == "contextprotector://image_resource":
+            if str(uri) == "contextprotector://image_resource":
                 # Just return placeholder text for testing
                 content = b"[Binary image data]"
                 return [ReadResourceContents(content=content, mime_type="image/png")]
-            elif str(uri) == "contextprotector://document_resource":
+            if str(uri) == "contextprotector://document_resource":
                 # Return text document
                 content = "This is a sample document resource.\nIt contains multiple lines.\nFor testing purposes."
                 return [ReadResourceContents(content=content, mime_type="text/plain")]
@@ -150,7 +150,7 @@ class ResourceTestServer:
                 ReadResourceContents(content="Unknown resource requested", mime_type="text/plain")
             ]
 
-    async def run(self):
+    async def run(self) -> None:
         """Run the server with session tracking."""
         async with stdio_server() as streams:
             init_options = InitializationOptions(
@@ -186,7 +186,7 @@ class ResourceTestServer:
                         )
 
 
-async def main():
+async def main() -> None:
     """Main entry point for the server."""
     server = ResourceTestServer()
     await server.run()

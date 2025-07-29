@@ -6,18 +6,20 @@ Tests the integration between the MCP wrapper and the SSE server using HTTP tran
 
 import json
 import logging
-import os
-import pytest
 import tempfile
+from collections.abc import Awaitable, Callable
+from pathlib import Path
 
-from mcp import types
+import pytest
 from contextprotector.mcp_config import MCPServerConfig
+from mcp import ClientSession, types
+
+from .sse_server_utils import sse_server_fixture  # noqa: F401
 from .test_utils import approve_server_config_using_review as _approve_config
-from .sse_server_utils import sse_server_fixture
 
 
 # Local helper function for backward compatibility
-async def approve_server_config_using_review(url, config_path):
+async def approve_server_config_using_review(url: str, config_path: str) -> None:
     """
     Run the --review-server process to approve a server configuration.
 
@@ -31,7 +33,7 @@ async def approve_server_config_using_review(url, config_path):
 # Import global SERVER_PORT from sse_server_utils
 
 
-async def run_with_wrapper_session(callback, config_path=None):
+async def run_with_wrapper_session(callback: Callable[[ClientSession], Awaitable[None]], config_path=None) -> None:
     """
     Run a test with a wrapper session that connects to the SSE downstream server via URL.
 
@@ -39,8 +41,8 @@ async def run_with_wrapper_session(callback, config_path=None):
         callback: Async function to call with the client session
         config_path: Path to the wrapper config file
     """
-    from .test_utils import run_with_wrapper_session as _run_with_wrapper_session
     from . import sse_server_utils
+    from .test_utils import run_with_wrapper_session as _run_with_wrapper_session
 
     # Make sure we have a valid port
     assert (
@@ -51,17 +53,17 @@ async def run_with_wrapper_session(callback, config_path=None):
 
     # Build the URL for the SSE server
     sse_url = f"http://localhost:{sse_server_utils.SERVER_PORT}/sse"
-    logging.warning(f"Connecting wrapper to SSE server at: {sse_url}")
+    logging.warning("Connecting wrapper to SSE server at: %s", sse_url)
 
     # Use the shared utility function
     await _run_with_wrapper_session(callback, "sse", sse_url, config_path)
 
 
-@pytest.mark.asyncio
-async def test_echo_tool_through_wrapper(sse_server_fixture):
+@pytest.mark.asyncio()
+async def test_echo_tool_through_wrapper(sse_server_fixture: any) -> None: # noqa: ARG001 F811
     """Test that the echo tool correctly works through the MCP wrapper using SSE transport."""
 
-    async def callback(session):
+    async def callback(session: ClientSession) -> None:
         input_message = "Hello from Wrapped SSE Server!"
 
         # List available tools
@@ -77,10 +79,11 @@ async def test_echo_tool_through_wrapper(sse_server_fixture):
         result_dict = json.loads(result.content[0].text)
 
         # Check that the call was blocked due to unapproved config
-        assert isinstance(result_dict, dict) and result_dict["status"] == "blocked"
+        assert isinstance(result_dict, dict)
+        assert result_dict["status"] == "blocked"
         # Note: server_config is no longer included to prevent information leakage
 
-    async def callback2(session):
+    async def callback2(session: ClientSession) -> None:
         input_message = "Hello from Wrapped SSE Server!"
         # After approval, reconnect and try again
 
@@ -116,8 +119,8 @@ async def test_echo_tool_through_wrapper(sse_server_fixture):
     # Now we need to run the review process to approve this config
     await approve_server_config_using_review(sse_url, temp_file.name)
 
-    with open(temp_file.name, "r") as f:
-        logging.error(f.read())
+    with Path(temp_file.name).open("r") as f:
+        logging.exception(f.read())
     from contextprotector.mcp_config import MCPConfigDatabase
 
     cdb = MCPConfigDatabase(temp_file.name)
@@ -126,21 +129,21 @@ async def test_echo_tool_through_wrapper(sse_server_fixture):
 
     await run_with_wrapper_session(callback2, temp_file.name)
 
-    os.unlink(temp_file.name)
+    Path(temp_file.name).unlink()
 
 
-@pytest.mark.asyncio
-async def test_invalid_tool_through_wrapper(sse_server_fixture):
+@pytest.mark.asyncio()
+async def test_invalid_tool_through_wrapper(sse_server_fixture: any) -> None: # noqa: ARG001 F811
     """Test error handling for invalid tools through the MCP wrapper using SSE transport."""
 
-    async def callback(session):
+    async def callback(session: ClientSession) -> None:
         # First try calling any tool to get blocked and receive the config
         result = await session.call_tool(name="echo", arguments={"message": "Test"})
         assert len(result.content) == 1
         result_dict = json.loads(result.content[0].text)
         assert result_dict["status"] == "blocked"
 
-    async def callback2(session):
+    async def callback2(session: ClientSession) -> None:
         # Now try to call a tool that doesn't exist
         result = await session.call_tool(name="nonexistent_tool", arguments={"foo": "bar"})
         assert isinstance(result, types.CallToolResult)
@@ -181,4 +184,4 @@ async def test_invalid_tool_through_wrapper(sse_server_fixture):
     # Run the review process to approve this config
     await approve_server_config_using_review(sse_url, temp_file.name)
     await run_with_wrapper_session(callback2, temp_file.name)
-    os.unlink(temp_file.name)
+    Path(temp_file.name).unlink()

@@ -1,32 +1,31 @@
-#!/usr/bin/env python3
 """
 Integration tests for the tool response quarantine functionality.
 """
 
-import os
 import tempfile
-import pytest
+from collections.abc import Generator
+from pathlib import Path
 from unittest.mock import MagicMock
 
-from contextprotector.quarantine import ToolResponseQuarantine
-from contextprotector.mcp_wrapper import MCPWrapperServer
+import pytest
 from contextprotector.guardrail_providers.mock_provider import AlwaysAlertGuardrailProvider
-
+from contextprotector.mcp_wrapper import MCPWrapperServer
+from contextprotector.quarantine import ToolResponseQuarantine
 from mcp.types import CallToolResult, TextContent
 
 
-@pytest.fixture
-def temp_quarantine_file():
+@pytest.fixture()
+def temp_quarantine_file() -> Generator[str, None, None]:
     """Create a temporary quarantine file for testing."""
     tmp_file = tempfile.NamedTemporaryFile(delete=False)
     tmp_file.close()
     yield tmp_file.name
-    if os.path.exists(tmp_file.name):
-        os.unlink(tmp_file.name)
+    if Path(tmp_file.name).exists():
+        Path(tmp_file.name).unlink()
 
 
-@pytest.mark.asyncio
-async def test_quarantine_integration(temp_quarantine_file):
+@pytest.mark.asyncio()
+async def test_quarantine_integration(temp_quarantine_file) -> None:
     """Test that tool responses flagged by guardrails are properly quarantined."""
     # Create a guardrail provider that always triggers alerts
     provider = AlwaysAlertGuardrailProvider()
@@ -41,7 +40,7 @@ async def test_quarantine_integration(temp_quarantine_file):
     # Mock the call_tool method to return a ToolCallResult
     original_response = "This is a potentially harmful tool response."
 
-    async def mock_call_tool(name, arguments):
+    async def mock_call_tool(_name: any, _arguments: any) -> CallToolResult:
         return CallToolResult(content=[TextContent(type="text", text=original_response)])
 
     wrapper.session.call_tool = mock_call_tool
@@ -83,8 +82,8 @@ async def test_quarantine_integration(temp_quarantine_file):
     assert quarantined_response.released_at is not None
 
 
-@pytest.mark.asyncio
-async def test_quarantine_disabled_when_no_guardrails():
+@pytest.mark.asyncio()
+async def test_quarantine_disabled_when_no_guardrails() -> None:
     """Test that quarantine is not used when guardrails are disabled."""
     # Create a wrapper server without guardrails
     wrapper = MCPWrapperServer()
@@ -96,7 +95,7 @@ async def test_quarantine_disabled_when_no_guardrails():
     # Mock the call_tool method to return a ToolCallResult
     original_response = "This is a normal tool response."
 
-    async def mock_call_tool(name, arguments):
+    async def mock_call_tool(_name: any, _arguments: any) -> CallToolResult:
         return CallToolResult(content=[TextContent(type="text", text=original_response)])
 
     wrapper.session.call_tool = mock_call_tool

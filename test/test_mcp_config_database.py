@@ -2,21 +2,20 @@
 Tests for the MCPConfigDatabase class.
 """
 
-import os
-import tempfile
 import json
+import tempfile
 from pathlib import Path
 
 from contextprotector.mcp_config import (
+    MCPConfigDatabase,
+    MCPParameterDefinition,
     MCPServerConfig,
     MCPToolDefinition,
-    MCPParameterDefinition,
     ParameterType,
-    MCPConfigDatabase,
 )
 
 
-def test_config_database_save_load():
+def test_config_database_save_load() -> None:
     """Test saving and loading configurations from the database."""
     # Create a temporary file for the config database
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
@@ -135,11 +134,11 @@ def test_config_database_save_load():
 
     finally:
         # Clean up
-        if os.path.exists(config_path):
-            os.unlink(config_path)
+        if Path(config_path).exists():
+            Path(config_path).unlink()
 
 
-def test_config_database_removes_server():
+def test_config_database_removes_server() -> None:
     """Test removing a server configuration from the database."""
     # Create a temporary file for the config database
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
@@ -179,11 +178,11 @@ def test_config_database_removes_server():
 
     finally:
         # Clean up
-        if os.path.exists(config_path):
-            os.unlink(config_path)
+        if Path(config_path).exists():
+            Path(config_path).unlink()
 
 
-def test_config_database_file_structure():
+def test_config_database_file_structure() -> None:
     """Test the structure of the config database file."""
     # Create a temporary file for the config database
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
@@ -203,7 +202,7 @@ def test_config_database_file_structure():
         db.save_server_config("stdio", server_id, config)
 
         # Read the file directly to check its structure
-        with open(config_path, "r") as f:
+        with Path(config_path).open("r") as f:
             data = json.load(f)
 
         # Verify the structure
@@ -221,11 +220,11 @@ def test_config_database_file_structure():
 
     finally:
         # Clean up
-        if os.path.exists(config_path):
-            os.unlink(config_path)
+        if Path(config_path).exists():
+            Path(config_path).unlink()
 
 
-def test_config_instructions_comparison():
+def test_config_instructions_comparison() -> None:
     """Test that changes in instructions are detected in configuration comparison."""
     # Create two configs with the same tools but different instructions
     config1 = MCPServerConfig()
@@ -259,7 +258,7 @@ def test_config_instructions_comparison():
     assert config1 == config2
 
 
-def test_config_database_default_path():
+def test_config_database_default_path() -> None:
     """Test that the default config path is in the expected location."""
     # Get the default path
     default_path = MCPConfigDatabase.get_default_config_path()

@@ -7,24 +7,24 @@ in test environments, eliminating code duplication across test files.
 
 import asyncio
 import logging
-import os
 import subprocess
 import sys
 import tempfile
+from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import Optional
 
 import psutil
+import pytest
 import pytest_asyncio
 
 
 class SSEServerManager:
     """Manages the lifecycle of an SSE server process for testing."""
 
-    def __init__(self):
-        self.process: Optional[subprocess.Popen] = None
-        self.port: Optional[int] = None
-        self.pid: Optional[int] = None
+    def __init__(self) -> None:
+        self.process: subprocess.Popen | None = None
+        self.port: int | None = None
+        self.pid: int | None = None
 
     def get_ports_by_pid(self, pid: int) -> list[int]:
         """
@@ -45,10 +45,10 @@ class SSEServerManager:
                     ports.append(conn.laddr.port)
             return ports
         except psutil.NoSuchProcess:
-            logging.warning(f"Process with PID {pid} not found.")
+            logging.warning("Process with PID %d not found.", pid)
             return []
         except psutil.AccessDenied:
-            logging.warning(f"Access denied to process with PID {pid}.")
+            logging.warning("Access denied to process with PID %d.", pid)
             return []
 
     async def start_server(self) -> subprocess.Popen:
@@ -72,11 +72,11 @@ class SSEServerManager:
 
         # Read the PID from the file to ensure the server started
         try:
-            with open(pid_file.name, "r") as f:
+            with Path(pid_file.name).open("r") as f:
                 pid = int(f.read().strip())
                 self.pid = pid
                 assert pid is not None
-                logging.warning(f"SSE Server started with PID: {pid}")
+                logging.warning("SSE Server started with PID: %d", pid)
 
                 # Find which port the server is listening on
                 max_attempts = 5
@@ -84,27 +84,27 @@ class SSEServerManager:
                     ports = self.get_ports_by_pid(pid)
                     if ports:
                         self.port = ports[0]  # Use the first port found
-                        logging.warning(f"SSE Server is listening on port: {self.port}")
+                        logging.warning("SSE Server is listening on port: %d", self.port)
                         break
 
                     logging.warning(
-                        f"Attempt {attempt + 1}/{max_attempts}: No ports found for PID {pid}, waiting..."
+                        "Attempt %d/%d: No ports found for PID %d, waiting...", attempt + 1, max_attempts, pid
                     )
                     await asyncio.sleep(1.0)
 
                 assert self.port is not None, "Could not determine port for SSE server"
-        except (IOError, ValueError) as e:
-            assert False, f"Failed to read PID file: {e}"
+        except (OSError, ValueError) as e:
+            pytest.fail("Failed to read PID file: %s" % e)
 
         # Clean up the PID file
         try:
-            os.unlink(pid_file.name)
+            Path(pid_file.name).unlink()
         except OSError:
             pass
 
         return self.process
 
-    async def stop_server(self):
+    async def stop_server(self) -> None:
         """Stop the SSE downstream server process."""
         if self.process:
             self.process.terminate()
@@ -145,7 +145,7 @@ async def start_sse_server() -> subprocess.Popen:
     return process
 
 
-async def stop_sse_server():
+async def stop_sse_server() -> None:
     """Global function for backward compatibility."""
     global SERVER_PROCESS, SERVER_PORT, SERVER_PID
 
@@ -156,7 +156,7 @@ async def stop_sse_server():
 
 
 @pytest_asyncio.fixture
-async def sse_server_fixture():
+async def sse_server_fixture() -> AsyncGenerator[subprocess.Popen, None]:
     """Fixture to manage the SSE server lifecycle."""
     process = await start_sse_server()
     yield process
@@ -164,7 +164,7 @@ async def sse_server_fixture():
 
 
 @pytest_asyncio.fixture
-async def sse_server():
+async def sse_server() -> AsyncGenerator[subprocess.Popen, None]:
     """Alternative fixture name for backward compatibility."""
     process = await start_sse_server()
     yield process

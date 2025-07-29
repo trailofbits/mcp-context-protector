@@ -1,17 +1,17 @@
-#!/usr/bin/env python3
 """
 Tests for the resource proxying functionality in MCP wrapper.
 """
 
+import asyncio
 import base64
 import json
-import os
-import tempfile
-import pytest
-import asyncio
-from pathlib import Path
 import sys
-import mcp.types as types
+import tempfile
+from collections.abc import Awaitable, Callable
+from pathlib import Path
+
+import pytest
+from mcp import ClientSession, types
 
 # Configure path for imports
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -24,7 +24,7 @@ RESOURCE_TEST_SERVER_PATH = Path(__file__).resolve().parent / "resource_test_ser
 
 
 # Local helper function for backward compatibility
-async def run_with_wrapper(callback, config_path: str):
+async def run_with_wrapper(callback: Callable[[ClientSession], Awaitable[None]], config_path: str) -> None:
     """
     Run a test with a wrapper connected to the resource test server.
 
@@ -32,27 +32,27 @@ async def run_with_wrapper(callback, config_path: str):
         callback: Async function that will be called with the client session
         config_path: Path to the configuration file
     """
-    command = f"python {str(RESOURCE_TEST_SERVER_PATH)}"
+    command = f"python {RESOURCE_TEST_SERVER_PATH!s}"
     await run_with_wrapper_session(callback, "stdio", command, config_path)
 
 
 class TestResourceProxying:
     """Tests for resource proxying functionality."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test by creating temp config file."""
         self.temp_file = tempfile.NamedTemporaryFile(delete=False)
         self.config_path = self.temp_file.name
 
-    def teardown_method(self):
+    def teardown_method(self) -> None:
         """Clean up after test."""
-        os.unlink(self.config_path)
+        Path(self.config_path).unlink()
 
-    @pytest.mark.asyncio
-    async def test_initial_resource_listing(self):
+    @pytest.mark.asyncio()
+    async def test_initial_resource_listing(self) -> None:
         """Test that resources are correctly listed from the downstream server."""
 
-        async def callback(session):
+        async def callback(session: ClientSession) -> None:
             # List available resources - should work right away regardless of approval status
             initial_resources = await session.list_resources()
             assert len(initial_resources.resources) == 2
@@ -68,11 +68,11 @@ class TestResourceProxying:
 
         await run_with_wrapper(callback, self.config_path)
 
-    @pytest.mark.asyncio
-    async def test_resource_content_access(self):
+    @pytest.mark.asyncio()
+    async def test_resource_content_access(self) -> None:
         """Test that resource content can be accessed without config approval."""
 
-        async def callback(session):
+        async def callback(session: ClientSession) -> None:
             # Check we can access resource content without approving the server config
             sample_data_result = await session.read_resource("contextprotector://sample_data")
 
@@ -86,15 +86,15 @@ class TestResourceProxying:
 
         await run_with_wrapper(callback, self.config_path)
 
-    @pytest.mark.asyncio
-    async def test_resource_changes(self):
+    @pytest.mark.asyncio()
+    async def test_resource_changes(self) -> None:
         """
         Test that changes to resources are correctly proxied without affecting
         the approval status of the server configuration.
         """
 
         # Create the test command
-        command = f"python {str(RESOURCE_TEST_SERVER_PATH)}"
+        command = f"python {RESOURCE_TEST_SERVER_PATH!s}"
 
         # First do the approval process
         await run_with_wrapper(
@@ -108,7 +108,7 @@ class TestResourceProxying:
         await approve_server_config_using_review("stdio", command, self.config_path)
 
         # Now the main callback after approval
-        async def callback(session):
+        async def callback(session: ClientSession) -> None:
             # Initial resources check
             initial_resources = await session.list_resources()
             assert len(initial_resources.resources) == 2
@@ -149,11 +149,11 @@ class TestResourceProxying:
         # Run the test with the approved config
         await run_with_wrapper(callback, self.config_path)
 
-    @pytest.mark.asyncio
-    async def test_resource_access_with_parameters(self):
+    @pytest.mark.asyncio()
+    async def test_resource_access_with_parameters(self) -> None:
         """Test that resources can be accessed with parameters."""
 
-        async def callback(session):
+        async def callback(session: ClientSession) -> None:
             # Access image resource with custom width parameter
             image_result = await session.read_resource("contextprotector://image_resource")
 

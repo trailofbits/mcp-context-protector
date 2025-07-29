@@ -1,13 +1,14 @@
-#!/usr/bin/env python3
 """
 Tests for the guardrails provider loading functionality.
 """
 
 import sys
 from pathlib import Path
+
 import pytest
-from test.logging_config import configure_logging
 from contextprotector.guardrails import get_provider, get_provider_names
+
+from test.logging_config import configure_logging
 
 # Add the project root to the path if not already there
 project_root = Path(__file__).resolve().parent.parent
@@ -18,7 +19,7 @@ logger = configure_logging()
 logger.info("Starting guardrails loading test")
 
 
-def test_load_guardrail_providers():
+def test_load_guardrail_providers() -> None:
     """Test that guardrail providers can be loaded correctly."""
     # Get provider names
     providers = get_provider_names()
@@ -32,33 +33,33 @@ def test_load_guardrail_providers():
     assert provider.name == "Llama Firewall"
 
 
-def test_get_nonexistent_provider():
+def test_get_nonexistent_provider() -> None:
     """Test that trying to get a non-existent provider returns None."""
     provider = get_provider("Non-Existent Provider")
     assert provider is None, "Should return None for non-existent provider"
 
 
-def test_provider_check_server_config():
+def test_provider_check_server_config() -> None:
     """Test that a provider can check a server config and log the results."""
     from contextprotector.mcp_config import MCPServerConfig, MCPToolDefinition
 
     # Get the Llama Firewall provider
     provider = get_provider("Llama Firewall")
     assert provider is not None, "Failed to get Llama Firewall provider"
-    logger.info(f"Got provider: {provider.name}")
+    logger.info("Got provider: %s", provider.name)
 
     # Create a simple config to check
     config = MCPServerConfig()
     config.add_tool(MCPToolDefinition(name="test_tool", description="A test tool", parameters=[]))
-    logger.info(f"Created test config with {len(config.tools)} tools")
+    logger.info("Created test config with %d tools", len(config.tools))
 
     # Check the config and log the result
     logger.info("Checking server config with provider...")
     result = provider.check_server_config(config)
 
     if result:
-        logger.info(f"Provider returned alert: {result.explanation}")
-        logger.info(f"Alert data: {result.data}")
+        logger.info("Provider returned alert: %s", result.explanation)
+        logger.info("Alert data: %s", result.data)
     else:
         logger.info("Provider returned no alert (config is safe)")
 

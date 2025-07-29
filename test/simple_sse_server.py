@@ -6,7 +6,8 @@ Uses fastmcp with SSE transport from the official Python SDK for MCP.
 import argparse
 import os
 import sys
-from typing import Dict, Any
+from pathlib import Path
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 from mcp.types import Tool
@@ -24,7 +25,7 @@ echo_tool = Tool(
 
 
 # Echo handler function
-async def echo_handler(message: str) -> Dict[str, Any]:
+async def echo_handler(message: str) -> dict[str, Any]:
     """
     Echo handler function that returns the input message.
 
@@ -46,10 +47,10 @@ app.add_tool(echo_handler, "echo")
 
 
 # Function to write PID to file
-def write_pidfile(pidfile_path):
+def write_pidfile(pidfile_path) -> None:
     """Write the current process ID to the specified file."""
     if pidfile_path:
-        with open(pidfile_path, "w") as f:
+        with Path(pidfile_path).open("w") as f:
             f.write(str(os.getpid()))
         print(f"PID {os.getpid()} written to {pidfile_path}")
 
@@ -80,6 +81,5 @@ if __name__ == "__main__":
             break
         except SystemExit:
             print(f"Warning: port {port} in use", file=sys.stderr)
-            pass
         except KeyboardInterrupt:
             sys.exit(0)

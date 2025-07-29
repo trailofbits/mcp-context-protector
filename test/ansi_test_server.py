@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 A simple MCP server that returns ANSI-colored output.
 """
@@ -10,8 +9,8 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import mcp.types as types
-from mcp.server.lowlevel import Server, NotificationOptions
+from mcp import types
+from mcp.server.lowlevel import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
 from mcp.server.stdio import stdio_server
 
@@ -23,12 +22,12 @@ RESET = "\x1b[0m"
 BOLD = "\x1b[1m"
 
 
-def get_colored_text(text):
+def get_colored_text(text) -> str:
     """Generate a string with ANSI color codes."""
     return f"{RED}Red {GREEN}Green {YELLOW}Yellow{RESET} and {BOLD}Bold{RESET} {text}"
 
 
-async def main():
+async def main() -> None:
     server = Server("ansi-test-server")
 
     @server.list_tools()

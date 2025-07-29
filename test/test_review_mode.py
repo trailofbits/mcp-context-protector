@@ -2,27 +2,27 @@
 Tests for the MCP wrapper server review mode functionality.
 """
 
-import os
-import tempfile
-import pytest
 import sys
-from unittest.mock import AsyncMock, MagicMock, patch
+import tempfile
 from io import StringIO
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Configure path for imports
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # Import (but don't use) the shared utility function for patching
 
-from contextprotector.mcp_wrapper import review_server_config, MCPWrapperServer
 from contextprotector.mcp_config import MCPServerConfig
+from contextprotector.mcp_wrapper import MCPWrapperServer, review_server_config
 
 from .test_utils import approve_server_config_using_review
 
 
-@pytest.mark.asyncio
-async def test_review_mode_already_trusted():
+@pytest.mark.asyncio()
+async def test_review_mode_already_trusted() -> None:
     """Test review mode when config is already trusted."""
     # Create a temporary file for config storage
     temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -39,29 +39,29 @@ async def test_review_mode_already_trusted():
 
     # Patch the MCPWrapperServer.wrap_stdio to return our mock
     # and also patch the shared utility to avoid external calls
-    with patch.object(MCPWrapperServer, "wrap_stdio", return_value=mock_wrapper):
-        # Create mock for the utility function
-        mock_approve_func = AsyncMock(return_value=None)
-        with patch.object(approve_server_config_using_review, "__call__", mock_approve_func):
-            # Capture stdout for assertion
-            with patch("sys.stdout", new=StringIO()) as fake_stdout:
-                # Call the review function directly since we're testing its logic
-                await review_server_config("stdio", "test_command", temp_path)
+    mock_approve_func = AsyncMock(return_value=None)
+    with (
+        patch.object(MCPWrapperServer, "wrap_stdio", return_value=mock_wrapper),
+        patch.object(approve_server_config_using_review, "__call__", mock_approve_func),
+        patch("sys.stdout", new=StringIO()) as fake_stdout,
+    ):
+        # Call the review function directly since we're testing its logic
+        await review_server_config("stdio", "test_command", temp_path)
 
-                # Check output
-                output = fake_stdout.getvalue()
-                assert "already trusted" in output
-                assert "test_command" in output
+        # Check output
+        output = fake_stdout.getvalue()
+        assert "already trusted" in output
+        assert "test_command" in output
 
-                # Verify approve function wasn't called (since already trusted)
-                mock_approve_func.assert_not_called()
+        # Verify approve function wasn't called (since already trusted)
+        mock_approve_func.assert_not_called()
 
     # Clean up
-    os.unlink(temp_path)
+    Path(temp_path).unlink()
 
 
-@pytest.mark.asyncio
-async def test_review_mode_new_server_approval():
+@pytest.mark.asyncio()
+async def test_review_mode_new_server_approval() -> None:
     """Test review mode with a new server that gets approved."""
     # Create a temporary file for config storage
     temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -82,27 +82,27 @@ async def test_review_mode_new_server_approval():
     mock_wrapper.config_db.save_server_config = AsyncMock()
 
     # Patch the MCPWrapperServer.wrap_stdio to return our mock
-    with patch.object(MCPWrapperServer, "wrap_stdio", return_value=mock_wrapper):
-        # Mock user input to simulate 'yes' response
-        with patch("builtins.input", return_value="yes"):
-            # Capture stdout for assertion
-            with patch("sys.stdout", new=StringIO()) as fake_stdout:
-                # Call the review function
-                await review_server_config("stdio", "test_command", temp_path)
+    with (
+        patch.object(MCPWrapperServer, "wrap_stdio", return_value=mock_wrapper),
+        patch("builtins.input", return_value="yes"),
+        patch("sys.stdout", new=StringIO()) as fake_stdout,
+    ):
+        # Call the review function
+        await review_server_config("stdio", "test_command", temp_path)
 
-                # Check output
-                output = fake_stdout.getvalue()
-                assert "not trusted or has changed" in output
-                assert "new server" in output
-                assert "TOOL LIST" in output
-                assert "has been trusted" in output
+        # Check output
+        output = fake_stdout.getvalue()
+        assert "not trusted or has changed" in output
+        assert "new server" in output
+        assert "TOOL LIST" in output
+        assert "has been trusted" in output
 
     # Clean up
-    os.unlink(temp_path)
+    Path(temp_path).unlink()
 
 
-@pytest.mark.asyncio
-async def test_review_mode_modified_server_rejection():
+@pytest.mark.asyncio()
+async def test_review_mode_modified_server_rejection() -> None:
     """Test review mode with a modified server that gets rejected."""
     # Create a temporary file for config storage
     temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -137,31 +137,31 @@ async def test_review_mode_modified_server_rejection():
     mock_wrapper.config_db.save_server_config = AsyncMock()
 
     # Patch the MCPWrapperServer.wrap_stdio to return our mock
-    with patch.object(MCPWrapperServer, "wrap_stdio", return_value=mock_wrapper):
-        # Mock user input to simulate 'no' response
-        with patch("builtins.input", return_value="no"):
-            # Capture stdout for assertion
-            with patch("sys.stdout", new=StringIO()) as fake_stdout:
-                # Call the review function
-                await review_server_config("stdio", "test_command", temp_path)
+    with (
+        patch.object(MCPWrapperServer, "wrap_stdio", return_value=mock_wrapper),
+        patch("builtins.input", return_value="no"),
+        patch("sys.stdout", new=StringIO()) as fake_stdout,
+    ):
+        # Call the review function
+        await review_server_config("stdio", "test_command", temp_path)
 
-                # Check output
-                output = fake_stdout.getvalue()
-                assert "not trusted or has changed" in output
-                assert "Previous configuration found" in output
-                assert "CONFIGURATION DIFFERENCES" in output
-                assert "Mock diff output" in output
-                assert "NOT been trusted" in output
+        # Check output
+        output = fake_stdout.getvalue()
+        assert "not trusted or has changed" in output
+        assert "Previous configuration found" in output
+        assert "CONFIGURATION DIFFERENCES" in output
+        assert "Mock diff output" in output
+        assert "NOT been trusted" in output
 
-                # Verify save_server_config was NOT called
-                mock_wrapper.config_db.save_server_config.assert_not_called()
+        # Verify save_server_config was NOT called
+        mock_wrapper.config_db.save_server_config.assert_not_called()
 
     # Clean up
-    os.unlink(temp_path)
+    Path(temp_path).unlink()
 
 
-@pytest.mark.asyncio
-async def test_review_mode_with_guardrail_alert():
+@pytest.mark.asyncio()
+async def test_review_mode_with_guardrail_alert() -> None:
     """Test review mode with a configuration that triggers a guardrail alert."""
     # Create a temporary file for config storage
     temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -190,22 +190,22 @@ async def test_review_mode_with_guardrail_alert():
     mock_provider.name = "mock_provider"
 
     # Patch the MCPWrapperServer.wrap_stdio to return our mock
-    with patch.object(MCPWrapperServer, "wrap_stdio", return_value=mock_wrapper):
-        # Mock user input to simulate 'no' response
-        with patch("builtins.input", return_value="no"):
-            # Capture stdout for assertion
-            with patch("sys.stdout", new=StringIO()) as fake_stdout:
-                # Call the review function
-                await review_server_config("stdio", "test_command", temp_path, mock_provider)
+    with (
+        patch.object(MCPWrapperServer, "wrap_stdio", return_value=mock_wrapper),
+        patch("builtins.input", return_value="no"),
+        patch("sys.stdout", new=StringIO()) as fake_stdout,
+    ):
+        # Call the review function
+        await review_server_config("stdio", "test_command", temp_path, mock_provider)
 
-                # Check output
-                output = fake_stdout.getvalue()
-                assert "GUARDRAIL CHECK" in output
-                assert "ALERT" in output
-                assert "NOT been trusted" in output
+        # Check output
+        output = fake_stdout.getvalue()
+        assert "GUARDRAIL CHECK" in output
+        assert "ALERT" in output
+        assert "NOT been trusted" in output
 
-                # Verify save_server_config was NOT called
-                mock_wrapper.config_db.save_server_config.assert_not_called()
+        # Verify save_server_config was NOT called
+        mock_wrapper.config_db.save_server_config.assert_not_called()
 
     # Clean up
-    os.unlink(temp_path)
+    Path(temp_path).unlink()

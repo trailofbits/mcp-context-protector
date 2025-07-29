@@ -4,32 +4,31 @@ Uses the MCP Python SDK Server with ServerSession for sending notifications.
 """
 
 import asyncio
-import anyio
 import logging
-from typing import List
 from contextlib import AsyncExitStack
 
-import mcp.types as types
-from mcp.server.lowlevel import Server, NotificationOptions
+import anyio
+from mcp import types
+from mcp.server.lowlevel import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
-from mcp.server.stdio import stdio_server
 from mcp.server.session import ServerSession
+from mcp.server.stdio import stdio_server
 
 logger = logging.getLogger("notification_test_server")
 
 
 class NotificationTestServer:
-    def __init__(self):
+    def __init__(self) -> None:
         self.server = Server("notification-test-server")
         self._session = None  # Will store the session object
         self.received_notifications = []  # Track received client notifications
         self.register_handlers()
 
-    def register_handlers(self):
+    def register_handlers(self) -> None:
         """Register all handlers with the server."""
 
         @self.server.list_tools()
-        async def list_tools() -> List[types.Tool]:
+        async def list_tools() -> list[types.Tool]:
             """Return list of available tools."""
             return [
                 types.Tool(
@@ -59,11 +58,11 @@ class NotificationTestServer:
             ]
 
         @self.server.call_tool()
-        async def call_tool(name: str, arguments: dict) -> List[types.TextContent]:
+        async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
             """Handle tool calls."""
             if name == "send_notifications":
                 include_invalid = arguments.get("include_invalid", True)
-                logger.info(f"Sending notifications, include_invalid={include_invalid}")
+                logger.info("Sending notifications, include_invalid=%s", include_invalid)
 
                 try:
                     # Send valid notifications
@@ -74,10 +73,10 @@ class NotificationTestServer:
                         types.TextContent(type="text", text="Sent test notifications (valid types)")
                     ]
                 except Exception as e:
-                    logger.error(f"Error sending notifications: {e}")
+                    logger.exception("Error sending notifications: %s", e)
                     return [
                         types.TextContent(
-                            type="text", text=f"Error sending notifications: {str(e)}"
+                            type="text", text=f"Error sending notifications: {e!s}"
                         )
                     ]
             elif name == "get_received_notifications":
@@ -107,14 +106,14 @@ class NotificationTestServer:
                 count = len(self.received_notifications)
                 self.received_notifications.clear()
                 return [
-                    types.TextContent(type="text", text=f"Cleared {count} received notifications")
+                    types.TextContent(type="text", text="Cleared %d received notifications" % count)
                 ]
             else:
                 raise ValueError(f"Unknown tool: {name}")
 
         # Add notification handlers to capture client→server notifications
         @self.server.progress_notification()
-        async def handle_progress_notification(notification: types.ProgressNotification):
+        async def handle_progress_notification(notification: types.ProgressNotification) -> None:
             """Handle progress notifications from client."""
             import time
 
@@ -124,10 +123,10 @@ class NotificationTestServer:
                 "timestamp": time.time(),
             }
             self.received_notifications.append(notification_data)
-            logger.info(f"Received progress notification from client: {notification.method}")
+            logger.info("Received progress notification from client: %s", notification.method)
 
         # Register other notification handlers manually
-        async def handle_message_notification(notification: types.LoggingMessageNotification):
+        async def handle_message_notification(notification: types.LoggingMessageNotification) -> None:
             """Handle message notifications from client."""
             import time
 
@@ -137,9 +136,9 @@ class NotificationTestServer:
                 "timestamp": time.time(),
             }
             self.received_notifications.append(notification_data)
-            logger.info(f"Received message notification from client: {notification.method}")
+            logger.info("Received message notification from client: %s", notification.method)
 
-        async def handle_cancelled_notification(notification: types.CancelledNotification):
+        async def handle_cancelled_notification(notification: types.CancelledNotification) -> None:
             """Handle cancelled notifications from client."""
             import time
 
@@ -149,9 +148,9 @@ class NotificationTestServer:
                 "timestamp": time.time(),
             }
             self.received_notifications.append(notification_data)
-            logger.info(f"Received cancelled notification from client: {notification.method}")
+            logger.info("Received cancelled notification from client: %s", notification.method)
 
-        async def handle_initialized_notification(notification: types.InitializedNotification):
+        async def handle_initialized_notification(notification: types.InitializedNotification) -> None:
             """Handle initialized notifications from client."""
             import time
 
@@ -161,7 +160,7 @@ class NotificationTestServer:
                 "timestamp": time.time(),
             }
             self.received_notifications.append(notification_data)
-            logger.info(f"Received initialized notification from client: {notification.method}")
+            logger.info("Received initialized notification from client: %s", notification.method)
 
         # Register handlers in the notification_handlers dict
         self.server.notification_handlers[types.LoggingMessageNotification] = (
@@ -175,19 +174,19 @@ class NotificationTestServer:
         )
 
         @self.server.list_prompts()
-        async def list_prompts() -> List[types.Prompt]:
+        async def list_prompts() -> list[types.Prompt]:
             """Return list of available prompts (empty for test server)."""
             return []
 
         @self.server.list_resources()
-        async def list_resources() -> List[types.Resource]:
+        async def list_resources() -> list[types.Resource]:
             """Return list of available resources (empty for test server)."""
             return []
 
-    async def _send_valid_notifications(self):
+    async def _send_valid_notifications(self) -> None:
         """Send all valid notification types according to MCP specification."""
         if not self._session:
-            logger.error("No session available to send notifications")
+            logger.exception("No session available to send notifications")
             return
 
         # 1. Send tools/list_changed notification
@@ -226,10 +225,10 @@ class NotificationTestServer:
         await self._session.send_notification(resource_updated_notification)
         logger.info("Sent notifications/resources/updated")
 
-    async def _send_invalid_notification(self):
+    async def _send_invalid_notification(self) -> None:
         """Send an invalid notification type that should be filtered out."""
         if not self._session:
-            logger.error("No session available to send notifications")
+            logger.exception("No session available to send notifications")
             return
 
         # Create a custom notification with invalid method for testing filtering
@@ -241,7 +240,7 @@ class NotificationTestServer:
         await self._session.send_notification(invalid_notification)
         logger.info("Sent notifications/invalid/custom_type (should be filtered)")
 
-    async def run(self):
+    async def run(self) -> None:
         """Run the server with session tracking."""
         async with stdio_server() as streams:
             init_options = InitializationOptions(
@@ -277,7 +276,7 @@ class NotificationTestServer:
                         )
 
 
-async def main():
+async def main() -> None:
     """Main entry point for the server."""
     server = NotificationTestServer()
     await server.run()
