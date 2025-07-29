@@ -3,10 +3,7 @@ Simple downstream MCP server with an echo tool.
 Uses fastmcp with SSE transport from the official Python SDK for MCP.
 """
 
-import argparse
-import os
 import sys
-from pathlib import Path
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -46,25 +43,8 @@ app = FastMCP()
 app.add_tool(echo_handler, "echo")
 
 
-# Function to write PID to file
-def write_pidfile(pidfile_path) -> None:
-    """Write the current process ID to the specified file."""
-    if pidfile_path:
-        with Path(pidfile_path).open("w") as f:
-            f.write(str(os.getpid()))
-        print(f"PID {os.getpid()} written to {pidfile_path}")
-
-
 # Run the server if executed directly
 if __name__ == "__main__":
-    # Parse command line arguments
-    parser = argparse.ArgumentParser(description="Simple SSE MCP Server")
-    parser.add_argument("--pidfile", help="File to write the server's PID to")
-
-    args = parser.parse_args()
-
-    # Write PID to file if specified
-    write_pidfile(args.pidfile)
 
     app.settings.host = "127.0.0.1"
 
