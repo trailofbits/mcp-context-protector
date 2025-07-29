@@ -4,19 +4,21 @@ A simple MCP server that provides both tools and prompts for testing.
 """
 
 import asyncio
-import anyio
 import sys
 from pathlib import Path
+
+import anyio
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import mcp.types as types
-from mcp.server.lowlevel import Server, NotificationOptions
-from mcp.server.models import InitializationOptions
-from mcp.server.stdio import stdio_server
-from mcp.server.session import ServerSession
 from contextlib import AsyncExitStack
+
+import mcp.types as types
+from mcp.server.lowlevel import NotificationOptions, Server
+from mcp.server.models import InitializationOptions
+from mcp.server.session import ServerSession
+from mcp.server.stdio import stdio_server
 
 
 class PromptTestServer:

@@ -2,17 +2,16 @@
 Tests for the MCPConfigDatabase class.
 """
 
-import os
-import tempfile
 import json
+import tempfile
 from pathlib import Path
 
 from contextprotector.mcp_config import (
+    MCPConfigDatabase,
+    MCPParameterDefinition,
     MCPServerConfig,
     MCPToolDefinition,
-    MCPParameterDefinition,
     ParameterType,
-    MCPConfigDatabase,
 )
 
 
@@ -135,8 +134,8 @@ def test_config_database_save_load() -> None:
 
     finally:
         # Clean up
-        if os.path.exists(config_path):
-            os.unlink(config_path)
+        if Path(config_path).exists():
+            Path(config_path).unlink()
 
 
 def test_config_database_removes_server() -> None:
@@ -179,8 +178,8 @@ def test_config_database_removes_server() -> None:
 
     finally:
         # Clean up
-        if os.path.exists(config_path):
-            os.unlink(config_path)
+        if Path(config_path).exists():
+            Path(config_path).unlink()
 
 
 def test_config_database_file_structure() -> None:
@@ -203,7 +202,7 @@ def test_config_database_file_structure() -> None:
         db.save_server_config("stdio", server_id, config)
 
         # Read the file directly to check its structure
-        with open(config_path, "r") as f:
+        with Path(config_path).open("r") as f:
             data = json.load(f)
 
         # Verify the structure
@@ -221,8 +220,8 @@ def test_config_database_file_structure() -> None:
 
     finally:
         # Clean up
-        if os.path.exists(config_path):
-            os.unlink(config_path)
+        if Path(config_path).exists():
+            Path(config_path).unlink()
 
 
 def test_config_instructions_comparison() -> None:

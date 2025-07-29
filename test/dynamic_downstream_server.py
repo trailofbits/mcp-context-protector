@@ -27,17 +27,18 @@ To test:
 import argparse
 import asyncio
 import atexit
-from contextlib import AsyncExitStack
 import os
 import signal
 import sys
-from typing import Dict, Any
-import anyio
+from contextlib import AsyncExitStack
+from pathlib import Path
+from typing import Any
 
+import anyio
 from mcp.server.fastmcp import FastMCP
-from mcp.server.session import ServerSession
-from mcp.server.stdio import stdio_server as stdio_server
 from mcp.server.lowlevel import NotificationOptions
+from mcp.server.session import ServerSession
+from mcp.server.stdio import stdio_server
 
 # Global counter for the number of tools
 num_tools = 1
@@ -173,18 +174,18 @@ def read_tool_count_from_file(toolcount_file) -> int:
         int: The number of tools to initialize, or 1 if the file doesn't exist or is invalid
     """
     try:
-        if toolcount_file and os.path.exists(toolcount_file):
-            with open(toolcount_file, "r") as f:
+        if toolcount_file and Path(toolcount_file).exists():
+            with Path(toolcount_file).open("r") as f:
                 count = int(f.read().strip())
                 return max(1, count)  # Ensure at least 1 tool
-    except (ValueError, FileNotFoundError, IOError) as e:
+    except (OSError, ValueError, FileNotFoundError) as e:
         print(f"Error reading tool count from {toolcount_file}: {e}", file=sys.stderr)
 
     # Default to 1 tool if file doesn't exist or has invalid content
     return 1
 
 
-def signal_handler(signum, frame) -> None:
+def signal_handler(_signum: any, _frame: any) -> None:
     """Signal handler for SIGHUP that adds a new tool."""
     global num_tools
 
@@ -217,11 +218,11 @@ def write_pidfile(pidfile_path) -> None:
     pid = os.getpid()
 
     try:
-        with open(pidfile_path, "w") as f:
+        with Path(pidfile_path).open("w") as f:
             f.write(str(pid))
 
         # Register cleanup function to remove pidfile on exit
-        atexit.register(lambda: os.remove(pidfile_path) if os.path.exists(pidfile_path) else None)
+        atexit.register(lambda: Path(pidfile_path).unlink() if Path(pidfile_path).exists() else None)
 
         print(f"PID {pid} written to {pidfile_path}", file=sys.stderr)
     except Exception as e:
@@ -239,7 +240,7 @@ async def my_run(
     # clients can perform initialization with any node. The client must still follow
     # the initialization lifecycle, but can do so with any available node
     # rather than requiring initialization for each connection.
-    stateless: bool = False,
+    _stateless: bool = False,
 ) -> None:
     """
     Server startup function that allows us to send notifications.

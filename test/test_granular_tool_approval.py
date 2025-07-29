@@ -10,15 +10,15 @@ This module tests the granular approval behaviors:
 """
 
 import tempfile
-import pytest
 
+import pytest
 from contextprotector.mcp_config import (
+    ApprovalStatus,
     MCPConfigDatabase,
+    MCPParameterDefinition,
     MCPServerConfig,
     MCPToolDefinition,
-    MCPParameterDefinition,
     ParameterType,
-    ApprovalStatus,
 )
 
 

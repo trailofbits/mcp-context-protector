@@ -2,19 +2,20 @@
 Tests for the MCP wrapper server.
 """
 
-import json
-import os
-import tempfile
-import subprocess
-import pytest
 import asyncio
+import json
+import subprocess
+import tempfile
+from collections.abc import Awaitable, Callable
+from pathlib import Path
+
+import pytest
+from contextprotector.mcp_config import MCPServerConfig
 from mcp import ClientSession, StdioServerParameters, types
 from mcp.client.stdio import stdio_client
-from pathlib import Path
-from contextprotector.mcp_config import MCPServerConfig
 
 
-async def approve_server_config_using_review(command, config_path) -> None:
+async def approve_server_config_using_review(command: str, config_path: str) -> None:
     """
     Run the --review-server process to approve a server configuration.
 
@@ -62,19 +63,19 @@ async def approve_server_config_using_review(command, config_path) -> None:
     ), f"Missing expected approval message in output: {stdout}"
 
 
-async def run_with_wrapper_session(callback, config_path=None) -> None:
+async def run_with_wrapper_session(callback: Callable[[ClientSession], Awaitable[None]], config_path=None) -> None:
     """
     Run a test with a wrapper session that connects to the simple downstream server.
     """
     config_path = config_path or MCPServerConfig.get_default_config_path()
-    dir = Path(__file__).resolve().parent
+    parent_dir = Path(__file__).resolve().parent
     server_params = StdioServerParameters(
         command="python",  # Executable
         args=[
             "-m",
             "contextprotector",
             "--command",
-            f"python {str(dir.joinpath('simple_downstream_server.py'))}",
+            f"python {parent_dir.joinpath('simple_downstream_server.py')!s}",
             "--server-config-file",
             str(config_path),
         ],  # Wrapper command + downstream server
@@ -82,7 +83,8 @@ async def run_with_wrapper_session(callback, config_path=None) -> None:
         env=None,  # Optional environment variables
     )
     async with stdio_client(server_params) as (read, write):
-        assert read is not None and write is not None
+        assert read is not None
+        assert write is not None
         async with ClientSession(read, write) as session:
             assert session is not None
             await session.initialize()
@@ -93,8 +95,8 @@ async def run_with_wrapper_session(callback, config_path=None) -> None:
 async def test_echo_tool_through_wrapper() -> None:
     """Test that the echo tool correctly works through the MCP wrapper."""
 
-    async def callback(session) -> None:
-        input = "Marco (Polo)"
+    async def callback(session: ClientSession) -> None:
+        input_data = "Marco (Polo)"
 
         # List available tools
         tools = await session.list_tools()
@@ -103,19 +105,20 @@ async def test_echo_tool_through_wrapper() -> None:
         assert sorted([t.name for t in tools.tools]) == ["context-protector-block"]
 
         # First try calling the echo tool - expect to get blocked
-        result = await session.call_tool(name="echo", arguments={"message": input})
+        result = await session.call_tool(name="echo", arguments={"message": input_data})
         assert len(result.content) == 1
         assert isinstance(result.content[0], types.TextContent)
         result_dict = json.loads(result.content[0].text)
 
         # Check that the call was blocked due to unapproved config
-        assert isinstance(result_dict, dict) and result_dict["status"] == "blocked"
+        assert isinstance(result_dict, dict)
+        assert result_dict["status"] == "blocked"
 
-    async def callback2(session) -> None:
-        input = "Marco (Polo)"
+    async def callback2(session: ClientSession) -> None:
+        input_data = "Marco (Polo)"
 
         # Call the echo tool again - should work now
-        result = await session.call_tool(name="echo", arguments={"message": input})
+        result = await session.call_tool(name="echo", arguments={"message": input_data})
         assert isinstance(result, types.CallToolResult)
         assert len(result.content) == 1
         assert isinstance(result.content[0], types.TextContent)
@@ -126,15 +129,15 @@ async def test_echo_tool_through_wrapper() -> None:
 
         # The actual echo response should be in the response field
         response_data = json.loads(response_json["response"])
-        assert response_data["echo_message"] == input
+        assert response_data["echo_message"] == input_data
 
     temp_file = tempfile.NamedTemporaryFile(delete=False)
     await run_with_wrapper_session(callback, temp_file.name)
 
     # Now we need to run the review process to approve this config
     await approve_server_config_using_review(
-        f"python {str(Path(__file__).resolve().parent.joinpath('simple_downstream_server.py'))}",
+        f"python {Path(__file__).resolve().parent.joinpath('simple_downstream_server.py')!s}",
         temp_file.name,
     )
     await run_with_wrapper_session(callback2, temp_file.name)
-    os.unlink(temp_file.name)
+    Path(temp_file.name).unlink()

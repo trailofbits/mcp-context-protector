@@ -4,16 +4,15 @@ Uses the MCP Python SDK Server with ServerSession for sending notifications.
 """
 
 import asyncio
-import anyio
 import logging
-from typing import List
 from contextlib import AsyncExitStack
 
+import anyio
 import mcp.types as types
-from mcp.server.lowlevel import Server, NotificationOptions
+from mcp.server.lowlevel import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
-from mcp.server.stdio import stdio_server
 from mcp.server.session import ServerSession
+from mcp.server.stdio import stdio_server
 
 logger = logging.getLogger("notification_test_server")
 
@@ -77,7 +76,7 @@ class NotificationTestServer:
                     logger.error(f"Error sending notifications: {e}")
                     return [
                         types.TextContent(
-                            type="text", text=f"Error sending notifications: {str(e)}"
+                            type="text", text=f"Error sending notifications: {e!s}"
                         )
                     ]
             elif name == "get_received_notifications":

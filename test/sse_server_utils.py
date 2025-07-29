@@ -7,14 +7,14 @@ in test environments, eliminating code duplication across test files.
 
 import asyncio
 import logging
-import os
 import subprocess
 import sys
 import tempfile
+from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import AsyncGenerator
 
 import psutil
+import pytest
 import pytest_asyncio
 
 
@@ -72,7 +72,7 @@ class SSEServerManager:
 
         # Read the PID from the file to ensure the server started
         try:
-            with open(pid_file.name, "r") as f:
+            with Path(pid_file.name).open("r") as f:
                 pid = int(f.read().strip())
                 self.pid = pid
                 assert pid is not None
@@ -93,12 +93,12 @@ class SSEServerManager:
                     await asyncio.sleep(1.0)
 
                 assert self.port is not None, "Could not determine port for SSE server"
-        except (IOError, ValueError) as e:
-            assert False, f"Failed to read PID file: {e}"
+        except (OSError, ValueError) as e:
+            pytest.fail(f"Failed to read PID file: {e}")
 
         # Clean up the PID file
         try:
-            os.unlink(pid_file.name)
+            Path(pid_file.name).unlink()
         except OSError:
             pass
 

@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-import json
-import os
-import threading
 import hashlib
+import json
+import pathlib
+import threading
 from dataclasses import dataclass, field
 from enum import Enum
-import pathlib
-from typing import Any, Dict, List, Union, TextIO, Literal
+from typing import Any, Literal, TextIO, Union
 
 
 class ParameterType(str, Enum):
@@ -240,7 +239,7 @@ class MCPServerConfig:
 
         return str(data_dir / "config")
 
-    def add_tool(self, tool: Union[MCPToolDefinition, dict[str, Any]]) -> None:
+    def add_tool(self, tool: MCPToolDefinition | dict[str, Any]) -> None:
         """Add a tool to the server configuration.
 
         Args:
@@ -300,7 +299,7 @@ class MCPServerConfig:
         json_str = json.dumps(config_dict, indent=indent)
 
         if path:
-            with open(path, "w") as f:
+            with pathlib.Path(path).open("w") as f:
                 f.write(json_str)
             return None
         elif fp:
@@ -337,7 +336,7 @@ class MCPServerConfig:
         data = None
         if path:
             try:
-                with open(path, "r") as f:
+                with pathlib.Path(path).open("r") as f:
                     data = json.load(f)
             except (FileNotFoundError, json.decoder.JSONDecodeError):
                 pass
@@ -667,8 +666,8 @@ class MCPConfigDatabase:
         """Load server configurations from the config file."""
         with MCPConfigDatabase._file_lock:
             try:
-                if os.path.exists(self.config_path):
-                    with open(self.config_path, "r") as f:
+                if pathlib.Path(self.config_path).exists():
+                    with pathlib.Path(self.config_path).open("r") as f:
                         data = json.load(f)
                         for server_data in data.get("servers", []):
                             approval_status_str = server_data.get(
@@ -711,15 +710,15 @@ class MCPConfigDatabase:
                 ]
             }
 
-            os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
+            pathlib.Path(self.config_path).parent.mkdir(parents=True, exist_ok=True)
 
             # Write to a temporary file first, then rename
             temp_path = f"{self.config_path}.tmp"
-            with open(temp_path, "w") as f:
+            with pathlib.Path(temp_path).open("w") as f:
                 json.dump(data, f, indent=2)
 
             # Atomically replace the old file with the new one
-            os.replace(temp_path, self.config_path)
+            pathlib.Path(temp_path).replace(self.config_path)
 
     def get_server_config(self, server_type: str, identifier: str) -> MCPServerConfig | None:
         """

@@ -9,13 +9,12 @@ This test verifies that:
 
 import asyncio
 import logging
-import os
-import pytest
 import sys
 import tempfile
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any
 
+import pytest
 from mcp import ClientSession, types
 
 from .test_utils import approve_server_config_using_review, run_with_wrapper_session
@@ -146,7 +145,7 @@ async def test_notification_forwarding() -> None:
 
     finally:
         # Clean up temp file
-        os.unlink(temp_file.name)
+        Path(temp_file.name).unlink()
 
 
 @pytest.mark.asyncio()
@@ -220,7 +219,7 @@ async def test_notification_forwarding_without_invalid() -> None:
             await run_with_wrapper_session(test_callback, "stdio", server_command, temp_file.name)
 
     finally:
-        os.unlink(temp_file.name)
+        Path(temp_file.name).unlink()
 
 
 @pytest.mark.asyncio()
@@ -335,4 +334,4 @@ async def test_client_to_server_notification_forwarding() -> None:
         await run_with_wrapper_session(test_callback, "stdio", server_command, temp_file.name)
 
     finally:
-        os.unlink(temp_file.name)
+        Path(temp_file.name).unlink()

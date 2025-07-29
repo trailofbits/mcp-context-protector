@@ -8,18 +8,20 @@ mixed approval states, demonstrating true granular blocking.
 
 import json
 import tempfile
-import pytest
 from pathlib import Path
 
+import pytest
 from contextprotector.mcp_config import (
+    ApprovalStatus,
     MCPConfigDatabase,
+    MCPParameterDefinition,
     MCPServerConfig,
     MCPToolDefinition,
-    MCPParameterDefinition,
     ParameterType,
-    ApprovalStatus,
 )
-from .test_utils import run_with_wrapper_session, approve_server_config_using_review
+from mcp import ClientSession
+
+from .test_utils import approve_server_config_using_review, run_with_wrapper_session
 
 
 def get_server_command(server_filename: str) -> str:
@@ -87,7 +89,7 @@ async def test_granular_tool_filtering_in_list_tools() -> None:
     # Note: NOT approving greet tool
 
     # Step 3: Test that list_tools() shows granular filtering
-    async def test_granular_filtering(session) -> None:
+    async def test_granular_filtering(session: ClientSession) -> None:
         tools = await session.list_tools()
         tool_names = [t.name for t in tools.tools]
 
@@ -346,7 +348,7 @@ async def test_new_server_complete_blocking() -> None:
     temp_file = tempfile.NamedTemporaryFile(delete=False)
 
     # Test connecting to a server that has never been seen before
-    async def test_new_server_blocking(session) -> None:
+    async def test_new_server_blocking(session: ClientSession) -> None:
         # New server should only show context-protector-block
         tools = await session.list_tools()
         tool_names = [t.name for t in tools.tools]

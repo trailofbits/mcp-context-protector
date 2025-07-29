@@ -3,7 +3,6 @@ Tests for ANSI escape code visualization in MCP wrapper.
 """
 
 import json
-import os
 import sys
 import tempfile
 from collections.abc import Awaitable, Callable
@@ -64,7 +63,7 @@ class TestAnsiVisualization:
 
     def teardown_method(self) -> None:
         """Clean up after test."""
-        os.unlink(self.config_path)
+        Path(self.config_path).unlink()
 
     @pytest.mark.asyncio()
     async def test_ansi_passthrough_default(self) -> None:

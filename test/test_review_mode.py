@@ -2,21 +2,21 @@
 Tests for the MCP wrapper server review mode functionality.
 """
 
-import os
-import tempfile
-import pytest
 import sys
-from unittest.mock import AsyncMock, MagicMock, patch
+import tempfile
 from io import StringIO
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Configure path for imports
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # Import (but don't use) the shared utility function for patching
 
-from contextprotector.mcp_wrapper import review_server_config, MCPWrapperServer
 from contextprotector.mcp_config import MCPServerConfig
+from contextprotector.mcp_wrapper import MCPWrapperServer, review_server_config
 
 from .test_utils import approve_server_config_using_review
 
@@ -57,7 +57,7 @@ async def test_review_mode_already_trusted() -> None:
                 mock_approve_func.assert_not_called()
 
     # Clean up
-    os.unlink(temp_path)
+    Path(temp_path).unlink()
 
 
 @pytest.mark.asyncio()
@@ -98,7 +98,7 @@ async def test_review_mode_new_server_approval() -> None:
                 assert "has been trusted" in output
 
     # Clean up
-    os.unlink(temp_path)
+    Path(temp_path).unlink()
 
 
 @pytest.mark.asyncio()
@@ -157,7 +157,7 @@ async def test_review_mode_modified_server_rejection() -> None:
                 mock_wrapper.config_db.save_server_config.assert_not_called()
 
     # Clean up
-    os.unlink(temp_path)
+    Path(temp_path).unlink()
 
 
 @pytest.mark.asyncio()
@@ -208,4 +208,4 @@ async def test_review_mode_with_guardrail_alert() -> None:
                 mock_wrapper.config_db.save_server_config.assert_not_called()
 
     # Clean up
-    os.unlink(temp_path)
+    Path(temp_path).unlink()

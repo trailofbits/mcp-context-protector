@@ -4,10 +4,10 @@ CLI interface for reviewing and managing quarantined tool responses.
 
 import json
 import logging
-from typing import List, Dict, Any
+from typing import Any
 
 from .mcp_wrapper import make_ansi_escape_codes_visible
-from .quarantine import ToolResponseQuarantine, QuarantinedToolResponse
+from .quarantine import QuarantinedToolResponse, ToolResponseQuarantine
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("quarantine_cli")

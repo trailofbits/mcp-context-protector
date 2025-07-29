@@ -8,11 +8,13 @@ from a running server and verifies the granular approval behavior.
 
 import json
 import tempfile
-import pytest
 from pathlib import Path
 
+import pytest
 from contextprotector.mcp_config import ApprovalStatus
-from .test_utils import run_with_wrapper_session, approve_server_config_using_review
+from mcp import ClientSession
+
+from .test_utils import approve_server_config_using_review, run_with_wrapper_session
 
 
 def get_server_command(server_filename: str) -> str:
@@ -32,7 +34,7 @@ async def test_dynamic_tool_addition_with_existing_server() -> None:
     # The key is testing the approval logic, not the dynamic server behavior
 
     # Step 1: Start with the simple server and approve it
-    async def callback_initial_approval(session) -> None:
+    async def callback_initial_approval(session: ClientSession) -> None:
         tools = await session.list_tools()
         # Should only have context-protector-block initially
         assert "context-protector-block" in [t.name for t in tools.tools]
@@ -56,7 +58,7 @@ async def test_dynamic_tool_addition_with_existing_server() -> None:
     )
 
     # Step 2: Verify echo tool works after approval
-    async def callback_initial_working(session) -> None:
+    async def callback_initial_working(session: ClientSession) -> None:
         tools = await session.list_tools()
         tool_names = [t.name for t in tools.tools]
 
@@ -79,8 +81,8 @@ async def test_dynamic_tool_addition_with_existing_server() -> None:
     # Step 3: Simulate tool addition by modifying the database directly
     from contextprotector.mcp_config import (
         MCPConfigDatabase,
-        MCPToolDefinition,
         MCPParameterDefinition,
+        MCPToolDefinition,
         ParameterType,
     )
 
@@ -103,7 +105,7 @@ async def test_dynamic_tool_addition_with_existing_server() -> None:
     db.save_unapproved_config("stdio", get_server_command("simple_downstream_server.py"), config)
 
     # Step 4: Test granular blocking - original tool works, new tool blocked
-    async def callback_after_addition(session) -> None:
+    async def callback_after_addition(_session: ClientSession) -> None:
         # Check approval status
         approval_status = db.get_server_approval_status(
             "stdio", get_server_command("simple_downstream_server.py"), config
@@ -144,9 +146,9 @@ async def test_instruction_change_blocks_all_tools() -> None:
 
     from contextprotector.mcp_config import (
         MCPConfigDatabase,
+        MCPParameterDefinition,
         MCPServerConfig,
         MCPToolDefinition,
-        MCPParameterDefinition,
         ParameterType,
     )
 

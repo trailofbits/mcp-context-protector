@@ -6,10 +6,9 @@ Provides functionality to load and manage guardrail providers.
 
 import importlib
 import inspect
-import pkgutil
 import logging
+import pkgutil
 import sys
-from typing import List, Dict, Type
 
 from . import guardrail_providers
 from .guardrail_types import GuardrailProvider
@@ -52,7 +51,7 @@ def _is_provider_class(obj) -> bool:
     return has_name and has_check
 
 
-def load_guardrail_providers() -> dict[str, Type[GuardrailProvider]]:
+def load_guardrail_providers() -> dict[str, type[GuardrailProvider]]:
     """
     Load all guardrail providers from the guardrail_providers package.
 

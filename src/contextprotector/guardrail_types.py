@@ -6,7 +6,7 @@ Defines the base classes and data structures used by guardrail providers.
 
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, Any
+from typing import Any
 
 logger = logging.getLogger("guardrail_types")
 
@@ -55,7 +55,7 @@ class GuardrailProvider:
         """Get the provider name."""
         raise NotImplementedError("Guardrail providers must implement the name property")
 
-    def check_server_config(self, config) -> GuardrailAlert | None:
+    def check_server_config(self, config) -> GuardrailAlert | None: # noqa: ARG002
         """
         Check a server configuration against the guardrail.
 
@@ -70,7 +70,7 @@ class GuardrailProvider:
         """
         return None
 
-    def check_tool_response(self, tool_response: ToolResponse) -> GuardrailAlert | None:
+    def check_tool_response(self, tool_response: ToolResponse) -> GuardrailAlert | None: # noqa: ARG002
         """
         Check a tool response against the guardrail.
 

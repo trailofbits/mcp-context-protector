@@ -10,12 +10,11 @@ This test verifies that when a configuration is not approved:
 
 import json
 import logging
-import os
-import pytest
 import sys
 import tempfile
 from pathlib import Path
 
+import pytest
 from mcp import ClientSession, types
 
 from .test_utils import run_with_wrapper_session
@@ -87,7 +86,8 @@ async def test_zero_information_leakage_unapproved_config() -> None:
             blocked_data = json.loads(blocked_text)
 
             # Should be a ValueError response (from call_tool method blocking)
-            assert "status" in blocked_data and blocked_data["status"] == "blocked"
+            assert "status" in blocked_data
+            assert blocked_data["status"] == "blocked"
             assert "reason" in blocked_data
             assert "configuration not approved" in blocked_data["reason"].lower()
 
@@ -190,7 +190,7 @@ async def test_zero_information_leakage_unapproved_config() -> None:
 
     finally:
         # Clean up temp file
-        os.unlink(temp_file.name)
+        Path(temp_file.name).unlink()
 
 
 @pytest.mark.asyncio()
@@ -250,4 +250,4 @@ async def test_information_visible_after_approval() -> None:
 
     finally:
         # Clean up temp file
-        os.unlink(temp_file.name)
+        Path(temp_file.name).unlink()

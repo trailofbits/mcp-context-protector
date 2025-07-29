@@ -3,7 +3,7 @@ Simple downstream MCP server with an echo tool.
 Uses fastmcp from the official Python SDK for MCP.
 """
 
-from typing import Dict, Any
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 from mcp.types import Tool

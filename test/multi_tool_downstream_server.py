@@ -3,7 +3,7 @@ Multi-tool downstream MCP server for testing granular approval.
 Has multiple tools that can be selectively approved/blocked.
 """
 
-from typing import Dict, Any
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 from mcp.types import Tool

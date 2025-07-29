@@ -87,6 +87,8 @@ ignore = ["D203", "D213", "COM812", "ISC001", "ANN101"]
     "D",    # no docstrings in tests
     "S101", # asserts are expected in tests
     "T201", # allow `print` in tests
+    "PLR2004", # allow "magic numbers" in tests
+    "SLF001",  # allow private member access in tests
 ]
 "src/contextprotector/__main__.py" = [
     "T201", # allow `print` in main module

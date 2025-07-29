@@ -2,32 +2,31 @@
 # ruff: noqa: T201
 import asyncio
 import base64
-import logging
 import json
+import logging
 import re
 import traceback
-from typing import List, Literal, Dict, Any
+from typing import Any, Literal
 
 import mcp.types as types
-from mcp.server.lowlevel import Server, NotificationOptions
+from mcp.server.lowlevel import NotificationOptions, Server
 from mcp.server.lowlevel.helper_types import ReadResourceContents
 from mcp.server.models import InitializationOptions
 
 # Import guardrail types for type hints
-from .guardrail_types import GuardrailProvider, GuardrailAlert, ToolResponse
+from .guardrail_types import GuardrailAlert, GuardrailProvider, ToolResponse
+from .mcp_config import (
+    ApprovalStatus,
+    MCPConfigDatabase,
+    MCPParameterDefinition,
+    MCPServerConfig,
+    MCPToolDefinition,
+    MCPToolSpec,
+    ParameterType,
+)
 
 # Import quarantine functionality
 from .quarantine import ToolResponseQuarantine
-
-from .mcp_config import (
-    MCPServerConfig,
-    MCPToolSpec,
-    MCPToolDefinition,
-    MCPParameterDefinition,
-    ParameterType,
-    MCPConfigDatabase,
-    ApprovalStatus,
-)
 
 logger = logging.getLogger("mcp_wrapper")
 
@@ -234,7 +233,7 @@ class MCPWrapperServer:
                 return contents
             except Exception as e:
                 logger.error(f"Error fetching resource {name} from downstream server: {e}")
-                raise ValueError(f"Error fetching resource from downstream server: {str(e)}")
+                raise ValueError(f"Error fetching resource from downstream server: {e!s}")
 
         @self.server.list_tools()
         async def list_tools() -> list[types.Tool]:
@@ -363,7 +362,7 @@ class MCPWrapperServer:
                 logger.error(
                     f"Error from downstream server during prompt dispatch:\n\n---\n\n{e}\n\n---\n\n"
                 )
-                raise ValueError(f"Error from downstream server: {str(e)}")
+                raise ValueError(f"Error from downstream server: {e!s}")
 
         @self.server.call_tool()
         async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
@@ -477,7 +476,7 @@ class MCPWrapperServer:
 
             except Exception as e:
                 logger.error(f"Error from child MCP server: {e}")
-                raise ValueError(f"Error from child MCP server: {str(e)}")
+                raise ValueError(f"Error from child MCP server: {e!s}")
 
     async def _handle_context_protector_block(self) -> list[types.TextContent]:
         """
@@ -669,7 +668,7 @@ Note: This tool is only available when tools are blocked due to security restric
 
         except Exception as e:
             logger.error(f"Error calling downstream tool '{name}': {e}")
-            raise ValueError(f"Error calling downstream tool: {str(e)}")
+            raise ValueError(f"Error calling downstream tool: {e!s}")
 
     def _create_tool_response(
         self,
@@ -690,7 +689,7 @@ Note: This tool is only available when tools are blocked due to security restric
         self,
         tool_name: str,
         arguments: dict,
-        response_text: str,
+        _response_text: str,
         guardrail_alert: GuardrailAlert,
         quarantine_id: str | None,
     ) -> str:
@@ -1402,10 +1401,11 @@ Note: This tool is only available when tools are blocked due to security restric
         await self.connect()
 
         try:
-            from mcp.server.stdio import stdio_server
-            from mcp.server.session import ServerSession
             from contextlib import AsyncExitStack
+
             import anyio
+            from mcp.server.session import ServerSession
+            from mcp.server.stdio import stdio_server
 
             async with stdio_server() as streams:
                 init_options = InitializationOptions(
@@ -1435,7 +1435,7 @@ Note: This tool is only available when tools are blocked due to security restric
                     async with anyio.create_task_group() as tg:
                         async for message in self.server_session.incoming_messages:
                             tg.start_soon(
-                                self.server._handle_message,
+                                self.server._handle_message, # noqa: SLF001
                                 message,
                                 self.server_session,
                                 None,  # No lifespan context needed
@@ -1527,7 +1527,7 @@ async def review_server_config(
             # First approve instructions
             wrapper.config_db.approve_instructions(
                 wrapper.connection_type,
-                wrapper._get_server_identifier(),
+                wrapper._get_server_identifier(), # noqa: SLF001
                 wrapper.current_config.instructions,
             )
 
@@ -1535,7 +1535,7 @@ async def review_server_config(
             for tool in wrapper.current_config.tools:
                 wrapper.config_db.approve_tool(
                     wrapper.connection_type,
-                    wrapper._get_server_identifier(),
+                    wrapper._get_server_identifier(), # noqa: SLF001
                     tool.name,
                     tool,
                 )
@@ -1543,7 +1543,7 @@ async def review_server_config(
             # Finally set the server as approved
             wrapper.config_db.save_server_config(
                 wrapper.connection_type,
-                wrapper._get_server_identifier(),
+                wrapper._get_server_identifier(), # noqa: SLF001
                 wrapper.current_config,
                 ApprovalStatus.APPROVED,
             )

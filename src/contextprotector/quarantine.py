@@ -4,14 +4,13 @@ Quarantine system for tool responses that have been flagged by guardrails.
 Provides storage and retrieval of quarantined tool responses.
 """
 
+import datetime
 import json
-import os
-import uuid
 import pathlib
 import threading
-import datetime
-from dataclasses import dataclass, field, asdict
-from typing import Dict, Any, List, Tuple
+import uuid
+from dataclasses import asdict, dataclass, field
+from typing import Any, Tuple
 
 
 @dataclass
@@ -29,7 +28,7 @@ class QuarantinedToolResponse:
         timestamp: When the response was quarantined
         released: Whether the response has been released from quarantine
         released_at: When the response was released (if applicable)
-        
+
     """
 
     id: str
@@ -108,8 +107,8 @@ class ToolResponseQuarantine:
         """Load quarantined responses from the database file."""
         with ToolResponseQuarantine._file_lock:
             try:
-                if os.path.exists(self.db_path):
-                    with open(self.db_path, "r") as f:
+                if pathlib.Path(self.db_path).exists():
+                    with pathlib.Path(self.db_path).open("r") as f:
                         data = json.load(f)
                         for response_data in data.get("responses", []):
                             response = QuarantinedToolResponse.from_dict(response_data)
@@ -127,15 +126,15 @@ class ToolResponseQuarantine:
                 ]
             }
 
-            os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+            pathlib.Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
 
             # Write to a temporary file first, then rename
             temp_path = f"{self.db_path}.tmp"
-            with open(temp_path, "w") as f:
+            with pathlib.Path(temp_path).open("w") as f:
                 json.dump(data, f, indent=2)
 
             # Atomically replace the old file with the new one
-            os.replace(temp_path, self.db_path)
+            pathlib.Path(temp_path).replace(self.db_path)
 
     def quarantine_response(
         self, tool_name: str, tool_input: dict[str, Any], tool_output: Any, reason: str
@@ -243,7 +242,7 @@ class ToolResponseQuarantine:
             for response in responses
         ]
 
-    def get_response_pairs(self) -> list[Tuple[dict[str, Any], Any]]:
+    def get_response_pairs(self) -> list[tuple[dict[str, Any], Any]]:
         """
         Get all request-response pairs from quarantine.
 

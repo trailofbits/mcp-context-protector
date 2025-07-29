@@ -5,17 +5,18 @@ Provides server configuration checking capabilities.
 """
 
 import logging
+
 from llamafirewall import (
     LlamaFirewall,
     Role,
     ScanDecision,
     ScannerType,
-    UserMessage,
     ToolMessage,
+    UserMessage,
 )
 
-from ..mcp_config import MCPServerConfig
 from ..guardrail_types import GuardrailAlert, GuardrailProvider, ToolResponse
+from ..mcp_config import MCPServerConfig
 
 logger = logging.getLogger("llama_firewall_provider")
 
@@ -98,7 +99,7 @@ class LlamaFirewallProvider(GuardrailProvider):
                 exc_info=True,
             )
             return GuardrailAlert(
-                explanation=f"Error checking configuration: {str(e)}",
+                explanation=f"Error checking configuration: {e!s}",
                 data={"error": str(e)},
             )
 
@@ -158,7 +159,7 @@ class LlamaFirewallProvider(GuardrailProvider):
                 exc_info=True,
             )
             return GuardrailAlert(
-                explanation=f"Error checking tool response: {str(e)}",
+                explanation=f"Error checking tool response: {e!s}",
                 data={
                     "error": str(e),
                     "tool_name": tool_response.tool_name,

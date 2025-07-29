@@ -3,19 +3,19 @@
 Tests for the quarantine_release tool functionality.
 """
 
-import os
 import json
 import tempfile
-import pytest
-from typing import Generator
+from collections.abc import Generator
+from pathlib import Path
 
 import mcp.types as types
-from contextprotector.quarantine import ToolResponseQuarantine
-from contextprotector.mcp_wrapper import MCPWrapperServer
+import pytest
 from contextprotector.guardrail_providers.mock_provider import MockGuardrailProvider
+from contextprotector.mcp_wrapper import MCPWrapperServer
+from contextprotector.quarantine import ToolResponseQuarantine
 
 
-@pytest.fixture
+@pytest.fixture()
 def setup_quarantine_test() -> Generator[tuple[ToolResponseQuarantine, str, str], None, None]:
     """Create a test quarantine with sample data."""
     # Create a temporary file for the quarantine
@@ -62,12 +62,12 @@ def setup_quarantine_test() -> Generator[tuple[ToolResponseQuarantine, str, str]
     }
 
     # Clean up
-    if os.path.exists(tmp_file.name):
-        os.unlink(tmp_file.name)
+    if Path(tmp_file.name).exists():
+        Path(tmp_file.name).unlink()
 
 
 @pytest.mark.asyncio()
-async def test_quarantine_release_tool_lists_in_tools(setup_quarantine_test) -> None:
+async def test_quarantine_release_tool_lists_in_tools(setup_quarantine_test: any) -> None:
     """Test that the quarantine_release tool is added to the tool list."""
     test_data = setup_quarantine_test
 
@@ -95,7 +95,7 @@ async def test_quarantine_release_tool_lists_in_tools(setup_quarantine_test) -> 
 
 
 @pytest.mark.asyncio()
-async def test_quarantine_release_success(setup_quarantine_test) -> None:
+async def test_quarantine_release_success(setup_quarantine_test: any) -> None:
     """Test successfully releasing a quarantined response."""
     test_data = setup_quarantine_test
 
@@ -130,7 +130,7 @@ async def test_quarantine_release_success(setup_quarantine_test) -> None:
 
 
 @pytest.mark.asyncio()
-async def test_quarantine_release_unreleased_fails(setup_quarantine_test) -> None:
+async def test_quarantine_release_unreleased_fails(setup_quarantine_test: any) -> None:
     """Test that attempting to release an unreleased response fails."""
     test_data = setup_quarantine_test
 
@@ -156,7 +156,7 @@ async def test_quarantine_release_unreleased_fails(setup_quarantine_test) -> Non
 
 
 @pytest.mark.asyncio()
-async def test_quarantine_release_invalid_uuid(setup_quarantine_test) -> None:
+async def test_quarantine_release_invalid_uuid(setup_quarantine_test: any) -> None:
     """Test that attempting to release with an invalid UUID fails."""
     test_data = setup_quarantine_test
 
@@ -167,16 +167,12 @@ async def test_quarantine_release_invalid_uuid(setup_quarantine_test) -> None:
     )
 
     # Call the quarantine_release tool handler with an invalid UUID
-    with pytest.raises(ValueError) as excinfo:
+    with pytest.raises(ValueError, match="No quarantined response found") as excinfo:
         await wrapper._handle_quarantine_release({"uuid": "invalid-uuid"})
-
-    # Verify that the correct error message is returned
-    error_msg = str(excinfo.value)
-    assert "No quarantined response found" in error_msg
 
 
 @pytest.mark.asyncio()
-async def test_quarantine_release_missing_uuid(setup_quarantine_test) -> None:
+async def test_quarantine_release_missing_uuid(setup_quarantine_test: any) -> None:
     """Test that attempting to release without a UUID fails."""
     test_data = setup_quarantine_test
 
@@ -187,9 +183,5 @@ async def test_quarantine_release_missing_uuid(setup_quarantine_test) -> None:
     )
 
     # Call the quarantine_release tool handler without a UUID
-    with pytest.raises(ValueError) as excinfo:
+    with pytest.raises(ValueError, match="Missing required parameter") as excinfo:
         await wrapper._handle_quarantine_release({})
-
-    # Verify that the correct error message is returned
-    error_msg = str(excinfo.value)
-    assert "Missing required parameter" in error_msg

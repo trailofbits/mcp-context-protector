@@ -5,8 +5,8 @@ Mock guardrail providers for testing guardrail functionality.
 
 import logging
 
+from ..guardrail_types import GuardrailAlert, GuardrailProvider, ToolResponse
 from ..mcp_config import MCPServerConfig
-from ..guardrail_types import GuardrailProvider, GuardrailAlert, ToolResponse
 
 logger = logging.getLogger("mock_guardrail_provider")
 
@@ -206,7 +206,7 @@ class NeverAlertGuardrailProvider(GuardrailProvider):
         """Get the provider name."""
         return "Never Alert Provider"
 
-    def check_server_config(self, config: MCPServerConfig) -> None:
+    def check_server_config(self, config: MCPServerConfig) -> None: # noqa: ARG002
         """
         Always returns None, indicating no guardrail alert.
 

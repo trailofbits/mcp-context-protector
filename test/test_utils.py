@@ -2,11 +2,13 @@
 Utility functions for MCP wrapper tests.
 """
 
-import sys
 import asyncio
 import subprocess
+import sys
+from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Callable, Awaitable, Literal
+from typing import Literal
+
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
@@ -127,7 +129,8 @@ async def run_with_wrapper_session(
 
     # Connect to the wrapper
     async with stdio_client(server_params) as (read, write):
-        assert read is not None and write is not None
+        assert read is not None
+        assert write is not None
         async with ClientSession(read, write) as session:
             await session.initialize()
             await callback(session)

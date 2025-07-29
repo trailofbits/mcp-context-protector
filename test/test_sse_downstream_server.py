@@ -3,11 +3,12 @@ Tests for the SSE downstream MCP server.
 """
 
 import json
-import pytest
 
+import pytest
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 from mcp.types import CallToolResult, TextContent
+
 from .sse_server_utils import sse_server  # noqa: F401
 
 
@@ -27,7 +28,8 @@ async def run_with_sse_client(callback) -> None:
     print(f"Connecting to SSE server at: {server_url}")
 
     async with sse_client(server_url) as (read, write):
-        assert read is not None and write is not None
+        assert read is not None
+        assert write is not None
 
         async with ClientSession(read, write) as session:
             assert session is not None
@@ -36,10 +38,10 @@ async def run_with_sse_client(callback) -> None:
 
 
 @pytest.mark.asyncio()
-async def test_list_tools_via_sse(sse_server) -> None:
+async def test_list_tools_via_sse(sse_server: any) -> None: # noqa: ARG001
     """Test that the tool listing works correctly via SSE transport."""
 
-    async def callback(session) -> None:
+    async def callback(session: ClientSession) -> None:
         # List available tools
         tools = await session.list_tools()
 
@@ -62,10 +64,10 @@ async def test_list_tools_via_sse(sse_server) -> None:
 
 
 @pytest.mark.asyncio()
-async def test_echo_tool_via_sse(sse_server) -> None:
+async def test_echo_tool_via_sse(sse_server: any) -> None: # noqa: ARG001
     """Test that the echo tool works correctly via SSE transport."""
 
-    async def callback(session) -> None:
+    async def callback(session: ClientSession) -> None:
         # Test message to echo
         input_message = "Hello SSE MCP Server!"
 
@@ -91,19 +93,22 @@ async def test_echo_tool_via_sse(sse_server) -> None:
 
 
 @pytest.mark.asyncio()
-async def test_invalid_tool_call_via_sse(sse_server) -> None:
+async def test_invalid_tool_call_via_sse(sse_server: any) -> None: # noqa: ARG001
     """Test error handling when an invalid tool is called via SSE transport."""
 
-    async def callback(session) -> None:
+    async def callback(session: ClientSession) -> None:
         # Try to call a tool that doesn't exist
         result = await session.call_tool(name="nonexistent_tool", arguments={"foo": "bar"})
-        assert result.content and len(result.content) == 1
+        assert result.content
+        assert len(result.content) == 1
         assert result.content[0].text.startswith("Unknown tool")
 
         # Make sure a missing required parameter causes an error
         result = await session.call_tool(name="echo", arguments={})
-        assert result.content and len(result.content) == 1
+        assert result.content
+        assert len(result.content) == 1
         text = result.content[0].text.lower()
-        assert "error" in text and ("missing" in text or "required" in text)
+        assert "error" in text
+        assert ("missing" in text or "required" in text)
 
     await run_with_sse_client(callback)
