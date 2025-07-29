@@ -88,8 +88,7 @@ def review_response_list(
                         return
                     review_response_list(quarantine, responses)
                     return
-                else:
-                    print("\nError retrieving response from quarantine.")
+                print("\nError retrieving response from quarantine.")
             else:
                 print(f"\nInvalid choice. Please enter a number between 1 and {len(responses)}.")
         except ValueError:
@@ -122,8 +121,7 @@ def review_response(quarantine: ToolResponseQuarantine, response: QuarantinedToo
             quarantine.release_response(response.id)
             print(f"\nResponse {response.id} has been released from quarantine.")
             break
-        elif choice in ("n", "no"):
+        if choice in ("n", "no"):
             print("\nResponse remains in quarantine.")
             break
-        else:
-            print("\nInvalid choice. Please enter 'y' or 'n'.")
+        print("\nInvalid choice. Please enter 'y' or 'n'.")

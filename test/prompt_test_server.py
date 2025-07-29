@@ -116,7 +116,7 @@ class PromptTestServer:
             if name == "test_tool":
                 message = arguments.get("message", "")
                 return [types.TextContent(type="text", text=f"Echo: {message}")]
-            elif name == "toggle_prompts":
+            if name == "toggle_prompts":
                 # Toggle prompts and notify clients
                 self.use_alternate_prompts = not self.use_alternate_prompts
                 prompt_state = "alternate" if self.use_alternate_prompts else "default"

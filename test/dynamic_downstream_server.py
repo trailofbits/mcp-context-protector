@@ -139,7 +139,7 @@ def add_dynamic_tool() -> None:
         print(f"Added echo{num_tools} tool", file=sys.stderr)
 
 
-def initialize_tools(count) -> None:
+def initialize_tools(count: int) -> None:
     """
     Initialize the server with the specified number of tools.
 
@@ -162,7 +162,7 @@ def initialize_tools(count) -> None:
         add_dynamic_tool()
 
 
-def read_tool_count_from_file(toolcount_file) -> int:
+def read_tool_count_from_file(toolcount_file: str | None) -> int:
     """
     Read the tool count from the specified file.
 
@@ -184,7 +184,7 @@ def read_tool_count_from_file(toolcount_file) -> int:
     return 1
 
 
-def signal_handler(_signum: any, _frame: any) -> None:
+def signal_handler(_signum: Any, _frame: Any) -> None:
     """Signal handler for SIGHUP that adds a new tool."""
     global num_tools
 
@@ -207,7 +207,7 @@ def signal_handler(_signum: any, _frame: any) -> None:
     )
 
 
-def write_pidfile(pidfile_path) -> None:
+def write_pidfile(pidfile_path: str) -> None:
     """
     Write the current process ID to the specified pidfile.
 
@@ -229,7 +229,7 @@ def write_pidfile(pidfile_path) -> None:
 
 
 async def my_run(
-    self,
+    self: 'FastMCP',
     # When False, exceptions are returned as messages to the client.
     # When True, exceptions are raised, which will cause the server to shut down
     # but also make tracing exceptions much easier during testing and when using

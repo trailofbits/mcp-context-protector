@@ -3,16 +3,17 @@ Tests for the SSE downstream MCP server.
 """
 
 import json
+from collections.abc import Awaitable, Callable
 
 import pytest
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 from mcp.types import CallToolResult, TextContent
 
-from .sse_server_utils import sse_server  # noqa: F401
+from .sse_server_utils import sse_server
 
 
-async def run_with_sse_client(callback) -> None:
+async def run_with_sse_client(callback: Callable[[ClientSession], Awaitable[None]]) -> None:
     """
     Run a test with a client that connects to the SSE downstream server.
     """
@@ -38,7 +39,7 @@ async def run_with_sse_client(callback) -> None:
 
 
 @pytest.mark.asyncio()
-async def test_list_tools_via_sse(sse_server: any) -> None: # noqa: ARG001 F811
+async def test_list_tools_via_sse(sse_server: any) -> None:
     """Test that the tool listing works correctly via SSE transport."""
 
     async def callback(session: ClientSession) -> None:
@@ -64,7 +65,7 @@ async def test_list_tools_via_sse(sse_server: any) -> None: # noqa: ARG001 F811
 
 
 @pytest.mark.asyncio()
-async def test_echo_tool_via_sse(sse_server: any) -> None: # noqa: ARG001 F811
+async def test_echo_tool_via_sse(sse_server: any) -> None:
     """Test that the echo tool works correctly via SSE transport."""
 
     async def callback(session: ClientSession) -> None:
@@ -93,7 +94,7 @@ async def test_echo_tool_via_sse(sse_server: any) -> None: # noqa: ARG001 F811
 
 
 @pytest.mark.asyncio()
-async def test_invalid_tool_call_via_sse(sse_server: any) -> None: # noqa: ARG001 F811
+async def test_invalid_tool_call_via_sse(sse_server: any) -> None:
     """Test error handling when an invalid tool is called via SSE transport."""
 
     async def callback(session: ClientSession) -> None:

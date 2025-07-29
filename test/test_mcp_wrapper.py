@@ -24,33 +24,30 @@ async def approve_server_config_using_review(command: str, config_path: str) -> 
         command: The command to run the downstream server
     """
     # Run the review process
-    review_process = subprocess.Popen(
-        [
-            "python",
-            "-m",
-            "contextprotector",
-            "--review-server",
-            "--command",
-            command,
-            "--server-config-file",
-            config_path,
-        ],
+    review_process = await asyncio.create_subprocess_exec(
+        "python",
+        "-m",
+        "contextprotector",
+        "--review-server",
+        "--command",
+        command,
+        "--server-config-file",
+        config_path,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        cwd=Path(__file__).parent.parent.parent.resolve(),
-        text=True,
+        cwd=Path(__file__).parent.parent.parent.resolve()
     )
 
     # Wait for the review process to start
     await asyncio.sleep(0.5)
 
     # Send 'y' to approve the configuration
-    review_process.stdin.write("y\n")
-    review_process.stdin.flush()
+    review_process.stdin.write(b"y\n")
+    await review_process.stdin.drain()
 
     # Wait for the review process to complete
-    stdout, stderr = review_process.communicate(timeout=5)
+    stdout, stderr = await review_process.communicate()
 
     # Verify the review process output
     assert (
@@ -59,11 +56,11 @@ async def approve_server_config_using_review(command: str, config_path: str) -> 
 
     # Check for expected output in the review process
     assert (
-        "has been trusted and saved" in stdout
+        b"has been trusted and saved" in stdout
     ), f"Missing expected approval message in output: {stdout}"
 
 
-async def run_with_wrapper_session(callback: Callable[[ClientSession], Awaitable[None]], config_path=None) -> None:
+async def run_with_wrapper_session(callback: Callable[[ClientSession], Awaitable[None]], config_path: str | None = None) -> None:
     """
     Run a test with a wrapper session that connects to the simple downstream server.
     """

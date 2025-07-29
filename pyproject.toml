@@ -14,7 +14,8 @@ classifiers = [
 ]
 dependencies = [
     "mcp==1.9.4",
-    "llamafirewall>=1.0.3"
+    "llamafirewall>=1.0.3",
+    "aiofiles>=24.1.0",
 ]
 requires-python = ">=3.10"
 

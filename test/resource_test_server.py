@@ -109,10 +109,8 @@ class ResourceTestServer:
 
                 # Use the session to send a resource list changed notification
                 if self._session:
-                    loop = asyncio.get_running_loop()
-                    asyncio.run_coroutine_threadsafe(
-                        self._session.send_resource_list_changed(), loop
-                    )
+                    # Schedule the notification to be sent after the current operation completes
+                    asyncio.create_task(self._session.send_resource_list_changed())
 
                 return [
                     types.TextContent(type="text", text=f"Toggled to {resource_state} resources")

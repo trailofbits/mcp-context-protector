@@ -22,7 +22,7 @@ RESET = "\x1b[0m"
 BOLD = "\x1b[1m"
 
 
-def get_colored_text(text) -> str:
+def get_colored_text(text: str) -> str:
     """Generate a string with ANSI color codes."""
     return f"{RED}Red {GREEN}Green {YELLOW}Yellow{RESET} and {BOLD}Bold{RESET} {text}"
 

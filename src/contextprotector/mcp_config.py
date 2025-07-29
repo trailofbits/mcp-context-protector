@@ -1,3 +1,4 @@
+"""Classes and data structures that store, parse, and compare MCP server configurations."""
 import hashlib
 import json
 import pathlib
@@ -8,6 +9,8 @@ from typing import Any, Literal, TextIO
 
 
 class ParameterType(str, Enum):
+    """Types of MCP tool parameters."""
+
     STRING = "string"
     NUMBER = "number"
     BOOLEAN = "boolean"
@@ -16,6 +19,8 @@ class ParameterType(str, Enum):
 
 
 class ApprovalStatus(str, Enum):
+    """Approval status for an MCP server tracked in the local database."""
+
     APPROVED = "approved"
     UNAPPROVED = "unapproved"
 
@@ -45,6 +50,8 @@ class MCPToolSpec:
 
 @dataclass
 class MCPParameterDefinition:
+    """Logical representation of a tool parameter with equality checking logic."""
+
     name: str
     description: str
     type: ParameterType
@@ -54,7 +61,8 @@ class MCPParameterDefinition:
     items: dict[str, Any | None] = None  # For array types
     properties: dict[str, Any | None] = None  # For object types
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
+        """Evaluate whether two MCPParameterDefinitions are semantically equal."""
         if not isinstance(other, MCPParameterDefinition):
             return False
         return (
@@ -71,6 +79,8 @@ class MCPParameterDefinition:
 
 @dataclass
 class MCPToolDefinition:
+    """Definition of all aspects of an MCP tool that are relevant to server pinning."""
+
     name: str
     description: str
     parameters: list[MCPParameterDefinition]
@@ -78,6 +88,7 @@ class MCPToolDefinition:
 
     def __str__(self) -> str:
         """Generate a string representation of the tool with its parameters.
+
         Format is compact with parameters on a single line each.
         """
         lines = [f"Tool: {self.name}"]
@@ -106,7 +117,8 @@ class MCPToolDefinition:
 
         return "\n".join(lines)
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
+        """Compare two tool definitions for equality."""
         if not isinstance(other, MCPToolDefinition):
             return False
 
@@ -179,8 +191,7 @@ class ConfigDiff:
 
         if self.removed_tools:
             lines.append("Removed tools:")
-            for tool_name in self.removed_tools:
-                lines.append(f"  - {tool_name}")
+            lines.extend([f"  - {tool_name}" for tool_name in self.removed_tools])
             lines.append("")
 
         if self.modified_tools:
@@ -195,13 +206,11 @@ class ConfigDiff:
 
                 if changes.get("added_params"):
                     lines.append("    Added parameters:")
-                    for param in changes["added_params"]:
-                        lines.append(f"      + {param}")
+                    lines.extend([f"      + {param}" for param in changes["added_params"]])
 
                 if changes.get("removed_params"):
                     lines.append("    Removed parameters:")
-                    for param in changes["removed_params"]:
-                        lines.append(f"      - {param}")
+                    lines.extend([f"      - {param}" for param in changes["removed_params"]])
 
                 if changes.get("modified_params"):
                     lines.append("    Modified parameters:")
@@ -277,7 +286,7 @@ class MCPServerConfig:
                 return tool
         return None
 
-    def to_json(self, path: str | None = None, fp: TextIO = None, indent: int = 2) -> str | None:
+    def to_json(self, path: str | None = None, fp: TextIO | None = None, indent: int = 2) -> str | None:
         """Serialize the configuration to JSON.
 
         Args:
@@ -298,15 +307,14 @@ class MCPServerConfig:
             with pathlib.Path(path).open("w") as f:
                 f.write(json_str)
             return None
-        elif fp:
+        if fp:
             fp.write(json_str)
             return None
-        else:
-            return json_str
+        return json_str
 
     @classmethod
     def from_json(
-        cls, json_str: str | None = None, path: str | None = None, fp: TextIO = None
+        cls, json_str: str | None = None, path: str | None = None, fp: TextIO | None = None
     ) -> "MCPServerConfig":
         """Deserialize the configuration from JSON.
 
@@ -407,7 +415,7 @@ class MCPServerConfig:
 
         return config
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         """Compare two server configurations semantically."""
         if not isinstance(other, MCPServerConfig):
             return False
@@ -424,11 +432,7 @@ class MCPServerConfig:
         if set(self_tools.keys()) != set(other_tools.keys()):
             return False
 
-        for name, tool in self_tools.items():
-            if tool != other_tools[name]:
-                return False
-
-        return True
+        return all(tool == other_tools[name] for name, tool in self_tools.items())
 
     def compare(self, other: "MCPServerConfig") -> ConfigDiff:
         """Compare two server configurations and return the differences."""

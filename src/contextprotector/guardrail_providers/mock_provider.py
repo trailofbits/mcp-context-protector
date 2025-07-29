@@ -133,7 +133,7 @@ class AlwaysAlertGuardrailProvider(GuardrailProvider):
         return "Always Alert Provider"
 
     def check_server_config(self, config: MCPServerConfig) -> GuardrailAlert:
-        """Always returns a guardrail alert regardless of the config.
+        """Return a pre-written guardrail alert regardless of the config.
 
         Args:
         ----
@@ -155,7 +155,7 @@ class AlwaysAlertGuardrailProvider(GuardrailProvider):
         )
 
     def check_tool_response(self, tool_response: ToolResponse) -> GuardrailAlert:
-        """Always returns a guardrail alert regardless of the tool response.
+        """Return a pre-written guardrail alert regardless of the tool response.
 
         Args:
         ----
@@ -194,8 +194,8 @@ class NeverAlertGuardrailProvider(GuardrailProvider):
         """Get the provider name."""
         return "Never Alert Provider"
 
-    def check_server_config(self, config: MCPServerConfig) -> None: # noqa: ARG002
-        """Always returns None, indicating no guardrail alert.
+    def check_server_config(self, config: MCPServerConfig) -> None:
+        """Return None, indicating no guardrail alert.
 
         Args:
         ----

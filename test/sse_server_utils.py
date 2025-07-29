@@ -21,7 +21,7 @@ class SSEServerManager:
     """Manages the lifecycle of an SSE server process for testing."""
 
     def __init__(self) -> None:
-        self.process: subprocess.Popen | None = None
+        self.process: asyncio.subprocess.Process | None = None
         self.port: int | None = None
         self.pid: int | None = None
 
@@ -56,8 +56,9 @@ class SSEServerManager:
         server_script = str(Path(__file__).resolve().parent.joinpath("simple_sse_server.py"))
 
         # Start the server process
-        self.process = subprocess.Popen(
-            [sys.executable, server_script],
+        self.process = await asyncio.create_subprocess_exec(
+            sys.executable,
+            server_script,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -93,7 +94,7 @@ class SSEServerManager:
             await asyncio.sleep(0.5)
 
             # Make sure it's really gone
-            if self.process.poll() is None:
+            if self.process.returncode is None:
                 self.process.kill()
 
             self.process = None

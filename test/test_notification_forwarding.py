@@ -29,7 +29,7 @@ class NotificationCapturingClient:
         self.received_notifications: list[dict[str, Any]] = []
         self.notification_event = asyncio.Event()
 
-    async def handle_notification(self, notification) -> None:
+    async def handle_notification(self, notification: Any) -> None:
         """Handle notifications received from the server."""
         if hasattr(notification, "root") and hasattr(notification.root, "method"):
             notification_data = {
@@ -68,7 +68,7 @@ async def test_notification_forwarding() -> None:
         # Monkey patch the session to capture notifications
         original_handler = session._message_handler
 
-        async def capturing_handler(message) -> None:
+        async def capturing_handler(message: Any) -> None:
             # First let the original handler process it
             if original_handler:
                 await original_handler(message)
@@ -169,7 +169,7 @@ async def test_notification_forwarding_without_invalid() -> None:
         # Monkey patch the session to capture notifications
         original_handler = session._message_handler
 
-        async def capturing_handler(message) -> None:
+        async def capturing_handler(message: Any) -> None:
             if original_handler:
                 await original_handler(message)
             await notification_client.handle_notification(message)

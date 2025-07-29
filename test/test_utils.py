@@ -46,24 +46,23 @@ async def approve_server_config_using_review(
         raise ValueError(f"Invalid connection type: {connection_type}")
 
     # Run the review process
-    review_process = subprocess.Popen(
-        cmd,
+    review_process = await asyncio.create_subprocess_exec(
+        *cmd,
         cwd=Path(__file__).parent.parent.parent.resolve(),
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
+        stderr=subprocess.PIPE
     )
 
     # Wait for the review process to start
     await asyncio.sleep(1.5)
 
     # Send 'y' to approve the configuration
-    review_process.stdin.write("y\n")
-    review_process.stdin.flush()
+    review_process.stdin.write(b"y\n")
+    await review_process.stdin.drain()
 
     # Wait for the review process to complete
-    stdout, stderr = review_process.communicate(timeout=5)
+    stdout, stderr = await review_process.communicate()
 
     # Verify the review process output
     assert (
@@ -72,7 +71,7 @@ async def approve_server_config_using_review(
 
     # Check for expected output in the review process
     assert (
-        "has been trusted and saved" in stdout
+        b"has been trusted and saved" in stdout
     ), f"Missing expected approval message in output: {stdout}"
 
 

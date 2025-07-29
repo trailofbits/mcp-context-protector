@@ -137,7 +137,6 @@ class ToolResponseQuarantine:
 
         Args:
         ----
-        ____
             tool_name: The name of the tool that was called
             tool_input: The input parameters to the tool
             tool_output: The output returned by the tool

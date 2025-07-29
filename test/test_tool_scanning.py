@@ -27,7 +27,7 @@ def mock_session() -> Generator[MagicMock, None, None]:
     async def mock_call_tool(name: str, _arguments: any) -> any:
         if name == "test_tool":
             return ToolCallResult(content=[TextContent(type="text", text="Test result")])
-        elif name == "dangerous_tool":
+        if name == "dangerous_tool":
             return ToolCallResult(
                 content=[
                     TextContent(
@@ -36,8 +36,7 @@ def mock_session() -> Generator[MagicMock, None, None]:
                     )
                 ]
             )
-        else:
-            return ToolCallResult(content=[])
+        return ToolCallResult(content=[])
 
     session.call_tool = mock_call_tool
     return session
