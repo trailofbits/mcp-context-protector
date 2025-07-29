@@ -9,7 +9,6 @@ import asyncio
 import logging
 import subprocess
 import sys
-import tempfile
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
@@ -53,55 +52,38 @@ class SSEServerManager:
 
     async def start_server(self) -> subprocess.Popen:
         """Start the SSE downstream server in a separate process."""
-        # Create a temporary file for the PID
-        pid_file = tempfile.NamedTemporaryFile(delete=False)
-        pid_file.close()
-
         # Get the path to the server script
         server_script = str(Path(__file__).resolve().parent.joinpath("simple_sse_server.py"))
 
         # Start the server process
         self.process = subprocess.Popen(
-            [sys.executable, server_script, "--pidfile", pid_file.name],
+            [sys.executable, server_script],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
 
+        # Get the PID directly from the process object
+        self.pid = self.process.pid
+        logging.warning("SSE Server started with PID: %d", self.pid)
+
         # Give the server time to start
         await asyncio.sleep(1.0)
 
-        # Read the PID from the file to ensure the server started
-        try:
-            with Path(pid_file.name).open("r") as f:
-                pid = int(f.read().strip())
-                self.pid = pid
-                assert pid is not None
-                logging.warning("SSE Server started with PID: %d", pid)
+        # Find which port the server is listening on
+        max_attempts = 5
+        for attempt in range(max_attempts):
+            ports = self.get_ports_by_pid(self.pid)
+            if ports:
+                self.port = ports[0]  # Use the first port found
+                logging.warning("SSE Server is listening on port: %d", self.port)
+                break
 
-                # Find which port the server is listening on
-                max_attempts = 5
-                for attempt in range(max_attempts):
-                    ports = self.get_ports_by_pid(pid)
-                    if ports:
-                        self.port = ports[0]  # Use the first port found
-                        logging.warning("SSE Server is listening on port: %d", self.port)
-                        break
+            logging.warning(
+                "Attempt %d/%d: No ports found for PID %d, waiting...", attempt + 1, max_attempts, self.pid
+            )
+            await asyncio.sleep(1.0)
 
-                    logging.warning(
-                        "Attempt %d/%d: No ports found for PID %d, waiting...", attempt + 1, max_attempts, pid
-                    )
-                    await asyncio.sleep(1.0)
-
-                assert self.port is not None, "Could not determine port for SSE server"
-        except (OSError, ValueError) as e:
-            pytest.fail("Failed to read PID file: %s" % e)
-
-        # Clean up the PID file
-        try:
-            Path(pid_file.name).unlink()
-        except OSError:
-            pass
-
+        assert self.port is not None, "Could not determine port for SSE server"
         return self.process
 
     async def stop_server(self) -> None:

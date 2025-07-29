@@ -1,5 +1,5 @@
 [project]
-name = "context-protector"
+name = "mcp-context-protector"
 dynamic = ["version"]
 description = "MCP security wrapper"
 readme = "README.md"
@@ -34,13 +34,13 @@ lint = [
     "types-toml",
     "interrogate",
 ]
-dev = ["context-protector[doc,test,lint]", "twine", "build"]
+dev = ["mcp-context-protector[doc,test,lint]", "twine", "build"]
 
 [project.scripts]
-"context-protector" = "contextprotector.__main__:main"
+"mcp-context-protector" = "contextprotector.__main__:main"
 
 [project.urls]
-Homepage = "https://pypi.org/project/context-protector"
+Homepage = "https://github.com/trailofbits/mcp-context-protector/"
 Documentation = "https://github.com/trailofbits/mcp-context-protector/README.md"
 Issues = "https://github.com/trailofbits/mcp-context-protector/issues"
 Source = "https://github.com/trailofbits/mcp-context-protector"

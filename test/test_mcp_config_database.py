@@ -263,8 +263,8 @@ def test_config_database_default_path() -> None:
     # Get the default path
     default_path = MCPConfigDatabase.get_default_config_path()
 
-    # Check that it's in the .context-protector directory
-    expected_dir = Path.home() / ".context-protector"
+    # Check that it's in the .mcp-context-protector directory
+    expected_dir = Path.home() / ".mcp-context-protector"
     assert Path(default_path).parent == expected_dir
 
     # Check the filename

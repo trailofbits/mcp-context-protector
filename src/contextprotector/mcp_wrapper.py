@@ -520,7 +520,7 @@ class MCPWrapperServer:
                 blocked_changed_tools = blocked_tools
 
         instructions = f"""
-context-protector status:
+mcp-context-protector status:
 
 {blocked_tools} out of {total_tools} tools are currently blocked
 """
@@ -538,7 +538,7 @@ context-protector status:
 
 To approve this server configuration, run the wrapper in review mode:
 
-context-protector.sh --list-server stdio "your-server-command"
+mcp-context-protector.sh --list-server stdio "your-server-command"
 
 The review process will show you the server's capabilities and tools, and ask if you want to
 trust them.
@@ -600,7 +600,7 @@ Note: This tool is only available when tools are blocked due to security restric
             error = (
                 f"Response {response_id} is not marked for release. "
                 + "Please use the CLI to review and release it first: "
-                + f"context-protector.sh --review-quarantine --quarantine-id {response_id}"
+                + f"mcp-context-protector.sh --review-quarantine --quarantine-id {response_id}"
             )
             return [types.TextContent(type="text", text=error)]
 

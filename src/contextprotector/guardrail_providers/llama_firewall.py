@@ -1,4 +1,4 @@
-"""Llama Firewall guardrail provider for context-protector.
+"""Llama Firewall guardrail provider for mcp-context-protector.
 Provides server configuration checking capabilities.
 """
 

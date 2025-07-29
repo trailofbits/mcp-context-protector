@@ -195,7 +195,7 @@ def _parse_args() -> argparse.Namespace:
         "--server-config-file",
         help=(
             "The path to the server config database file "
-            "(default: ~/.context-protector/servers.json)"
+            "(default: ~/.mcp-context-protector/servers.json)"
         ),
         default="",
     )
@@ -224,7 +224,7 @@ def _parse_args() -> argparse.Namespace:
         "--quarantine-path",
         help=(
             "The path to the quarantine database file "
-            "(default: ~/.context-protector/quarantine.json)"
+            "(default: ~/.mcp-context-protector/quarantine.json)"
         ),
     )
 

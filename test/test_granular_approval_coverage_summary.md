@@ -65,7 +65,7 @@ This document summarizes the test coverage for the granular approval system impl
 
 ### Wrapper Layer (`MCPWrapperServer`)
 - ✅ Granular tool blocking in `call_tool()`
-- ✅ Selective tool listing in `list_tools()` 
+- ✅ Selective tool listing in `list_tools()`
 - ✅ Approval preservation in review process
 - ✅ Connection-time approval evaluation
 
