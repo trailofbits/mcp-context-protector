@@ -222,7 +222,7 @@ class MCPServerConfig:
 
     @classmethod
     def get_default_config_path(cls) -> str:
-        """Get the default config path (~/.context-protector/config).
+        """Get the default config path (~/.mcp-context-protector/config).
 
         Returns
         -------
@@ -230,7 +230,7 @@ class MCPServerConfig:
 
         """
         home_dir = pathlib.Path.home()
-        data_dir = home_dir / ".context-protector"
+        data_dir = home_dir / ".mcp-context-protector"
 
         data_dir.mkdir(exist_ok=True)
 
@@ -640,7 +640,7 @@ class MCPConfigDatabase:
 
     @staticmethod
     def get_default_config_path() -> str:
-        """Get the default config database path (~/.context-protector/servers.json).
+        """Get the default config database path (~/.mcp-context-protector/servers.json).
 
         Returns
         -------
@@ -648,7 +648,7 @@ class MCPConfigDatabase:
 
         """
         home_dir = pathlib.Path.home()
-        data_dir = home_dir / ".context-protector"
+        data_dir = home_dir / ".mcp-context-protector"
 
         data_dir.mkdir(exist_ok=True)
 

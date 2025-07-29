@@ -1,4 +1,4 @@
-"""Core guardrail types for context-protector.
+"""Core guardrail types for mcp-context-protector.
 Defines the base classes and data structures used by guardrail providers.
 """
 

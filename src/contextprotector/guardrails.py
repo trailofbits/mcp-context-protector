@@ -1,4 +1,4 @@
-"""Guardrails module for context-protector.
+"""Guardrails module for mcp-context-protector.
 Provides functionality to load and manage guardrail providers.
 """
 

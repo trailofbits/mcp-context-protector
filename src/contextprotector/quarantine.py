@@ -83,7 +83,7 @@ class ToolResponseQuarantine:
 
     @staticmethod
     def get_default_db_path() -> str:
-        """Get the default quarantine database path (~/.context-protector/quarantine.json).
+        """Get the default quarantine database path (~/.mcp-context-protector/quarantine.json).
 
         Returns
         -------
@@ -91,7 +91,7 @@ class ToolResponseQuarantine:
 
         """
         home_dir = pathlib.Path.home()
-        data_dir = home_dir / ".context-protector"
+        data_dir = home_dir / ".mcp-context-protector"
 
         data_dir.mkdir(exist_ok=True)
 
