@@ -76,24 +76,11 @@ async def approve_server_config_using_review(
     ), f"Missing expected approval message in output: {stdout}"
 
 
-async def run_with_wrapper_session(
-    callback: Callable[[ClientSession], Awaitable[None]],
+def _wrapper_args(
     connection_type: Literal["stdio", "http", "sse"],
     identifier: str,
-    config_path: str,
-    visualize_ansi: bool = False
-) -> None:
-    """
-    Run a test with a wrapper that connects to the specified downstream server.
-
-    Args:
-        callback: Async function to call with the client session
-        connection_type: Type of connection ("stdio", "http", or "sse")
-        identifier: The command or URL to connect to the downstream server
-        config_path: Path to the wrapper config file
-        visualize_ansi: Whether to visualize ANSI escape codes
-        guardrail_provider: Optional guardrail provider to use
-    """
+    config_path: str
+) -> list[str]:
     # Base arguments
     args = [
         "-m",
@@ -113,9 +100,24 @@ async def run_with_wrapper_session(
         error_msg = f"Invalid connection type: {connection_type}"
         raise ValueError(error_msg)
 
-    # Add optional args
-    if visualize_ansi:
-        args.append("--visualize-ansi-codes")
+    return args
+
+async def run_with_wrapper_session(
+    callback: Callable[[ClientSession], Awaitable[None]],
+    connection_type: Literal["stdio", "http", "sse"],
+    identifier: str,
+    config_path: str
+) -> None:
+    """
+    Run a test with a wrapper that connects to the specified downstream server.
+
+    Args:
+        callback: Async function to call with the client session
+        connection_type: Type of connection ("stdio", "http", or "sse")
+        identifier: The command or URL to connect to the downstream server
+        config_path: Path to the wrapper config file
+    """
+    args = _wrapper_args(connection_type, identifier, config_path)
 
     # Create server parameters
     server_params = StdioServerParameters(
@@ -131,3 +133,83 @@ async def run_with_wrapper_session(
         async with ClientSession(read, write) as session:
             await session.initialize()
             await callback(session)
+
+
+async def run_with_wrapper_session_visualize_ansi(
+    callback: Callable[[ClientSession], Awaitable[None]],
+    connection_type: Literal["stdio", "http", "sse"],
+    identifier: str,
+    config_path: str
+) -> None:
+    """
+    Run a test with a wrapper that connects to the specified downstream server.
+
+    Args:
+        callback: Async function to call with the client session
+        connection_type: Type of connection ("stdio", "http", or "sse")
+        identifier: The command or URL to connect to the downstream server
+        config_path: Path to the wrapper config file
+    """
+    args = _wrapper_args(connection_type, identifier, config_path)
+    args.append("--visualize-ansi-codes")
+
+    # Create server parameters
+    server_params = StdioServerParameters(
+        command="python",
+        args=args,
+        cwd=Path(__file__).parent.parent.parent.resolve(),
+    )
+
+    # Connect to the wrapper
+    async with stdio_client(server_params) as (read, write):
+        assert read is not None
+        assert write is not None
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            await callback(session)
+
+async def run_with_simple_downstream_server(
+    callback: Callable[[ClientSession], Awaitable[None]],
+    config_path: str | None = None
+) -> None:
+    """
+    Run a test with a wrapper session that connects to the simple downstream server.
+
+    This is a convenience function that wraps the generic run_with_wrapper_session
+    to specifically use the simple_downstream_server.py test server.
+
+    Args:
+        callback: Async function to call with the client session
+        config_path: Optional path to the wrapper config file
+    """
+    from contextprotector.mcp_config import MCPServerConfig
+
+    config_path = config_path or MCPServerConfig.get_default_config_path()
+    parent_dir = Path(__file__).resolve().parent
+    command = f"python {parent_dir.joinpath('simple_downstream_server.py')!s}"
+
+    await run_with_wrapper_session(callback, "stdio", command, config_path)
+
+
+async def run_with_sse_downstream_server(
+    callback: Callable[[ClientSession], Awaitable[None]],
+    server_port: int,
+    config_path: str | None = None
+) -> None:
+    """
+    Run a test with a wrapper session that connects to an SSE downstream server.
+
+    This is a convenience function that wraps the generic run_with_wrapper_session
+    to specifically connect to an SSE server at the given port.
+
+    Args:
+        callback: Async function to call with the client session
+        server_port: Port number where the SSE server is running
+        config_path: Optional path to the wrapper config file
+    """
+    from contextprotector.mcp_config import MCPServerConfig
+
+    config_path = config_path or MCPServerConfig.get_default_config_path()
+    sse_url = f"http://localhost:{server_port}/sse"
+
+    await run_with_wrapper_session(callback, "sse", sse_url, config_path)

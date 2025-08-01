@@ -36,29 +36,21 @@ async def review_server_config(
     """
     # Create configuration and wrapper
     if connection_type == "stdio":
-        config = MCPWrapperConfig.for_stdio(
-            command=identifier,
-            config_path=config_path,
-            guardrail_provider=guardrail_provider,
-            quarantine_path=quarantine_path,
-        )
+        config = MCPWrapperConfig.for_stdio(identifier)
     elif connection_type == "http":
-        config = MCPWrapperConfig.for_http(
-            url=identifier,
-            config_path=config_path,
-            guardrail_provider=guardrail_provider,
-            quarantine_path=quarantine_path,
-        )
+        config = MCPWrapperConfig.for_http(identifier)
     elif connection_type == "sse":
-        config = MCPWrapperConfig.for_sse(
-            url=identifier,
-            config_path=config_path,
-            guardrail_provider=guardrail_provider,
-            quarantine_path=quarantine_path,
-        )
+        config = MCPWrapperConfig.for_sse(identifier)
     else:
         msg = f"Unsupported connection type: {connection_type}"
         raise ValueError(msg)
+
+    # Set additional configuration properties
+    if config_path:
+        config.config_path = config_path
+    if quarantine_path:
+        config.quarantine_path = quarantine_path
+    config.guardrail_provider = guardrail_provider
 
     wrapper = MCPWrapperServer.from_config(config)
 

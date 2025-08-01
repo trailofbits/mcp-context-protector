@@ -234,21 +234,37 @@ class ToolResponseQuarantine:
 
         return False
 
-    def list_responses(self, include_released: bool = False) -> list[dict[str, Any]]:
+    def list_responses(self) -> list[dict[str, Any]]:
         """List all quarantined responses.
 
-        Args:
-        ----
-            include_released: Whether to include responses that have been released
-
-        Returns:
+        Returns
         -------
             A list of quarantined responses
 
         """
         responses = self.quarantined_responses.values()
-        if not include_released:
-            responses = [r for r in responses if not r.released]
+        responses = [r for r in responses if not r.released]
+
+        return [
+            {
+                "id": response.id,
+                "tool_name": response.tool_name,
+                "reason": response.reason,
+                "timestamp": response.timestamp.isoformat(),
+                "released": response.released,
+            }
+            for response in responses
+        ]
+
+    def list_responses_with_released(self) -> list[dict[str, Any]]:
+        """List all quarantined responses, including ones that have already been released.
+
+        Returns
+        -------
+            A list of quarantined responses
+
+        """
+        responses = self.quarantined_responses.values()
 
         return [
             {
@@ -303,14 +319,10 @@ class ToolResponseQuarantine:
 
         return False
 
-    def clear_quarantine(self, only_released: bool = False) -> int:
-        """Clear the quarantine, optionally only removing released responses.
+    def purge_quarantine(self) -> int:
+        """Purge all responses from the quarantine.
 
-        Args:
-        ----
-            only_released: If True, only clear released responses
-
-        Returns:
+        Returns
         -------
             The number of responses cleared
 
@@ -320,12 +332,31 @@ class ToolResponseQuarantine:
 
         original_count = len(self.quarantined_responses)
 
-        if only_released:
-            self.quarantined_responses = {
-                k: v for k, v in self.quarantined_responses.items() if not v.released
-            }
-        else:
-            self.quarantined_responses = {}
+        self.quarantined_responses = {}
+
+        removed_count = original_count - len(self.quarantined_responses)
+
+        if removed_count > 0:
+            self._save()
+
+        return removed_count
+
+    def tidy_quarantine(self) -> int:
+        """Remove all previously released responses from the quarantine.
+
+        Returns
+        -------
+            The number of responses cleared
+
+        """
+        # Reload the database first to avoid overwriting other changes
+        self._load()
+
+        original_count = len(self.quarantined_responses)
+
+        self.quarantined_responses = {
+            k: v for k, v in self.quarantined_responses.items() if not v.released
+        }
 
         removed_count = original_count - len(self.quarantined_responses)
 

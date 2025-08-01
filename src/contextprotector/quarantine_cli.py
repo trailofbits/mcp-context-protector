@@ -24,7 +24,7 @@ async def review_quarantine(
     """
     quarantine = ToolResponseQuarantine(quarantine_path)
 
-    responses = quarantine.list_responses(include_released=False)
+    responses = quarantine.list_responses()
     if not responses:
         print("\nNo quarantined tool responses found.")
         return
@@ -89,7 +89,7 @@ def review_response_list(
                 if response:
                     review_response(quarantine, response)
                     # After reviewing, show the list again with updated data
-                    responses = quarantine.list_responses(include_released=False)
+                    responses = quarantine.list_responses()
                     if not responses:
                         print("\nNo more quarantined responses to review.")
                         return

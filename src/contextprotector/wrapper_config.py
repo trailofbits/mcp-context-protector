@@ -44,6 +44,16 @@ class MCPWrapperConfig:
     def __post_init__(self) -> None:
         """Validate configuration and compute derived properties."""
         self._validate_connection_config()
+
+        # Set default paths if not provided
+        if self.config_path is None:
+            from .mcp_config import MCPConfigDatabase
+            self.config_path = MCPConfigDatabase.get_default_config_path()
+
+        if self.quarantine_path is None:
+            from .quarantine import ToolResponseQuarantine
+            self.quarantine_path = ToolResponseQuarantine.get_default_db_path()
+
         self.use_guardrails = self.guardrail_provider is not None
         self.server_identifier = self._compute_server_identifier()
 
@@ -95,52 +105,41 @@ class MCPWrapperConfig:
             ValueError: If no valid connection type is found in args
 
         """
-        # Determine connection type and identifier from args
+        # Determine connection type and create base config
+        config = None
         if hasattr(args, "command") and args.command:
-            return cls.for_stdio(
-                command=args.command,
-                config_path=getattr(args, "server_config_file", None) or None,
-                guardrail_provider=guardrail_provider,
-                visualize_ansi_codes=getattr(args, "visualize_ansi_codes", False),
-                quarantine_path=getattr(args, "quarantine_path", None),
+            config = cls.for_stdio(args.command)
+        elif hasattr(args, "url") and args.url:
+            config = cls.for_http(args.url)
+        elif hasattr(args, "sse_url") and args.sse_url:
+            config = cls.for_sse(args.sse_url)
+
+        if config is None:
+            msg = (
+                "No valid connection type found in arguments. "
+                "Must provide command, url, or sse_url."
             )
-        if hasattr(args, "url") and args.url:
-            return cls.for_http(
-                url=args.url,
-                config_path=getattr(args, "server_config_file", None) or None,
-                guardrail_provider=guardrail_provider,
-                visualize_ansi_codes=getattr(args, "visualize_ansi_codes", False),
-                quarantine_path=getattr(args, "quarantine_path", None),
-            )
-        if hasattr(args, "sse_url") and args.sse_url:
-            return cls.for_sse(
-                url=args.sse_url,
-                config_path=getattr(args, "server_config_file", None) or None,
-                guardrail_provider=guardrail_provider,
-                visualize_ansi_codes=getattr(args, "visualize_ansi_codes", False),
-                quarantine_path=getattr(args, "quarantine_path", None),
-            )
-        msg = "No valid connection type found in arguments. Must provide command, url, or sse_url."
-        raise ValueError(msg)
+            raise ValueError(msg)
+
+        # Set additional properties from args
+        if hasattr(args, "server_config_file") and args.server_config_file:
+            config.config_path = args.server_config_file
+        if hasattr(args, "quarantine_path") and args.quarantine_path:
+            config.quarantine_path = args.quarantine_path
+        if hasattr(args, "visualize_ansi_codes"):
+            config.visualize_ansi_codes = args.visualize_ansi_codes
+
+        config.guardrail_provider = guardrail_provider
+
+        return config
 
     @classmethod
-    def for_stdio(
-        cls,
-        command: str,
-        config_path: str | None = None,
-        guardrail_provider: GuardrailProvider | None = None,
-        visualize_ansi_codes: bool = False,
-        quarantine_path: str | None = None,
-    ) -> "MCPWrapperConfig":
+    def for_stdio(cls, command: str) -> "MCPWrapperConfig":
         """Create configuration for stdio connection.
 
         Args:
         ----
             command: The command to run as a child process
-            config_path: Optional path to the wrapper config file
-            guardrail_provider: Optional guardrail provider object to use
-            visualize_ansi_codes: Whether to make ANSI escape codes visible in tool outputs
-            quarantine_path: Optional path to the quarantine database file
 
         Returns:
         -------
@@ -150,30 +149,15 @@ class MCPWrapperConfig:
         return cls(
             connection_type="stdio",
             command=command,
-            config_path=config_path,
-            guardrail_provider=guardrail_provider,
-            visualize_ansi_codes=visualize_ansi_codes,
-            quarantine_path=quarantine_path,
         )
 
     @classmethod
-    def for_http(
-        cls,
-        url: str,
-        config_path: str | None = None,
-        guardrail_provider: GuardrailProvider | None = None,
-        visualize_ansi_codes: bool = False,
-        quarantine_path: str | None = None,
-    ) -> "MCPWrapperConfig":
+    def for_http(cls, url: str) -> "MCPWrapperConfig":
         """Create configuration for HTTP connection.
 
         Args:
         ----
             url: The URL to connect to for a remote MCP server
-            config_path: Optional path to the wrapper config file
-            guardrail_provider: Optional guardrail provider object to use
-            visualize_ansi_codes: Whether to make ANSI escape codes visible in tool outputs
-            quarantine_path: Optional path to the quarantine database file
 
         Returns:
         -------
@@ -183,30 +167,15 @@ class MCPWrapperConfig:
         return cls(
             connection_type="http",
             url=url,
-            config_path=config_path,
-            guardrail_provider=guardrail_provider,
-            visualize_ansi_codes=visualize_ansi_codes,
-            quarantine_path=quarantine_path,
         )
 
     @classmethod
-    def for_sse(
-        cls,
-        url: str,
-        config_path: str | None = None,
-        guardrail_provider: GuardrailProvider | None = None,
-        visualize_ansi_codes: bool = False,
-        quarantine_path: str | None = None,
-    ) -> "MCPWrapperConfig":
+    def for_sse(cls, url: str) -> "MCPWrapperConfig":
         """Create configuration for SSE connection.
 
         Args:
         ----
             url: The URL to connect to for a remote MCP server
-            config_path: Optional path to the wrapper config file
-            guardrail_provider: Optional guardrail provider object to use
-            visualize_ansi_codes: Whether to make ANSI escape codes visible in tool outputs
-            quarantine_path: Optional path to the quarantine database file
 
         Returns:
         -------
@@ -216,10 +185,6 @@ class MCPWrapperConfig:
         return cls(
             connection_type="sse",
             url=url,
-            config_path=config_path,
-            guardrail_provider=guardrail_provider,
-            visualize_ansi_codes=visualize_ansi_codes,
-            quarantine_path=quarantine_path,
         )
 
     def to_dict(self) -> dict[str, any]:

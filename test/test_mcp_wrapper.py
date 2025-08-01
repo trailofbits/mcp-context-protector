@@ -6,13 +6,12 @@ import asyncio
 import json
 import subprocess
 import tempfile
-from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 import pytest
-from contextprotector.mcp_config import MCPServerConfig
-from mcp import ClientSession, StdioServerParameters, types
-from mcp.client.stdio import stdio_client
+from mcp import ClientSession, types
+
+from .test_utils import run_with_simple_downstream_server as run_with_wrapper_session
 
 
 async def approve_server_config_using_review(command: str, config_path: str) -> None:
@@ -59,33 +58,6 @@ async def approve_server_config_using_review(command: str, config_path: str) -> 
         b"has been trusted and saved" in stdout
     ), f"Missing expected approval message in output: {stdout}"
 
-
-async def run_with_wrapper_session(callback: Callable[[ClientSession], Awaitable[None]], config_path: str | None = None) -> None:  # noqa: E501
-    """
-    Run a test with a wrapper session that connects to the simple downstream server.
-    """
-    config_path = config_path or MCPServerConfig.get_default_config_path()
-    parent_dir = Path(__file__).resolve().parent
-    server_params = StdioServerParameters(
-        command="python",  # Executable
-        args=[
-            "-m",
-            "contextprotector",
-            "--command",
-            f"python {parent_dir.joinpath('simple_downstream_server.py')!s}",
-            "--server-config-file",
-            str(config_path),
-        ],  # Wrapper command + downstream server
-        cwd=Path(__file__).parent.parent.parent.resolve(),
-        env=None,  # Optional environment variables
-    )
-    async with stdio_client(server_params) as (read, write):
-        assert read is not None
-        assert write is not None
-        async with ClientSession(read, write) as session:
-            assert session is not None
-            await session.initialize()
-            await callback(session)
 
 
 @pytest.mark.asyncio()

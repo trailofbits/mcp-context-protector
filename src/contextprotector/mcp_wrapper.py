@@ -65,7 +65,6 @@ class MCPWrapperServer:
         instance = cls(
             config_path=config.config_path,
             guardrail_provider=config.guardrail_provider,
-            visualize_ansi_codes=config.visualize_ansi_codes,
             quarantine_path=config.quarantine_path,
         )
 
@@ -77,13 +76,14 @@ class MCPWrapperServer:
         else:  # http or sse
             instance.server_url = config.url
 
+        instance.visualize_ansi_codes = config.visualize_ansi_codes
+
         return instance
 
     def __init__(
         self,
         config_path: str | None = None,
         guardrail_provider: GuardrailProvider | None = None,
-        visualize_ansi_codes: bool = False,
         quarantine_path: str | None = None,
     ) -> None:
         """Initialize the wrapper server with common attributes.
@@ -115,7 +115,7 @@ class MCPWrapperServer:
         self.server = Server("mcp_wrapper")
         self.guardrail_provider = guardrail_provider
         self.use_guardrails = guardrail_provider is not None
-        self.visualize_ansi_codes = visualize_ansi_codes
+        self.visualize_ansi_codes = False
         self.server_session = None  # Track the server session for sending notifications
         self.quarantine = ToolResponseQuarantine(quarantine_path) if self.use_guardrails else None
         self.tasks = set()
@@ -217,7 +217,7 @@ class MCPWrapperServer:
             except McpError as e:
                 logger.exception("Error fetching resource %s from downstream server", name)
                 error_msg = f"Error fetching resource from downstream server: {e!s}"
-                raise ConnectionError(error_msg)
+                raise ConnectionError(error_msg) from e
             return contents
 
         @self.server.list_tools()
@@ -350,7 +350,7 @@ class MCPWrapperServer:
             except McpError as e:
                 logger.exception("Error from downstream server during prompt dispatch")
                 error_msg = f"Error from downstream server: {e!s}"
-                raise ConnectionError(error_msg)
+                raise ConnectionError(error_msg) from e
 
         @self.server.call_tool()
         async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
@@ -477,7 +477,7 @@ class MCPWrapperServer:
             except McpError as e:
                 logger.exception("Error from child MCP server")
                 error_msg = f"Error from child MCP server: {e!s}"
-                raise ConnectionError(error_msg)
+                raise ConnectionError(error_msg) from e
 
     async def _handle_context_protector_block(self) -> list[types.TextContent]:
         """Handle the context-protector-block tool call.
@@ -633,14 +633,6 @@ Note: This tool is only available when tools are blocked due to security restric
             ):
                 structured_content = result.structuredContent
 
-            # Check if response_text is already valid JSON (from FastMCP tools)
-            # If so, we should not double-wrap it in our legacy format
-            try:
-                json.loads(response_text)
-                is_json_response = True
-            except (json.JSONDecodeError, TypeError):
-                is_json_response = False
-
             # Scan the tool response with guardrail provider if configured
             if self.use_guardrails and self.guardrail_provider is not None:
                 guardrail_alert = self._scan_tool_response(name, arguments, response_text)
@@ -667,27 +659,25 @@ Note: This tool is only available when tools are blocked due to security restric
 
             # Return both text and structured content, preserving all content types
             return self._create_tool_response(
-                response_text, structured_content, processed_content, is_json_response
+                response_text, structured_content, processed_content
             )
 
         except McpError as e:
             logger.exception("Error calling downstream tool '%s'", name)
             error_msg = f"Error calling downstream tool: {e!s}"
-            raise ConnectionError(error_msg)
+            raise ConnectionError(error_msg) from e
 
     def _create_tool_response(
         self,
         response_text: str,
         structured_content: dict[str, Any | None],
         content_list: list[types.Content],
-        is_json_response: bool = False,
     ) -> dict[str, Any]:
         """Create a tool response dict with text, structured content, and all content types."""
         return {
             "text": response_text,
             "structured_content": structured_content,
-            "content_list": content_list,
-            "is_json_response": is_json_response,
+            "content_list": content_list
         }
 
     def _guardrail_tool_response(
@@ -917,7 +907,7 @@ Note: This tool is only available when tools are blocked due to security restric
                 self.config_approved = False
                 logger.info("Tool list changed - invalidating config approval")
                 # Schedule tool update as a separate task to avoid deadlock with message handler
-                self._task = asyncio.create_task(self.update_tools(send_notification=True))
+                self._task = asyncio.create_task(self.update_tools_and_notify())
                 await self._forward_notification_to_upstream(method, params)
             elif method == "notifications/prompts/list_changed":
                 # Prompt changes do NOT affect the config approval status
@@ -951,7 +941,7 @@ Note: This tool is only available when tools are blocked due to security restric
 
 
 
-    async def update_tools(self, send_notification: bool = False) -> None:
+    async def update_tools(self) -> None:
         """Update tools from the downstream server."""
         try:
             downstream_tools = await self.session.list_tools()
@@ -962,12 +952,15 @@ Note: This tool is only available when tools are blocked due to security restric
             logger.info("Received %d tools after update notification", len(downstream_tools.tools))
 
             await self._handle_tool_updates(downstream_tools.tools)
-            if send_notification:
-                await self._forward_notification_to_upstream(
-                    "notifications/tools/list_changed", None
-                )
         except McpError as e:
             logger.warning("Error handling tool update notification: %s", e)
+
+    async def update_tools_and_notify(self) -> None:
+        """Update tools from the downstream server and send a notification to the client."""
+        self.update_tools()
+        await self._forward_notification_to_upstream(
+            "notifications/tools/list_changed", None
+        )
 
     async def connect(self) -> None:
         """Initialize the connection to the downstream server."""
@@ -1225,13 +1218,7 @@ Note: This tool is only available when tools are blocked due to security restric
             logger.info("Forwarding progress notification from client to downstream server")
 
             if self.session:
-                try:
-                    # Forward the notification to the downstream server's session
-                    # Note: ClientSession doesn't have send_notification, so we'll need
-                    # to send as JSON-RPC
-                    await self._forward_notification_to_downstream(notification)
-                except Exception as e:
-                    logger.warning("Failed to forward progress notification to downstream: %s", e)
+                await self._forward_notification_to_downstream(notification)
 
         # Handle other client notifications by registering them manually
         # Since there may not be decorators for all notification types, we'll register directly
@@ -1241,10 +1228,7 @@ Note: This tool is only available when tools are blocked due to security restric
             logger.info("Forwarding cancelled notification from client to downstream server")
 
             if self.session:
-                try:
-                    await self._forward_notification_to_downstream(notification)
-                except Exception as e:
-                    logger.warning("Failed to forward cancelled notification to downstream: %s", e)
+                await self._forward_notification_to_downstream(notification)
 
         async def handle_initialized_notification(
             notification: types.InitializedNotification,
@@ -1253,12 +1237,7 @@ Note: This tool is only available when tools are blocked due to security restric
             logger.info("Forwarding initialized notification from client to downstream server")
 
             if self.session:
-                try:
-                    await self._forward_notification_to_downstream(notification)
-                except Exception as e:
-                    logger.warning(
-                        "Failed to forward initialized notification to downstream: %s", e
-                    )
+                await self._forward_notification_to_downstream(notification)
 
         async def handle_message_notification(
             notification: types.LoggingMessageNotification,
@@ -1267,10 +1246,7 @@ Note: This tool is only available when tools are blocked due to security restric
             logger.info("Forwarding message notification from client to downstream server")
 
             if self.session:
-                try:
-                    await self._forward_notification_to_downstream(notification)
-                except Exception as e:
-                    logger.warning("Failed to forward message notification to downstream: %s", e)
+                await self._forward_notification_to_downstream(notification)
 
         # Register the handlers manually in the notification_handlers dict
         self.server.notification_handlers[types.CancelledNotification] = (
