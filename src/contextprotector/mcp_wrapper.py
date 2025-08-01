@@ -5,7 +5,7 @@ import base64
 import json
 import logging
 import re
-from typing import Any, Literal
+from typing import Any
 
 from mcp import types
 from mcp.server.lowlevel import NotificationOptions, Server
@@ -17,7 +17,6 @@ from mcp.shared.session import RequestResponder
 # Import guardrail types for type hints
 from .guardrail_types import GuardrailAlert, GuardrailProvider, ToolResponse
 from .mcp_config import (
-    ApprovalStatus,
     MCPConfigDatabase,
     MCPParameterDefinition,
     MCPServerConfig,
@@ -28,6 +27,7 @@ from .mcp_config import (
 
 # Import quarantine functionality
 from .quarantine import ToolResponseQuarantine
+from .wrapper_config import MCPWrapperConfig
 
 logger = logging.getLogger("mcp_wrapper")
 
@@ -48,90 +48,35 @@ class MCPWrapperServer:
     """
 
     @classmethod
-    def wrap_stdio(
-        cls,
-        command: str,
-        config_path: str | None = None,
-        guardrail_provider: GuardrailProvider | None = None,
-        visualize_ansi_codes: bool = False,
-        quarantine_path: str | None = None,
-    ) -> "MCPWrapperServer":
-        """Create a wrapper server that connects to a child process via stdio.
+    def from_config(cls, config: MCPWrapperConfig) -> "MCPWrapperServer":
+        """Create a wrapper server from a configuration object.
 
         Args:
         ----
-            command: The command to run as a child process
-            config_path: Optional path to the wrapper config file
-            guardrail_provider: Optional guardrail provider object to use
-            visualize_ansi_codes: Whether to make ANSI escape codes visible in tool outputs
-            quarantine_path: Optional path to the quarantine database file
+            config: MCPWrapperConfig object containing all configuration parameters
 
         Returns:
         -------
-            An instance of MCPWrapperServer configured for stdio
+            An instance of MCPWrapperServer configured according to the config
 
         """
-        instance = cls(config_path, guardrail_provider, visualize_ansi_codes, quarantine_path)
-        instance.connection_type = "stdio"
-        instance.child_command = command
-        return instance
+        # Import here to avoid circular imports
 
-    @classmethod
-    def wrap_http(
-        cls,
-        url: str,
-        config_path: str | None = None,
-        guardrail_provider: GuardrailProvider | None = None,
-        visualize_ansi_codes: bool = False,
-        quarantine_path: str | None = None,
-    ) -> "MCPWrapperServer":
-        """Create a wrapper server that connects to a remote MCP server via HTTP.
+        instance = cls(
+            config_path=config.config_path,
+            guardrail_provider=config.guardrail_provider,
+            visualize_ansi_codes=config.visualize_ansi_codes,
+            quarantine_path=config.quarantine_path,
+        )
 
-        Args:
-        ----
-            url: The URL to connect to for a remote MCP server
-            config_path: Optional path to the wrapper config file
-            guardrail_provider: Optional guardrail provider object to use
-            visualize_ansi_codes: Whether to make ANSI escape codes visible in tool outputs
-            quarantine_path: Optional path to the quarantine database file
+        # Set connection-specific attributes
+        instance.connection_type = config.connection_type
 
-        Returns:
-        -------
-            An instance of MCPWrapperServer configured for HTTP
+        if config.connection_type == "stdio":
+            instance.child_command = config.command
+        else:  # http or sse
+            instance.server_url = config.url
 
-        """
-        instance = cls(config_path, guardrail_provider, visualize_ansi_codes, quarantine_path)
-        instance.connection_type = "sse"
-        instance.server_url = url
-        return instance
-
-    @classmethod
-    def wrap_streamable_http(
-        cls,
-        url: str,
-        config_path: str | None = None,
-        guardrail_provider: GuardrailProvider | None = None,
-        visualize_ansi_codes: bool = False,
-        quarantine_path: str | None = None,
-    ) -> "MCPWrapperServer":
-        """Create a wrapper server that connects to a remote MCP server via streamable HTTP.
-
-        Args:
-        ----
-            url: The URL to connect to for a remote MCP server
-            config_path: Optional path to the wrapper config file
-            guardrail_provider: Optional guardrail provider object to use
-            visualize_ansi_codes: Whether to make ANSI escape codes visible in tool outputs
-            quarantine_path: Optional path to the quarantine database file
-
-        Returns:
-        -------
-            An instance of MCPWrapperServer configured for streamable HTTP
-
-        """
-        instance = cls(config_path, guardrail_provider, visualize_ansi_codes, quarantine_path)
-        instance.connection_type = "http"
-        instance.server_url = url
         return instance
 
     def __init__(
@@ -1483,114 +1428,6 @@ Note: This tool is only available when tools are blocked due to security restric
             await self.stop_child_process()
 
 
-async def review_server_config(
-    connection_type: Literal["stdio", "http", "sse"],
-    identifier: str,
-    config_path: str | None = None,
-    guardrail_provider: GuardrailProvider | None = None,
-    quarantine_path: str | None = None,
-) -> None:
-    """Review and approve server configuration for the given connection.
-
-    This function connects to the downstream server, retrieves its configuration,
-    and prompts the user to approve it. If approved, the configuration is saved
-    as trusted in the config database.
-
-    Args:
-    ----
-        connection_type: Type of connection ("stdio", "http", or "sse")
-        identifier: The command or URL to connect to
-        config_path: Optional path to config file
-        guardrail_provider: Optional guardrail provider to use
-        quarantine_path: Optional path to the quarantine database file
-
-    """
-    if connection_type == "stdio":
-        wrapper = MCPWrapperServer.wrap_stdio(
-            command=identifier,
-            config_path=config_path,
-            guardrail_provider=guardrail_provider,
-            quarantine_path=quarantine_path,
-        )
-    else:  # http
-        wrapper = MCPWrapperServer.wrap_http(
-            url=identifier,
-            config_path=config_path,
-            guardrail_provider=guardrail_provider,
-            quarantine_path=quarantine_path,
-        )
-
-    try:
-        await wrapper.connect()
-
-        if wrapper.config_approved:
-            print(f"\nServer configuration for {identifier} is already trusted.")
-            return
-
-        print(f"\nServer configuration for {identifier} is not trusted or has changed.")
-
-        if wrapper.saved_config:
-            print("\nPrevious configuration found. Checking for changes...")
-
-            diff = wrapper.saved_config.compare(wrapper.current_config)
-            if diff.has_differences():
-                print("\n===== CONFIGURATION DIFFERENCES =====")
-                print(make_ansi_escape_codes_visible(str(diff)))
-                print("====================================\n")
-            else:
-                print("No differences found (configs are identical)")
-        else:
-            print("\nThis appears to be a new server.")
-
-        print("\n===== TOOL LIST =====")
-        for tool_spec in wrapper.tool_specs:
-            print(f"• {tool_spec.name}: {make_ansi_escape_codes_visible(tool_spec.description)}")
-        print("=====================\n")
-
-        guardrail_alert = None
-        if wrapper.guardrail_provider is not None:
-            guardrail_alert = wrapper.guardrail_provider.check_server_config(wrapper.current_config)
-
-        if guardrail_alert:
-            print("\n==== GUARDRAIL CHECK: ALERT ====")
-            print(f"Provider: {wrapper.guardrail_provider.name}")
-            print(f"Alert: {guardrail_alert.explanation}")
-            print("==================================\n")
-
-        response = (
-            input("Do you want to trust this server configuration? (yes/no): ").strip().lower()
-        )
-        if response in ("yes", "y"):
-            # First approve instructions
-            wrapper.config_db.approve_instructions(
-                wrapper.connection_type,
-                wrapper.get_server_identifier(),
-                wrapper.current_config.instructions,
-            )
-
-            # Then approve each tool individually
-            for tool in wrapper.current_config.tools:
-                wrapper.config_db.approve_tool(
-                    wrapper.connection_type,
-                    wrapper.get_server_identifier(),
-                    tool.name,
-                    tool,
-                )
-
-            # Finally set the server as approved
-            wrapper.config_db.save_server_config(
-                wrapper.connection_type,
-                wrapper.get_server_identifier(),
-                wrapper.current_config,
-                ApprovalStatus.APPROVED,
-            )
-            print(f"\nThe server configuration for {identifier} has been trusted and saved.")
-        else:
-            print(f"\nThe server configuration for {identifier} has NOT been trusted.")
-
-    finally:
-        # Clean up
-        await wrapper.stop_child_process()
 
 
 def make_ansi_escape_codes_visible(text: str) -> str:
