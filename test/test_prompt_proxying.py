@@ -23,7 +23,9 @@ PROMPT_TEST_SERVER_PATH = Path(__file__).resolve().parent / "prompt_test_server.
 
 
 # Local helper function for backward compatibility
-async def run_with_wrapper(callback: Callable[[ClientSession], Awaitable[None]], config_path: str) -> None:
+async def run_with_wrapper(
+    callback: Callable[[ClientSession], Awaitable[None]], config_path: str
+) -> None:
     """
     Run a test with a wrapper connected to the prompt test server.
 

@@ -1,12 +1,11 @@
-"""CLI interface for reviewing and managing quarantined tool responses.
-"""
+"""CLI interface for reviewing and managing quarantined tool responses."""
 
 import json
 import logging
 from typing import Any
 
 from .mcp_wrapper import make_ansi_escape_codes_visible
-from .quarantine import QuarantinedToolResponse, ToolResponseQuarantine
+from .quarantine import QuarantinedToolResponse, ToolResponseQuarantine, _utc_to_local_display
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("quarantine_cli")
@@ -62,7 +61,15 @@ def review_response_list(
     """
     print("\n===== QUARANTINED TOOL RESPONSES =====")
     for i, response_data in enumerate(responses):
-        timestamp = response_data["timestamp"].split("T")[0]
+        # Parse ISO timestamp and convert to local display
+        utc_timestamp = response_data["timestamp"]
+        if isinstance(utc_timestamp, str):
+            import datetime
+            utc_dt = datetime.datetime.fromisoformat(utc_timestamp.replace("Z", "+00:00"))
+            local_display = _utc_to_local_display(utc_dt)
+            timestamp = local_display.split()[0]  # Just the date part for list view
+        else:
+            timestamp = str(utc_timestamp)[:10]  # Fallback
         print(
             f"{i+1}. [{timestamp}] {response_data['tool_name']} - {response_data['reason'][:50]}..."
         )
@@ -91,7 +98,7 @@ def review_response_list(
                 print("\nError retrieving response from quarantine.")
             else:
                 print(f"\nInvalid choice. Please enter a number between 1 and {len(responses)}.")
-        except ValueError:
+        except ValueError: # noqa: PERF203
             print("\nPlease enter a valid number.")
 
 
@@ -108,7 +115,7 @@ def review_response(quarantine: ToolResponseQuarantine, response: QuarantinedToo
     print(f"ID: {response.id}")
     print(f"Tool: {response.tool_name}")
     print(f"Quarantine Reason: {response.reason}")
-    print(f"Timestamp: {response.timestamp.isoformat()}")
+    print(f"Timestamp: {response.get_local_timestamp_display()}")
     print("\nTool Input:")
     print(json.dumps(response.tool_input, indent=2))
     print("\nTool Output:")

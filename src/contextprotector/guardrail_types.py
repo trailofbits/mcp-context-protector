@@ -1,4 +1,5 @@
 """Core guardrail types for mcp-context-protector.
+
 Defines the base classes and data structures used by guardrail providers.
 """
 
@@ -52,9 +53,10 @@ class GuardrailProvider:
     @property
     def name(self) -> str:
         """Get the provider name."""
-        raise NotImplementedError("Guardrail providers must implement the name property")
+        msg = "Guardrail providers must implement the name property"
+        raise NotImplementedError(msg)
 
-    def check_server_config(self, config: 'MCPServerConfig') -> GuardrailAlert | None:
+    def check_server_config(self, _config: "MCPServerConfig") -> GuardrailAlert | None:
         """Check a server configuration against the guardrail.
 
         Args:
@@ -68,7 +70,7 @@ class GuardrailProvider:
         """
         return None
 
-    def check_tool_response(self, tool_response: ToolResponse) -> GuardrailAlert | None:
+    def check_tool_response(self, _tool_response: ToolResponse) -> GuardrailAlert | None:
         """Check a tool response against the guardrail.
 
         Args:

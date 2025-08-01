@@ -56,7 +56,7 @@ class ResourceTestServer:
                 ),
                 types.Tool(
                     name="toggle_resources",
-                    description="Toggle between different sets of resources (to test resource changes)",
+                    description="Toggle between different sets of resources (to test resource changes)",  # noqa: E501
                     inputSchema={"type": "object", "properties": {}},
                 ),
             ]
@@ -110,7 +110,7 @@ class ResourceTestServer:
                 # Use the session to send a resource list changed notification
                 if self._session:
                     # Schedule the notification to be sent after the current operation completes
-                    asyncio.create_task(self._session.send_resource_list_changed())
+                    self._task = asyncio.create_task(self._session.send_resource_list_changed())
 
                 return [
                     types.TextContent(type="text", text=f"Toggled to {resource_state} resources")
@@ -141,7 +141,7 @@ class ResourceTestServer:
                 return [ReadResourceContents(content=content, mime_type="image/png")]
             if str(uri) == "contextprotector://document_resource":
                 # Return text document
-                content = "This is a sample document resource.\nIt contains multiple lines.\nFor testing purposes."
+                content = "This is a sample document resource.\nIt contains multiple lines.\nFor testing purposes."  # noqa: E501
                 return [ReadResourceContents(content=content, mime_type="text/plain")]
 
             return [
@@ -180,7 +180,6 @@ class ResourceTestServer:
                             message,
                             self._session,
                             None,  # No lifespan context needed
-                            False,  # Don't raise exceptions
                         )
 
 

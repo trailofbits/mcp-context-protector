@@ -60,7 +60,7 @@ async def approve_server_config_using_review(command: str, config_path: str) -> 
     ), f"Missing expected approval message in output: {stdout}"
 
 
-async def run_with_wrapper_session(callback: Callable[[ClientSession], Awaitable[None]], config_path: str | None = None) -> None:
+async def run_with_wrapper_session(callback: Callable[[ClientSession], Awaitable[None]], config_path: str | None = None) -> None:  # noqa: E501
     """
     Run a test with a wrapper session that connects to the simple downstream server.
     """

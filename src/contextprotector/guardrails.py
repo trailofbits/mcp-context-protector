@@ -1,4 +1,5 @@
 """Guardrails module for mcp-context-protector.
+
 Provides functionality to load and manage guardrail providers.
 """
 
@@ -25,7 +26,7 @@ TEST_ONLY_PROVIDERS = {
 }
 
 
-def _is_provider_class(obj: Any) -> bool:
+def _is_provider_class(obj: Any) -> bool:  # noqa: ANN401
     """Check if an object is a valid guardrail provider class.
 
     Args:

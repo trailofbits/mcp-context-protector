@@ -78,7 +78,7 @@ select = ["ALL"]
 # D203 and D213 are incompatible with D211 and D212 respectively.
 # COM812 and ISC001 can cause conflicts when using ruff as a formatter.
 # See https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules.
-ignore = ["D203", "D213", "COM812", "ISC001", "ANN101", "ANN102"]
+ignore = ["D203", "D213", "COM812", "ISC001", "ANN101", "ANN102", "C901", "PLR0912", "PLR0915"]
 
 [tool.ruff.lint.per-file-ignores]
 "**/*_cli.py" = [

@@ -13,7 +13,6 @@ from collections.abc import AsyncGenerator
 from pathlib import Path
 
 import psutil
-import pytest
 import pytest_asyncio
 
 
@@ -38,17 +37,14 @@ class SSEServerManager:
         try:
             process = psutil.Process(pid)
             connections = process.net_connections()
-            ports = []
-            for conn in connections:
-                if conn.status == "LISTEN":
-                    ports.append(conn.laddr.port)
-            return ports
+            ports = [conn.laddr.port for conn in connections if conn.status == "LISTEN"]
         except psutil.NoSuchProcess:
             logging.warning("Process with PID %d not found.", pid)
             return []
         except psutil.AccessDenied:
             logging.warning("Access denied to process with PID %d.", pid)
             return []
+        return ports
 
     async def start_server(self) -> subprocess.Popen:
         """Start the SSE downstream server in a separate process."""
@@ -80,7 +76,8 @@ class SSEServerManager:
                 break
 
             logging.warning(
-                "Attempt %d/%d: No ports found for PID %d, waiting...", attempt + 1, max_attempts, self.pid
+                "Attempt %d/%d: No ports found for PID %d, waiting...",
+                attempt + 1, max_attempts, self.pid
             )
             await asyncio.sleep(1.0)
 

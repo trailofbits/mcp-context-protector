@@ -1,4 +1,5 @@
 """Quarantine system for tool responses that have been flagged by guardrails.
+
 Provides storage and retrieval of quarantined tool responses.
 """
 
@@ -9,6 +10,23 @@ import threading
 import uuid
 from dataclasses import asdict, dataclass, field
 from typing import Any
+
+
+def _utc_to_local_display(utc_dt: datetime.datetime) -> str:
+    """Convert UTC datetime to local timezone for display.
+
+    Args:
+    ----
+        utc_dt: UTC datetime object
+
+    Returns:
+    -------
+        Formatted string showing date/time in local timezone
+
+    """
+    # Convert UTC to local timezone
+    local_dt = utc_dt.replace(tzinfo=datetime.timezone.utc).astimezone()
+    return local_dt.strftime("%Y-%m-%d %H:%M:%S %Z")
 
 
 @dataclass
@@ -33,14 +51,16 @@ class QuarantinedToolResponse:
     tool_input: dict[str, Any]
     tool_output: Any
     reason: str
-    timestamp: datetime.datetime = field(default_factory=datetime.datetime.now)
+    timestamp: datetime.datetime = field(
+        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
     released: bool = False
     released_at: datetime.datetime | None = None
 
     def release(self) -> None:
         """Mark this quarantined response as released."""
         self.released = True
-        self.released_at = datetime.datetime.now()
+        self.released_at = datetime.datetime.now(datetime.timezone.utc)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to a dictionary representation for storage."""
@@ -58,6 +78,16 @@ class QuarantinedToolResponse:
         if "released_at" in data and isinstance(data["released_at"], str) and data["released_at"]:
             data["released_at"] = datetime.datetime.fromisoformat(data["released_at"])
         return cls(**data)
+
+    def get_local_timestamp_display(self) -> str:
+        """Get timestamp formatted for display in local timezone."""
+        return _utc_to_local_display(self.timestamp)
+
+    def get_local_released_at_display(self) -> str | None:
+        """Get released_at timestamp formatted for display in local timezone."""
+        if self.released_at is None:
+            return None
+        return _utc_to_local_display(self.released_at)
 
 
 class ToolResponseQuarantine:
@@ -131,7 +161,7 @@ class ToolResponseQuarantine:
             pathlib.Path(temp_path).replace(self.db_path)
 
     def quarantine_response(
-        self, tool_name: str, tool_input: dict[str, Any], tool_output: Any, reason: str
+        self, tool_name: str, tool_input: dict[str, Any], tool_output: str, reason: str
     ) -> str:
         """Add a tool response to the quarantine.
 

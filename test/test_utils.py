@@ -43,7 +43,8 @@ async def approve_server_config_using_review(
     elif connection_type == "sse":
         cmd.extend(["--sse-url", identifier])
     else:
-        raise ValueError(f"Invalid connection type: {connection_type}")
+        error_msg = f"Invalid connection type: {connection_type}"
+        raise ValueError(error_msg)
 
     # Run the review process
     review_process = await asyncio.create_subprocess_exec(
@@ -80,8 +81,7 @@ async def run_with_wrapper_session(
     connection_type: Literal["stdio", "http", "sse"],
     identifier: str,
     config_path: str,
-    visualize_ansi: bool = False,
-    guardrail_provider: str | None = None,
+    visualize_ansi: bool = False
 ) -> None:
     """
     Run a test with a wrapper that connects to the specified downstream server.
@@ -110,14 +110,12 @@ async def run_with_wrapper_session(
     elif connection_type == "sse":
         args.extend(["--sse-url", identifier])
     else:
-        raise ValueError(f"Invalid connection type: {connection_type}")
+        error_msg = f"Invalid connection type: {connection_type}"
+        raise ValueError(error_msg)
 
     # Add optional args
     if visualize_ansi:
         args.append("--visualize-ansi-codes")
-
-    if guardrail_provider:
-        args.extend(["--guardrail-provider", guardrail_provider])
 
     # Create server parameters
     server_params = StdioServerParameters(

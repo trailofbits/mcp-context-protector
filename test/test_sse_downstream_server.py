@@ -10,7 +10,7 @@ from mcp import ClientSession
 from mcp.client.sse import sse_client
 from mcp.types import CallToolResult, TextContent
 
-from .sse_server_utils import sse_server
+from .sse_server_utils import sse_server  # noqa: F401
 
 
 async def run_with_sse_client(callback: Callable[[ClientSession], Awaitable[None]]) -> None:
@@ -39,7 +39,7 @@ async def run_with_sse_client(callback: Callable[[ClientSession], Awaitable[None
 
 
 @pytest.mark.asyncio()
-async def test_list_tools_via_sse(sse_server: any) -> None:
+async def test_list_tools_via_sse(sse_server: any) -> None: # noqa: F811 ARG001
     """Test that the tool listing works correctly via SSE transport."""
 
     async def callback(session: ClientSession) -> None:
@@ -65,7 +65,7 @@ async def test_list_tools_via_sse(sse_server: any) -> None:
 
 
 @pytest.mark.asyncio()
-async def test_echo_tool_via_sse(sse_server: any) -> None:
+async def test_echo_tool_via_sse(sse_server: any) -> None: # noqa: F811 ARG001
     """Test that the echo tool works correctly via SSE transport."""
 
     async def callback(session: ClientSession) -> None:
@@ -94,7 +94,7 @@ async def test_echo_tool_via_sse(sse_server: any) -> None:
 
 
 @pytest.mark.asyncio()
-async def test_invalid_tool_call_via_sse(sse_server: any) -> None:
+async def test_invalid_tool_call_via_sse(sse_server: any) -> None: # noqa: F811 ARG001
     """Test error handling when an invalid tool is called via SSE transport."""
 
     async def callback(session: ClientSession) -> None:

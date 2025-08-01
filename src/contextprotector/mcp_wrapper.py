@@ -1,17 +1,17 @@
 # ruff: noqa: T201
+"""Core wrapper functionality for mcp-context-protector."""
 import asyncio
 import base64
 import json
 import logging
 import re
-import sys
-import traceback
 from typing import Any, Literal
 
 from mcp import types
 from mcp.server.lowlevel import NotificationOptions, Server
 from mcp.server.lowlevel.helper_types import ReadResourceContents
 from mcp.server.models import InitializationOptions
+from mcp.shared.exceptions import McpError
 from mcp.shared.session import RequestResponder
 
 # Import guardrail types for type hints
@@ -35,11 +35,18 @@ logger = logging.getLogger("mcp_wrapper")
 class ChildServerNotConnectedError(ConnectionError):
     """Raised when the child MCP server is not connected."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize error message."""
         super().__init__("Child MCP server not connected")
 
 
 class MCPWrapperServer:
+    """MCP wrapper server with security features.
+
+    Provides server pinning, automatic blocking of changed tools, invocation of the enabled
+    guardrail provider, and quarantining of tool responses.
+    """
+
     @classmethod
     def wrap_stdio(
         cls,
@@ -48,7 +55,7 @@ class MCPWrapperServer:
         guardrail_provider: GuardrailProvider | None = None,
         visualize_ansi_codes: bool = False,
         quarantine_path: str | None = None,
-    ):
+    ) -> "MCPWrapperServer":
         """Create a wrapper server that connects to a child process via stdio.
 
         Args:
@@ -77,7 +84,7 @@ class MCPWrapperServer:
         guardrail_provider: GuardrailProvider | None = None,
         visualize_ansi_codes: bool = False,
         quarantine_path: str | None = None,
-    ):
+    ) -> "MCPWrapperServer":
         """Create a wrapper server that connects to a remote MCP server via HTTP.
 
         Args:
@@ -106,7 +113,7 @@ class MCPWrapperServer:
         guardrail_provider: GuardrailProvider | None = None,
         visualize_ansi_codes: bool = False,
         quarantine_path: str | None = None,
-    ):
+    ) -> "MCPWrapperServer":
         """Create a wrapper server that connects to a remote MCP server via streamable HTTP.
 
         Args:
@@ -135,6 +142,7 @@ class MCPWrapperServer:
         quarantine_path: str | None = None,
     ) -> None:
         """Initialize the wrapper server with common attributes.
+
         Use wrap_stdio or wrap_http class methods instead of calling this directly.
 
         Args:
@@ -174,8 +182,10 @@ class MCPWrapperServer:
 
         @self.server.list_prompts()
         async def list_prompts() -> list[types.Prompt]:
-            """Return prompts from the downstream server, or an empty list if server
-            config is not approved.
+            """Return prompts from the downstream server.
+
+            Return an empty list if server config is not approved.
+
             When config isn't approved, we don't reveal any prompts to clients.
             """
             if not self.config_approved:
@@ -185,35 +195,38 @@ class MCPWrapperServer:
             try:
                 downstream_prompts = await self.session.list_prompts()
                 if downstream_prompts and downstream_prompts.prompts:
-                    logger.info("Returning %d prompts to upstream client", len(downstream_prompts.prompts))
+                    logger.info(
+                        "Returning %d prompts to upstream client", len(downstream_prompts.prompts)
+                    )
                     return downstream_prompts.prompts
-                else:
-                    logger.info("No prompts available from downstream server")
-                    return []
-            except Exception as e:
+                logger.info("No prompts available from downstream server")
+            except McpError as e:
                 logger.warning("Error getting prompts from downstream server: %s", e)
-                return []
+            return []
 
         @self.server.list_resources()
         async def list_resources() -> list[types.Resource]:
             """Return resources from the downstream server.
+
             Unlike prompts and tools, resources are always available regardless of config approval.
             """
             try:
                 downstream_resources = await self.session.list_resources()
                 if downstream_resources and downstream_resources.resources:
-                    logger.info("Returning %d resources to upstream client", len(downstream_resources.resources))
+                    logger.info(
+                        "Returning %d resources to upstream client",
+                        len(downstream_resources.resources),
+                    )
                     return downstream_resources.resources
-                else:
-                    logger.info("No resources available from downstream server")
-                    return []
-            except Exception as e:
+                logger.info("No resources available from downstream server")
+            except McpError as e:
                 logger.warning("Error getting resources from downstream server: %s", e)
-                return []
+            return []
 
         @self.server.read_resource()
         async def read_resource(name: str) -> types.ReadResourceResult:
             """Handle resource content requests - proxy directly to downstream server.
+
             Resources are always accessible regardless of server config approval status.
 
             Args:
@@ -241,9 +254,12 @@ class MCPWrapperServer:
                         contents.append(
                             ReadResourceContents(content=content, mime_type=content_item.mimeType)
                         )
-                        assert isinstance(
-                            contents[-1].content, bytes
-                        ), f"type {type(contents[-1].content)} value {content} is not bytes"
+                        if not isinstance(contents[-1].content, bytes):
+                            msg = (
+                                f"Expected bytes, got {type(contents[-1].content)} "
+                                f"with value {content}"
+                            )
+                            raise TypeError(msg)
                     else:
                         contents.append(
                             ReadResourceContents(
@@ -253,7 +269,7 @@ class MCPWrapperServer:
                         )
 
                 logger.info("Successfully fetched resource %s from downstream server", name)
-            except Exception as e:
+            except McpError as e:
                 logger.exception("Error fetching resource %s from downstream server", name)
                 error_msg = f"Error fetching resource from downstream server: {e!s}"
                 raise ConnectionError(error_msg)
@@ -353,6 +369,7 @@ class MCPWrapperServer:
         @self.server.get_prompt()
         async def get_prompt(name: str, arguments: dict) -> list[types.TextContent]:
             """Handle prompt dispatch requests - proxy to downstream server if config is approved.
+
             If the server config isn't approved, return an empty message list.
             """
             logger.info(
@@ -385,15 +402,17 @@ class MCPWrapperServer:
                     ],
                 )
 
-            except Exception as e:
+            except McpError as e:
                 logger.exception("Error from downstream server during prompt dispatch")
                 error_msg = f"Error from downstream server: {e!s}"
                 raise ConnectionError(error_msg)
 
         @self.server.call_tool()
         async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
-            """Handle tool use requests - either approve config, proxy to downstream server,
-            handle quarantine release, or block if config not approved.
+            """Handle tool use requests.
+
+            Either approve config, proxy to downstream server, handle quarantine release, or block
+            if server config not approved.
             """
             logger.info("Tool call with name %s and config_approved %s", name, self.config_approved)
 
@@ -510,7 +529,7 @@ class MCPWrapperServer:
                 json_response = json.dumps(wrapped_response)
                 return [types.TextContent(type="text", text=json_response)]
 
-            except Exception as e:
+            except McpError as e:
                 logger.exception("Error from child MCP server")
                 error_msg = f"Error from child MCP server: {e!s}"
                 raise ConnectionError(error_msg)
@@ -589,7 +608,8 @@ Note: This tool is only available when tools are blocked due to security restric
 
         """
         if "uuid" not in arguments:
-            raise ValueError("Missing required parameter 'uuid' for quarantine_release tool")
+            msg = "Missing required parameter 'uuid' for quarantine_release tool"
+            raise ValueError(msg)
 
         response_id = arguments["uuid"]
         logger.info("Processing quarantine_release request for UUID: %s", response_id)
@@ -618,8 +638,8 @@ Note: This tool is only available when tools are blocked due to security restric
             return [types.TextContent(type="text", text=final_response)]
         error = (
             f"Response {response_id} is not marked for release. "
-            + "Please use the CLI to review and release it first: "
-            + f"mcp-context-protector.sh --review-quarantine --quarantine-id {response_id}"
+            "Please use the CLI to review and release it first: "
+            f"mcp-context-protector.sh --review-quarantine --quarantine-id {response_id}"
         )
         return [types.TextContent(type="text", text=error)]
 
@@ -705,7 +725,7 @@ Note: This tool is only available when tools are blocked due to security restric
                 response_text, structured_content, processed_content, is_json_response
             )
 
-        except Exception as e:
+        except McpError as e:
             logger.exception("Error calling downstream tool '%s'", name)
             error_msg = f"Error calling downstream tool: {e!s}"
             raise ConnectionError(error_msg)
@@ -733,8 +753,9 @@ Note: This tool is only available when tools are blocked due to security restric
         guardrail_alert: GuardrailAlert,
         quarantine_id: str | None,
     ) -> str:
-        """Generate the response message sent to the client when a tool
-        response is blocked by a guardrail.
+        """Generate the response message sent to the client.
+
+        When a tool response is blocked by a guardrail.
         """
         return f"""
         This tool call was quarantined because it appears to contain a prompt injection attack.
@@ -864,7 +885,9 @@ Note: This tool is only available when tools are blocked due to security restric
             ]
             logger.info("Approved tools: %s", approved_tools)
 
-    async def _forward_notification_to_upstream(self, method: str, params: dict[str, Any] | None = None) -> None:
+    async def _forward_notification_to_upstream(
+        self, method: str, params: dict[str, Any] | None = None
+    ) -> None:
         """Forward a notification to the upstream client.
 
         Args:
@@ -911,15 +934,18 @@ Note: This tool is only available when tools are blocked due to security restric
 
             await self.server_session.send_notification(notification)
             logger.info("Forwarded %s to upstream client", method)
-        except Exception as e:
+        except McpError as e:
             logger.warning("Failed to forward %s notification: %s", method, e)
 
     async def _handle_client_message(
             self,
-            message: RequestResponder[types.ServerRequest, types.ClientResult] | types.ServerNotification | Exception
+            message: (
+                RequestResponder[types.ServerRequest, types.ClientResult]
+                | types.ServerNotification
+                | Exception
+            )
         ) -> None:
-        """Message handler for the ClientSession to process notifications,
-        particularly tool update notifications.
+        """Message handler for the ClientSession to process notifications.
 
         Args:
         ----
@@ -946,7 +972,7 @@ Note: This tool is only available when tools are blocked due to security restric
                 self.config_approved = False
                 logger.info("Tool list changed - invalidating config approval")
                 # Schedule tool update as a separate task to avoid deadlock with message handler
-                asyncio.create_task(self.update_tools(send_notification=True))
+                self._task = asyncio.create_task(self.update_tools(send_notification=True))
                 await self._forward_notification_to_upstream(method, params)
             elif method == "notifications/prompts/list_changed":
                 # Prompt changes do NOT affect the config approval status
@@ -985,7 +1011,9 @@ Note: This tool is only available when tools are blocked due to security restric
         try:
             downstream_tools = await self.session.list_tools()
 
-            assert downstream_tools.tools
+            if not downstream_tools.tools:
+                msg = "No tools received from downstream server"
+                raise ValueError(msg)
             logger.info("Received %d tools after update notification", len(downstream_tools.tools))
 
             await self._handle_tool_updates(downstream_tools.tools)
@@ -993,7 +1021,7 @@ Note: This tool is only available when tools are blocked due to security restric
                 await self._forward_notification_to_upstream(
                     "notifications/tools/list_changed", None
                 )
-        except Exception as e:
+        except McpError as e:
             logger.warning("Error handling tool update notification: %s", e)
 
     async def connect(self) -> None:
@@ -1014,22 +1042,29 @@ Note: This tool is only available when tools are blocked due to security restric
         self.initialize_result = await self.session.initialize()
 
         downstream_tools = await self.session.list_tools()
-        assert downstream_tools.tools
+        if not downstream_tools.tools:
+            msg = "No tools received from downstream server during initialization"
+            raise ValueError(msg)
 
         self.tool_specs = self._convert_mcp_tools_to_specs(downstream_tools.tools)
 
         try:
             downstream_prompts = await self.session.list_prompts()
             if downstream_prompts and downstream_prompts.prompts:
-                logger.info("Received %d prompts during initialization", len(downstream_prompts.prompts))
-        except Exception as e:
+                logger.info(
+                    "Received %d prompts during initialization", len(downstream_prompts.prompts)
+                )
+        except McpError as e:
             logger.info("Downstream server does not support prompts: %s", e)
 
         try:
             downstream_resources = await self.session.list_resources()
             if downstream_resources and downstream_resources.resources:
-                logger.info("Received %d resources during initialization", len(downstream_resources.resources))
-        except Exception as e:
+                logger.info(
+                    "Received %d resources during initialization",
+                    len(downstream_resources.resources),
+                )
+        except McpError as e:
             logger.info("Downstream server does not support resources: %s", e)
 
         self.current_config = self._create_server_config()
@@ -1097,7 +1132,8 @@ Note: This tool is only available when tools are blocked due to security restric
 
             command_parts = self.child_command.split()
             if not command_parts:
-                raise ValueError("Invalid command")
+                msg = "Invalid command"
+                raise ValueError(msg)
 
             server_params = StdioServerParameters(
                 command=command_parts[0],
@@ -1118,7 +1154,7 @@ Note: This tool is only available when tools are blocked due to security restric
                 message_handler=self._handle_client_message,
             ).__aenter__()
 
-        except Exception:
+        except McpError:
             logger.exception("Error connecting to downstream server via stdio")
             raise
 
@@ -1148,7 +1184,7 @@ Note: This tool is only available when tools are blocked due to security restric
                 message_handler=self._handle_client_message,
             ).__aenter__()
 
-        except Exception:
+        except McpError:
             logger.exception("Error connecting to downstream server via SSE")
             raise
 
@@ -1203,7 +1239,7 @@ Note: This tool is only available when tools are blocked due to security restric
 
                 if schema_type == "string":
                     param_type = ParameterType.STRING
-                elif schema_type == "number" or schema_type == "integer":
+                elif schema_type in ["number", "integer"]:
                     param_type = ParameterType.NUMBER
                 elif schema_type == "boolean":
                     param_type = ParameterType.BOOLEAN
@@ -1302,7 +1338,9 @@ Note: This tool is only available when tools are blocked due to security restric
             handle_message_notification
         )
 
-    async def _forward_notification_to_downstream(self, notification: types.ClientNotification) -> None:
+    async def _forward_notification_to_downstream(
+        self, notification: types.ClientNotification
+    ) -> None:
         """Forward a notification from upstream client to downstream server."""
         if not self.session:
             logger.warning("No downstream session available to forward notification")
@@ -1318,11 +1356,12 @@ Note: This tool is only available when tools are blocked due to security restric
             logger.info(
                 "Successfully forwarded notification %s to downstream server", notification.method
             )
-        except Exception:
+        except McpError:
             logger.exception("Error forwarding notification %s to downstream", notification.method)
 
     def _make_ansi_escape_codes_visible(self, text: str) -> str:
         """Convert ANSI escape sequences to visible text by replacing escape character with "ESC".
+
         This makes ANSI color codes and other terminal control sequences visible in the text
         instead of being interpreted by the terminal.
 
@@ -1377,12 +1416,10 @@ Note: This tool is only available when tools are blocked due to security restric
                 logger.warning(
                     "Guardrail alert triggered for tool '%s': %s", tool_name, alert.explanation
                 )
-
-            return alert
-
         except Exception:
             logger.exception("Error scanning tool response")
             return None
+        return alert
 
     async def stop_child_process(self) -> None:
         """Close connections to the downstream server."""
@@ -1437,11 +1474,10 @@ Note: This tool is only available when tools are blocked due to security restric
                     async with anyio.create_task_group() as tg:
                         async for message in self.server_session.incoming_messages:
                             tg.start_soon(
-                                self.server._handle_message,
+                                self.server._handle_message, # noqa: SLF001
                                 message,
                                 self.server_session,
                                 None,  # No lifespan context needed
-                                False,  # Don't raise exceptions
                             )
         finally:
             await self.stop_child_process()
@@ -1558,7 +1594,10 @@ async def review_server_config(
 
 
 def make_ansi_escape_codes_visible(text: str) -> str:
-    # Replace the escape character (ASCII 27, typically \x1b or \033) with "ESC"
-    # This will convert escape sequences like "\x1b[31m" (red text) to "ESC[31m"
-    # making them visible instead of changing the terminal colors
+    r"""Neutralize ANSI escape codes.
+
+    Replace the escape character (ASCII 27, typically \x1b or \033) with "ESC"
+    This will convert escape sequences like "\x1b[31m" (red text) to "ESC[31m"
+    making them visible instead of changing the terminal colors
+    """
     return re.sub(r"\x1b", "ESC", text)

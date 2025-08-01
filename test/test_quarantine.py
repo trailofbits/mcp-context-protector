@@ -4,7 +4,7 @@ Tests for the quarantine system.
 
 import tempfile
 import unittest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from contextprotector.quarantine import QuarantinedToolResponse, ToolResponseQuarantine
@@ -51,7 +51,7 @@ class TestQuarantinedToolResponse(unittest.TestCase):
 
     def test_to_dict(self) -> None:
         """Test conversion to dictionary."""
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         response = QuarantinedToolResponse(
             id="test-id",
             tool_name="test-tool",
@@ -74,7 +74,7 @@ class TestQuarantinedToolResponse(unittest.TestCase):
 
     def test_from_dict(self) -> None:
         """Test creation from dictionary."""
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         released_at = now + timedelta(minutes=5)
 
         data = {

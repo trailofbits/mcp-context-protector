@@ -137,11 +137,7 @@ class MCPToolDefinition:
         if set(self_params.keys()) != set(other_params.keys()):
             return False
 
-        for name, param in self_params.items():
-            if param != other_params[name]:
-                return False
-
-        return True
+        return all(param == other_params[name] for name, param in self_params.items())
 
 
 @dataclass
@@ -286,7 +282,9 @@ class MCPServerConfig:
                 return tool
         return None
 
-    def to_json(self, path: str | None = None, fp: TextIO | None = None, indent: int = 2) -> str | None:
+    def to_json(
+        self, path: str | None = None, fp: TextIO | None = None, indent: int = 2
+    ) -> str | None:
         """Serialize the configuration to JSON.
 
         Args:
@@ -334,7 +332,8 @@ class MCPServerConfig:
 
         """
         if sum(x is not None for x in (json_str, path, fp)) != 1:
-            raise ValueError("Exactly one of json_str, path, or fp must be provided")
+            msg = "Exactly one of json_str, path, or fp must be provided"
+            raise ValueError(msg)
 
         data = None
         if path:

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from exceptiongroup import ExceptionGroup
 from mcp import ClientSession, types
 
 from .test_utils import approve_server_config_using_review, run_with_wrapper_session
@@ -29,7 +30,7 @@ class NotificationCapturingClient:
         self.received_notifications: list[dict[str, Any]] = []
         self.notification_event = asyncio.Event()
 
-    async def handle_notification(self, notification: Any) -> None:
+    async def handle_notification(self, notification: types.ServerNotification) -> None:
         """Handle notifications received from the server."""
         if hasattr(notification, "root") and hasattr(notification.root, "method"):
             notification_data = {
@@ -68,7 +69,7 @@ async def test_notification_forwarding() -> None:
         # Monkey patch the session to capture notifications
         original_handler = session._message_handler
 
-        async def capturing_handler(message: Any) -> None:
+        async def capturing_handler(message: types.ServerNotification) -> None:
             # First let the original handler process it
             if original_handler:
                 await original_handler(message)
@@ -133,9 +134,12 @@ async def test_notification_forwarding() -> None:
         # First run to get blocked and trigger config approval
         try:
             await run_with_wrapper_session(test_callback, "stdio", server_command, temp_file.name)
-        except Exception as e:
-            # Expected to fail on first run due to unapproved config
-            logger.info("First run failed as expected: %s", e)
+        except ExceptionGroup as e:
+            if len(e.exceptions) > 0 and isinstance(e.exceptions[0].exceptions[0], AssertionError):
+                # Expected to fail on first run due to unapproved config
+                logger.info("First run failed as expected: %s", e)
+            else:
+                raise
 
         # Approve the server configuration
         await approve_server_config_using_review("stdio", server_command, temp_file.name)
@@ -169,7 +173,7 @@ async def test_notification_forwarding_without_invalid() -> None:
         # Monkey patch the session to capture notifications
         original_handler = session._message_handler
 
-        async def capturing_handler(message: Any) -> None:
+        async def capturing_handler(message: types.ServerNotification) -> None:
             if original_handler:
                 await original_handler(message)
             await notification_client.handle_notification(message)
@@ -211,12 +215,18 @@ async def test_notification_forwarding_without_invalid() -> None:
         # First run may fail due to unapproved config
         try:
             await run_with_wrapper_session(test_callback, "stdio", server_command, temp_file.name)
-        except Exception:
-            # Approve the server configuration
-            await approve_server_config_using_review("stdio", server_command, temp_file.name)
+        except ExceptionGroup as e:
+            if len(e.exceptions) > 0 and isinstance(e.exceptions[0].exceptions[0], AssertionError):
+                # Approve the server configuration
+                await approve_server_config_using_review("stdio", server_command, temp_file.name)
 
-            # Run again with approved config
-            await run_with_wrapper_session(test_callback, "stdio", server_command, temp_file.name)
+                # Run again with approved config
+                await run_with_wrapper_session(
+                    test_callback,
+                    "stdio",
+                    server_command,
+                    temp_file.name
+                )
 
     finally:
         Path(temp_file.name).unlink()
@@ -315,11 +325,9 @@ async def test_client_to_server_notification_forwarding() -> None:
         assert received_count >= 1, "Expected at least 1 notification, got %d" % received_count
 
         logger.info(
-            "✅ Verified client→server notification forwarding works (received %d notifications)", received_count
+            "✅ Verified client→server notification forwarding works "
+            "(received %d notifications)", received_count
         )
-
-        # TODO: Investigate and fix forwarding issues for other notification types
-        # The logs show validation errors and handler signature issues that need resolution
 
     # Create temporary config file
     temp_file = tempfile.NamedTemporaryFile(delete=False)

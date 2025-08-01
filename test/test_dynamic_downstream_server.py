@@ -2,17 +2,16 @@
 Tests for the dynamic downstream MCP server with signal-based tool updates.
 """
 
-import aiofiles
 import asyncio
+import contextlib
 import json
 import os
 import signal
 import tempfile
-import time
 from collections.abc import Awaitable, Callable, Generator
 from pathlib import Path
-from typing import Any
 
+import aiofiles
 import pytest
 from mcp import ClientSession, StdioServerParameters, types
 from mcp.client.stdio import stdio_client
@@ -33,7 +32,7 @@ class ToolUpdateTracker:
         self.latest_tools = []
         self.notification_event = asyncio.Event()
 
-    async def handle_message(self, message: Any) -> None:
+    async def handle_message(self, message: types.ServerNotification) -> None:
         """
         Message handler function that processes notifications from the server.
 
@@ -58,12 +57,15 @@ class ToolUpdateTracker:
         """Wait for a tool update notification to be received."""
         try:
             await asyncio.wait_for(self.notification_event.wait(), timeout=timeout)
-            return True
         except asyncio.TimeoutError:
             return False
+        return True
 
 
-async def verify_tools(session: ClientSession, expected_tool_names: list[str]) -> types.ListToolsResult:
+async def verify_tools(
+    session: ClientSession,
+    expected_tool_names: list[str]
+) -> types.ListToolsResult:
     """
     Verify that the session has the expected tools.
 
@@ -87,7 +89,11 @@ async def verify_tools(session: ClientSession, expected_tool_names: list[str]) -
     return tools
 
 
-async def send_sighup_and_wait(session: ClientSession, expected_tools: list[str], tracker: ToolUpdateTracker) -> None:
+async def send_sighup_and_wait(
+    session: ClientSession,
+    expected_tools: list[str],
+    tracker: ToolUpdateTracker
+) -> None:
     """
     Send SIGHUP to the server, verify a notification is received, then check tools were updated.
 
@@ -140,7 +146,10 @@ def write_tool_count(count: int) -> str:
     return TEMP_TOOLCOUNT_FILE
 
 
-async def start_dynamic_server(callback: Callable[[ClientSession, ToolUpdateTracker], Awaitable[None]], initial_tool_count: int | None = None) -> None:
+async def start_dynamic_server(
+    callback: Callable[[ClientSession, ToolUpdateTracker], Awaitable[None]],
+    initial_tool_count: int | None = None
+) -> None:
     """
     Start the dynamic server and run the provided callback with a client session.
 
@@ -206,16 +215,12 @@ def cleanup_files() -> None:
     global TEMP_PIDFILE, TEMP_TOOLCOUNT_FILE
 
     if TEMP_PIDFILE and Path(TEMP_PIDFILE).exists():
-        try:
+        with contextlib.suppress(OSError):
             Path(TEMP_PIDFILE).unlink()
-        except OSError:
-            pass
 
     if TEMP_TOOLCOUNT_FILE and Path(TEMP_TOOLCOUNT_FILE).exists():
-        try:
+        with contextlib.suppress(OSError):
             Path(TEMP_TOOLCOUNT_FILE).unlink()
-        except OSError:
-            pass
 
 
 @pytest.fixture(autouse=True)
@@ -243,7 +248,7 @@ async def test_initial_tools() -> None:
     The timeout ensures the test won't hang indefinitely if there's an issue.
     """
 
-    async def callback(session: ClientSession, _tracker: Any) -> None:
+    async def callback(session: ClientSession, _tracker: ToolUpdateTracker) -> None:
         """
         Test callback that verifies the initial tool state and tests the echo tool.
 
@@ -278,7 +283,7 @@ async def test_preconfigured_tools() -> None:
     2. The tools are properly initialized and functional
     """
 
-    async def callback(session: ClientSession, _tracker: Any) -> None:
+    async def callback(session: ClientSession, _tracker: ToolUpdateTracker) -> None:
         """
         Test callback that verifies multiple tools are available at startup.
 

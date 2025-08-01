@@ -196,7 +196,6 @@ class PromptTestServer:
                             message,
                             self._session,
                             None,  # No lifespan context needed
-                            False,  # Don't raise exceptions
                         )
 
 

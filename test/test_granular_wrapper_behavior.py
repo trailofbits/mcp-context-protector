@@ -112,7 +112,7 @@ async def test_granular_tool_filtering_in_list_tools() -> None:
             assert (
                 "not approved" in response_json["reason"].lower()
             ), "Should indicate tool not approved"
-        except Exception as e:
+        except ValueError as e:
             # The wrapper should raise a ValueError with JSON error details for blocked tools
             error_message = str(e)
             assert "blocked" in error_message, f"Expected blocked error, got: {error_message}"
@@ -198,13 +198,16 @@ async def test_tool_modification_blocks_only_modified_tool() -> None:
     assert not status["tools"]["modified_tool"]
 
     print(
-        "✅ Tool modification correctly detected - stable tool remains approved, modified tool needs re-approval"
+        "✅ Tool modification correctly detected - stable tool remains approved, "
+        "modified tool needs re-approval"
     )
 
 
 @pytest.mark.asyncio()
 async def test_instruction_change_blocks_everything() -> None:
-    """Test that changing server instructions blocks ALL tools, demonstrating whole-server blocking."""
+    """Test effect of changing server instructions.
+
+    All tools should disappear, demonstrating whole-server blocking."""
 
     temp_file = tempfile.NamedTemporaryFile(delete=False)
     db = MCPConfigDatabase(temp_file.name)
@@ -269,7 +272,8 @@ async def test_instruction_change_blocks_everything() -> None:
     # (this is enforced in the wrapper's connection logic and call_tool logic)
 
     print(
-        "✅ Instruction change correctly detected - wrapper will block all tools despite individual tool approval"
+        "✅ Instruction change correctly detected - wrapper will block all tools despite "
+        "individual tool approval"
     )
 
 
