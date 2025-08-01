@@ -77,7 +77,9 @@ class SSEServerManager:
 
             logging.warning(
                 "Attempt %d/%d: No ports found for PID %d, waiting...",
-                attempt + 1, max_attempts, self.pid
+                attempt + 1,
+                max_attempts,
+                self.pid,
             )
             await asyncio.sleep(1.0)
 

@@ -15,8 +15,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # Import (but don't use) the shared utility function for patching
 
+from contextprotector.approval_cli import review_server_config
 from contextprotector.mcp_config import MCPServerConfig
-from contextprotector.mcp_wrapper import MCPWrapperServer, review_server_config
+from contextprotector.mcp_wrapper import MCPWrapperServer
 
 from .test_utils import approve_server_config_using_review
 
@@ -37,11 +38,11 @@ async def test_review_mode_already_trusted() -> None:
     mock_wrapper.connect = AsyncMock(return_value=None)
     mock_wrapper.stop_child_process = AsyncMock(return_value=None)
 
-    # Patch the MCPWrapperServer.wrap_stdio to return our mock
+    # Patch the MCPWrapperServer.from_config to return our mock
     # and also patch the shared utility to avoid external calls
     mock_approve_func = AsyncMock(return_value=None)
     with (
-        patch.object(MCPWrapperServer, "wrap_stdio", return_value=mock_wrapper),
+        patch.object(MCPWrapperServer, "from_config", return_value=mock_wrapper),
         patch.object(approve_server_config_using_review, "__call__", mock_approve_func),
         patch("sys.stdout", new=StringIO()) as fake_stdout,
     ):
@@ -81,9 +82,9 @@ async def test_review_mode_new_server_approval() -> None:
     mock_wrapper.stop_child_process = AsyncMock(return_value=None)
     mock_wrapper.config_db.save_server_config = AsyncMock()
 
-    # Patch the MCPWrapperServer.wrap_stdio to return our mock
+    # Patch the MCPWrapperServer.from_config to return our mock
     with (
-        patch.object(MCPWrapperServer, "wrap_stdio", return_value=mock_wrapper),
+        patch.object(MCPWrapperServer, "from_config", return_value=mock_wrapper),
         patch("builtins.input", return_value="yes"),
         patch("sys.stdout", new=StringIO()) as fake_stdout,
     ):
@@ -136,9 +137,9 @@ async def test_review_mode_modified_server_rejection() -> None:
     mock_wrapper.stop_child_process = AsyncMock(return_value=None)
     mock_wrapper.config_db.save_server_config = AsyncMock()
 
-    # Patch the MCPWrapperServer.wrap_stdio to return our mock
+    # Patch the MCPWrapperServer.from_config to return our mock
     with (
-        patch.object(MCPWrapperServer, "wrap_stdio", return_value=mock_wrapper),
+        patch.object(MCPWrapperServer, "from_config", return_value=mock_wrapper),
         patch("builtins.input", return_value="no"),
         patch("sys.stdout", new=StringIO()) as fake_stdout,
     ):
@@ -189,9 +190,9 @@ async def test_review_mode_with_guardrail_alert() -> None:
     mock_provider = MagicMock()
     mock_provider.name = "mock_provider"
 
-    # Patch the MCPWrapperServer.wrap_stdio to return our mock
+    # Patch the MCPWrapperServer.from_config to return our mock
     with (
-        patch.object(MCPWrapperServer, "wrap_stdio", return_value=mock_wrapper),
+        patch.object(MCPWrapperServer, "from_config", return_value=mock_wrapper),
         patch("builtins.input", return_value="no"),
         patch("sys.stdout", new=StringIO()) as fake_stdout,
     ):

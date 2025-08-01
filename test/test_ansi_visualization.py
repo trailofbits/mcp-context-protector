@@ -11,7 +11,11 @@ from pathlib import Path
 import pytest
 from mcp import ClientSession
 
-from .test_utils import approve_server_config_using_review, run_with_wrapper_session
+from .test_utils import (
+    approve_server_config_using_review,
+    run_with_wrapper_session,
+    run_with_wrapper_session_visualize_ansi,
+)
 
 # Configure path for imports
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -22,8 +26,7 @@ TEST_SERVER_PATH = Path(__file__).resolve().parent / "ansi_test_server.py"
 
 
 async def run_without_ansi_visualization(
-    callback: Callable[[ClientSession], Awaitable[None]],
-    config_path: str
+    callback: Callable[[ClientSession], Awaitable[None]], config_path: str
 ) -> None:
     """
     Run a test with a wrapper that has ANSI visualization set accordingly.
@@ -34,12 +37,11 @@ async def run_without_ansi_visualization(
         visualize_ansi: Whether to visualize ANSI escape codes
     """
     command = f"python {TEST_SERVER_PATH!s}"
-    await run_with_wrapper_session(callback, "stdio", command, config_path, False)
+    await run_with_wrapper_session(callback, "stdio", command, config_path)
 
 
 async def run_with_ansi_visualization(
-    callback: Callable[[ClientSession], Awaitable[None]],
-    config_path: str
+    callback: Callable[[ClientSession], Awaitable[None]], config_path: str
 ) -> None:
     """
     Run a test with a wrapper that has ANSI visualization set accordingly.
@@ -50,7 +52,7 @@ async def run_with_ansi_visualization(
         visualize_ansi: Whether to visualize ANSI escape codes
     """
     command = f"python {TEST_SERVER_PATH!s}"
-    await run_with_wrapper_session(callback, "stdio", command, config_path, True)
+    await run_with_wrapper_session_visualize_ansi(callback, "stdio", command, config_path)
 
 
 class TestAnsiVisualization:

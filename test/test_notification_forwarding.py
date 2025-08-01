@@ -222,10 +222,7 @@ async def test_notification_forwarding_without_invalid() -> None:
 
                 # Run again with approved config
                 await run_with_wrapper_session(
-                    test_callback,
-                    "stdio",
-                    server_command,
-                    temp_file.name
+                    test_callback, "stdio", server_command, temp_file.name
                 )
 
     finally:
@@ -326,7 +323,8 @@ async def test_client_to_server_notification_forwarding() -> None:
 
         logger.info(
             "✅ Verified client→server notification forwarding works "
-            "(received %d notifications)", received_count
+            "(received %d notifications)",
+            received_count,
         )
 
     # Create temporary config file

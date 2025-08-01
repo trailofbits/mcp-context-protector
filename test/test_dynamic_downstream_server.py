@@ -63,8 +63,7 @@ class ToolUpdateTracker:
 
 
 async def verify_tools(
-    session: ClientSession,
-    expected_tool_names: list[str]
+    session: ClientSession, expected_tool_names: list[str]
 ) -> types.ListToolsResult:
     """
     Verify that the session has the expected tools.
@@ -90,9 +89,7 @@ async def verify_tools(
 
 
 async def send_sighup_and_wait(
-    session: ClientSession,
-    expected_tools: list[str],
-    tracker: ToolUpdateTracker
+    session: ClientSession, expected_tools: list[str], tracker: ToolUpdateTracker
 ) -> None:
     """
     Send SIGHUP to the server, verify a notification is received, then check tools were updated.
@@ -148,7 +145,7 @@ def write_tool_count(count: int) -> str:
 
 async def start_dynamic_server(
     callback: Callable[[ClientSession, ToolUpdateTracker], Awaitable[None]],
-    initial_tool_count: int | None = None
+    initial_tool_count: int | None = None,
 ) -> None:
     """
     Start the dynamic server and run the provided callback with a client session.

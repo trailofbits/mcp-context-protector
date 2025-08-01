@@ -54,7 +54,7 @@ Now configure your client to run your MCP servers through `mcp-context-protector
 ## Server configuration pinning
 
 mcp-context-protector uses a trust-on-first use pinning system for MCP server configurations. Any deviation from the approved/known-good server configuration will block downstream tool calls until the user explicitly approves the changed server configuration. Server approval is handled through mcp-context-protector's command-line interface.
- 
+
 Server configuration comparisons compare server instructions, tool descriptions, and tool input schemas to determine whether a server configuration is equivalent to any approved one. Comparisons are semantic and ignore irrelevant factors like tool order and parameter order.
 
 The database of server configurations is stored in a JSON-encoded file whose default location is `~/.mcp-context-protector/servers.json`. If a server configuration is in that file, it's approved and will run without tool blocking and without requiring user approval. The wrapper server checks downstream server configurations as soon as the connection is initiated and again whenever the wrapper receives a notification that the downstream server's tools have changed (`notifications/tools/list_changed`).

@@ -380,9 +380,5 @@ async def test_tool_parameter_modification_blocking() -> None:
     db.approve_tool("stdio", "param_test_server", "param_test_tool", original_tool)
 
     # Test that modified tool is not approved
-    assert (
-        db.is_tool_approved("stdio", "param_test_server", "param_test_tool", original_tool)
-    )
-    assert not (
-        db.is_tool_approved("stdio", "param_test_server", "param_test_tool", modified_tool)
-    )
+    assert db.is_tool_approved("stdio", "param_test_server", "param_test_tool", original_tool)
+    assert not (db.is_tool_approved("stdio", "param_test_server", "param_test_tool", modified_tool))
