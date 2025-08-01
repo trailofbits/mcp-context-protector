@@ -25,7 +25,7 @@ def temp_quarantine_file() -> Generator[str, None, None]:
 
 
 @pytest.mark.asyncio()
-async def test_quarantine_integration(temp_quarantine_file) -> None:
+async def test_quarantine_integration(temp_quarantine_file: str) -> None:
     """Test that tool responses flagged by guardrails are properly quarantined."""
     # Create a guardrail provider that always triggers alerts
     provider = AlwaysAlertGuardrailProvider()

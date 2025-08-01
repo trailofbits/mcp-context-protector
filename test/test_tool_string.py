@@ -45,9 +45,9 @@ def test_tool_str() -> None:
     assert "required_param (string) (required): A required parameter" in tool_str
     assert "optional_param (number) (optional): An optional parameter [Default: 42]" in tool_str
     assert (
-        "enum_param (string) (required): A parameter with enum values [Values: value1, value2, value3]"
-        in tool_str
-    )
+        "enum_param (string) (required): A parameter with enum values "
+        "[Values: value1, value2, value3]"
+    ) in tool_str
 
     # Test a tool with no parameters
     empty_tool = MCPToolDefinition(

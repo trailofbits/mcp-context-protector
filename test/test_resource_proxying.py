@@ -24,7 +24,9 @@ RESOURCE_TEST_SERVER_PATH = Path(__file__).resolve().parent / "resource_test_ser
 
 
 # Local helper function for backward compatibility
-async def run_with_wrapper(callback: Callable[[ClientSession], Awaitable[None]], config_path: str) -> None:
+async def run_with_wrapper(
+    callback: Callable[[ClientSession], Awaitable[None]], config_path: str
+) -> None:
     """
     Run a test with a wrapper connected to the resource test server.
 

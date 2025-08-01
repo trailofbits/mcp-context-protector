@@ -29,6 +29,7 @@ import atexit
 import os
 import signal
 import sys
+import types
 from contextlib import AsyncExitStack
 from pathlib import Path
 from typing import Any
@@ -134,12 +135,14 @@ def add_dynamic_tool() -> None:
         app.add_tool(
             numbered_echo_handler,
             name=f"echo{num_tools}",
-            description=f"Echo tool #{num_tools} - echoes back the input message with a tool number",
+            description=(
+                f"Echo tool #{num_tools} - echoes back the input message with a tool number"
+            ),
         )
         print(f"Added echo{num_tools} tool", file=sys.stderr)
 
 
-def initialize_tools(count) -> None:
+def initialize_tools(count: int) -> None:
     """
     Initialize the server with the specified number of tools.
 
@@ -162,7 +165,7 @@ def initialize_tools(count) -> None:
         add_dynamic_tool()
 
 
-def read_tool_count_from_file(toolcount_file) -> int:
+def read_tool_count_from_file(toolcount_file: str | None) -> int:
     """
     Read the tool count from the specified file.
 
@@ -184,7 +187,7 @@ def read_tool_count_from_file(toolcount_file) -> int:
     return 1
 
 
-def signal_handler(_signum: any, _frame: any) -> None:
+def signal_handler(_signum: int, _frame: types.FrameType | None) -> None:
     """Signal handler for SIGHUP that adds a new tool."""
     global num_tools
 
@@ -197,7 +200,6 @@ def signal_handler(_signum: any, _frame: any) -> None:
 
     # Notify clients of the updated tools list
     # This triggers the _handle_tool_updates callback in the wrapper
-    # app.notify_tools_updated()
     loop = asyncio.get_running_loop()
     asyncio.run_coroutine_threadsafe(app._session.send_tool_list_changed(), loop)
 
@@ -207,7 +209,7 @@ def signal_handler(_signum: any, _frame: any) -> None:
     )
 
 
-def write_pidfile(pidfile_path) -> None:
+def write_pidfile(pidfile_path: str) -> None:
     """
     Write the current process ID to the specified pidfile.
 
@@ -216,20 +218,19 @@ def write_pidfile(pidfile_path) -> None:
     """
     pid = os.getpid()
 
-    try:
-        with Path(pidfile_path).open("w") as f:
-            f.write(str(pid))
+    with Path(pidfile_path).open("w") as f:
+        f.write(str(pid))
 
-        # Register cleanup function to remove pidfile on exit
-        atexit.register(lambda: Path(pidfile_path).unlink() if Path(pidfile_path).exists() else None)
+    # Register cleanup function to remove pidfile on exit
+    atexit.register(
+        lambda: Path(pidfile_path).unlink() if Path(pidfile_path).exists() else None
+    )
 
-        print(f"PID {pid} written to {pidfile_path}", file=sys.stderr)
-    except Exception as e:
-        print(f"Error writing pidfile {pidfile_path}: {e}", file=sys.stderr)
+    print(f"PID {pid} written to {pidfile_path}", file=sys.stderr)
 
 
 async def my_run(
-    self,
+    self: "FastMCP",
     # When False, exceptions are returned as messages to the client.
     # When True, exceptions are raised, which will cause the server to shut down
     # but also make tracing exceptions much easier during testing and when using
@@ -253,26 +254,25 @@ async def my_run(
     opts = self._mcp_server.create_initialization_options(
         notification_options=NotificationOptions(tools_changed=True)
     )
-    async with stdio_server() as (read_stream, write_stream):
-        async with AsyncExitStack() as stack:
-            lifespan_context = await stack.enter_async_context(self._mcp_server.lifespan(self))
-            session = await stack.enter_async_context(
-                ServerSession(
-                    read_stream,
-                    write_stream,
-                    opts,
-                )
+    async with stdio_server() as (read_stream, write_stream), AsyncExitStack() as stack:
+        lifespan_context = await stack.enter_async_context(self._mcp_server.lifespan(self))
+        session = await stack.enter_async_context(
+            ServerSession(
+                read_stream,
+                write_stream,
+                opts,
             )
-            self._session = session
+        )
+        self._session = session
 
-            async with anyio.create_task_group() as tg:
-                async for message in session.incoming_messages:
-                    tg.start_soon(
-                        self._mcp_server._handle_message,
-                        message,
-                        self._session,
-                        lifespan_context,
-                        raise_exceptions,
+        async with anyio.create_task_group() as tg:
+            async for message in session.incoming_messages:
+                tg.start_soon(
+                    self._mcp_server._handle_message,
+                    message,
+                    self._session,
+                    lifespan_context,
+                    raise_exceptions,
                     )
 
 

@@ -14,8 +14,8 @@ async def run_with_session(callback: callable) -> None:
     parent_dir = Path(__file__).resolve().parent
     server_params = StdioServerParameters(
         command="python",
-        args=[str(parent_dir.joinpath("simple_downstream_server.py"))],  # Optional command line arguments
-        env=None,  # Optional environment variables
+        args=[str(parent_dir.joinpath("simple_downstream_server.py"))],
+        env=None,
     )
 
     async with stdio_client(server_params) as (read, write):

@@ -10,6 +10,7 @@ import tempfile
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
+import aiofiles
 import pytest
 from contextprotector.mcp_config import MCPServerConfig
 from mcp import ClientSession, types
@@ -33,7 +34,10 @@ async def approve_server_config_using_review(url: str, config_path: str) -> None
 # Import global SERVER_PORT from sse_server_utils
 
 
-async def run_with_wrapper_session(callback: Callable[[ClientSession], Awaitable[None]], config_path=None) -> None:
+async def run_with_wrapper_session(
+    callback: Callable[[ClientSession], Awaitable[None]],
+    config_path: str | None = None
+) -> None:
     """
     Run a test with a wrapper session that connects to the SSE downstream server via URL.
 
@@ -60,7 +64,7 @@ async def run_with_wrapper_session(callback: Callable[[ClientSession], Awaitable
 
 
 @pytest.mark.asyncio()
-async def test_echo_tool_through_wrapper(sse_server_fixture: any) -> None: # noqa: ARG001 F811
+async def test_echo_tool_through_wrapper(sse_server_fixture: any) -> None: # noqa: F811 ARG001
     """Test that the echo tool correctly works through the MCP wrapper using SSE transport."""
 
     async def callback(session: ClientSession) -> None:
@@ -119,8 +123,8 @@ async def test_echo_tool_through_wrapper(sse_server_fixture: any) -> None: # noq
     # Now we need to run the review process to approve this config
     await approve_server_config_using_review(sse_url, temp_file.name)
 
-    with Path(temp_file.name).open("r") as f:
-        logging.exception(f.read())
+    async with aiofiles.open(temp_file.name, "r") as f:
+        logging.exception(await f.read())
     from contextprotector.mcp_config import MCPConfigDatabase
 
     cdb = MCPConfigDatabase(temp_file.name)
@@ -133,7 +137,7 @@ async def test_echo_tool_through_wrapper(sse_server_fixture: any) -> None: # noq
 
 
 @pytest.mark.asyncio()
-async def test_invalid_tool_through_wrapper(sse_server_fixture: any) -> None: # noqa: ARG001 F811
+async def test_invalid_tool_through_wrapper(sse_server_fixture: any) -> None: # noqa: F811 ARG001
     """Test error handling for invalid tools through the MCP wrapper using SSE transport."""
 
     async def callback(session: ClientSession) -> None:

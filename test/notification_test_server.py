@@ -73,7 +73,7 @@ class NotificationTestServer:
                         types.TextContent(type="text", text="Sent test notifications (valid types)")
                     ]
                 except Exception as e:
-                    logger.exception("Error sending notifications: %s", e)
+                    logger.exception("Error sending notifications")
                     return [
                         types.TextContent(
                             type="text", text=f"Error sending notifications: {e!s}"
@@ -109,7 +109,8 @@ class NotificationTestServer:
                     types.TextContent(type="text", text="Cleared %d received notifications" % count)
                 ]
             else:
-                raise ValueError(f"Unknown tool: {name}")
+                error_msg = f"Unknown tool: {name}"
+                raise ValueError(error_msg)
 
         # Add notification handlers to capture client→server notifications
         @self.server.progress_notification()
@@ -126,7 +127,9 @@ class NotificationTestServer:
             logger.info("Received progress notification from client: %s", notification.method)
 
         # Register other notification handlers manually
-        async def handle_message_notification(notification: types.LoggingMessageNotification) -> None:
+        async def handle_message_notification(
+            notification: types.LoggingMessageNotification,
+        ) -> None:
             """Handle message notifications from client."""
             import time
 
@@ -148,9 +151,13 @@ class NotificationTestServer:
                 "timestamp": time.time(),
             }
             self.received_notifications.append(notification_data)
-            logger.info("Received cancelled notification from client: %s", notification.method)
+            logger.info(
+                "Received cancelled notification from client: %s", notification.method
+            )
 
-        async def handle_initialized_notification(notification: types.InitializedNotification) -> None:
+        async def handle_initialized_notification(
+            notification: types.InitializedNotification
+        ) -> None:
             """Handle initialized notifications from client."""
             import time
 
@@ -272,7 +279,6 @@ class NotificationTestServer:
                             message,
                             self._session,
                             None,  # No lifespan context needed
-                            False,  # Don't raise exceptions
                         )
 
 

@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 from mcp import ClientSession, types
+from mcp.shared.exceptions import McpError
 
 from .test_utils import run_with_wrapper_session
 
@@ -156,7 +157,7 @@ async def test_zero_information_leakage_unapproved_config() -> None:
                     ), "list_prompts leaked downstream prompt 'farewell'"
 
             logger.info("✓ list_prompts() does not leak downstream server information")
-        except Exception as e:
+        except McpError as e:
             # If prompts aren't supported by wrapper, that's fine
             logger.info("list_prompts() not supported or failed: %s", e)
 
@@ -171,7 +172,7 @@ async def test_zero_information_leakage_unapproved_config() -> None:
                 ), "list_resources() leaked downstream resource information"
 
             logger.info("✓ list_resources() does not leak downstream server information")
-        except Exception as e:
+        except McpError as e:
             # If resources aren't supported by wrapper, that's fine
             logger.info("list_resources() not supported or failed: %s", e)
 

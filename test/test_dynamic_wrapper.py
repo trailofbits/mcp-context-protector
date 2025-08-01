@@ -5,16 +5,17 @@ Tests the behavior of the dynamic server with tool count configuration.
 """
 
 import asyncio
+import contextlib
 import json
 import os
 import signal
 import subprocess
 import sys
 import tempfile
-import time
 from collections.abc import Awaitable, Callable, Generator
 from pathlib import Path
 
+import aiofiles
 import pytest
 from mcp import ClientSession, StdioServerParameters, types
 from mcp.client.stdio import stdio_client
@@ -64,7 +65,7 @@ def create_approved_config(server_cmd: str) -> str:
 
     # Use the review command to pre-approve the server config
     subprocess.run(
-        [
+        [ # noqa: S603
             sys.executable,
             "-m",
             "contextprotector",
@@ -82,7 +83,10 @@ def create_approved_config(server_cmd: str) -> str:
     return TEMP_CONFIG_FILE
 
 
-async def run_with_dynamic_server_session(callback: Callable[[ClientSession], Awaitable[None]], initial_tool_count=None) -> None:
+async def run_with_dynamic_server_session(
+    callback: Callable[[ClientSession], Awaitable[None]],
+    initial_tool_count: int | None = None
+) -> None:
     """
     Run a test with a direct connection to the dynamic downstream server.
 
@@ -132,13 +136,13 @@ async def run_with_dynamic_server_session(callback: Callable[[ClientSession], Aw
             attempts = 0
             while attempts < max_attempts:
                 try:
-                    with Path(TEMP_PIDFILE).open("r") as f:
-                        SERVER_PID = int(f.read().strip())
+                    async with aiofiles.open(TEMP_PIDFILE, "r") as f:
+                        SERVER_PID = int((await f.read()).strip())
                     break
                 except (FileNotFoundError, ValueError):
                     # Wait for the pidfile to be created
                     attempts += 1
-                    time.sleep(0.1)
+                    await asyncio.sleep(0.1)
 
             assert SERVER_PID is not None, f"Failed to read PID from {TEMP_PIDFILE}"
 
@@ -152,10 +156,8 @@ def cleanup_files() -> None:
 
     for file_path in [TEMP_PIDFILE, TEMP_TOOLCOUNT_FILE, TEMP_CONFIG_FILE]:
         if file_path and Path(file_path).exists():
-            try:
+            with contextlib.suppress(OSError):
                 Path(file_path).unlink()
-            except OSError:
-                pass
 
 
 @pytest.fixture(autouse=True)
@@ -182,7 +184,7 @@ async def send_sighup_and_wait() -> None:
     await asyncio.sleep(0.5)
 
 
-async def get_tool_names(session) -> list[str]:
+async def get_tool_names(session: ClientSession) -> list[str]:
     """
     Get a sorted list of tool names from the session.
 

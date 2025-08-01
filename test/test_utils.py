@@ -43,27 +43,27 @@ async def approve_server_config_using_review(
     elif connection_type == "sse":
         cmd.extend(["--sse-url", identifier])
     else:
-        raise ValueError(f"Invalid connection type: {connection_type}")
+        error_msg = f"Invalid connection type: {connection_type}"
+        raise ValueError(error_msg)
 
     # Run the review process
-    review_process = subprocess.Popen(
-        cmd,
+    review_process = await asyncio.create_subprocess_exec(
+        *cmd,
         cwd=Path(__file__).parent.parent.parent.resolve(),
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
+        stderr=subprocess.PIPE
     )
 
     # Wait for the review process to start
     await asyncio.sleep(1.5)
 
     # Send 'y' to approve the configuration
-    review_process.stdin.write("y\n")
-    review_process.stdin.flush()
+    review_process.stdin.write(b"y\n")
+    await review_process.stdin.drain()
 
     # Wait for the review process to complete
-    stdout, stderr = review_process.communicate(timeout=5)
+    stdout, stderr = await review_process.communicate()
 
     # Verify the review process output
     assert (
@@ -72,7 +72,7 @@ async def approve_server_config_using_review(
 
     # Check for expected output in the review process
     assert (
-        "has been trusted and saved" in stdout
+        b"has been trusted and saved" in stdout
     ), f"Missing expected approval message in output: {stdout}"
 
 
@@ -81,8 +81,7 @@ async def run_with_wrapper_session(
     connection_type: Literal["stdio", "http", "sse"],
     identifier: str,
     config_path: str,
-    visualize_ansi: bool = False,
-    guardrail_provider: str | None = None,
+    visualize_ansi: bool = False
 ) -> None:
     """
     Run a test with a wrapper that connects to the specified downstream server.
@@ -111,14 +110,12 @@ async def run_with_wrapper_session(
     elif connection_type == "sse":
         args.extend(["--sse-url", identifier])
     else:
-        raise ValueError(f"Invalid connection type: {connection_type}")
+        error_msg = f"Invalid connection type: {connection_type}"
+        raise ValueError(error_msg)
 
     # Add optional args
     if visualize_ansi:
         args.append("--visualize-ansi-codes")
-
-    if guardrail_provider:
-        args.extend(["--guardrail-provider", guardrail_provider])
 
     # Create server parameters
     server_params = StdioServerParameters(

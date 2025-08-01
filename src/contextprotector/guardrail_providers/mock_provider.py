@@ -1,5 +1,4 @@
-"""Mock guardrail providers for testing guardrail functionality.
-"""
+"""Mock guardrail providers for testing guardrail functionality."""
 
 import logging
 
@@ -11,43 +10,44 @@ logger = logging.getLogger("mock_guardrail_provider")
 
 class MockGuardrailProvider(GuardrailProvider):
     """A configurable mock guardrail provider for testing.
+
     This provider can be manually set to trigger alerts for testing purposes.
     Only available when running tests.
     """
 
-    def __init__(self, trigger_alert: bool = False, alert_text: str = "Test guardrail alert") -> None:
-        """Initialize the mock guardrail provider.
-
-        Args:
-        ----
-            trigger_alert: Whether to trigger an alert by default
-            alert_text: The text to use for the alert
-
-        """
+    def __init__(
+        self
+    ) -> None:
+        """Initialize the mock guardrail provider."""
         logger.info("Initializing MockGuardrailProvider")
         super().__init__()
-        self._trigger_alert = trigger_alert
-        self._alert_text = alert_text
+        self._trigger_alert = False
+        self._alert_text = None
 
     @property
     def name(self) -> str:
         """Get the provider name."""
         return "Mock Guardrail Provider"
 
-    def set_trigger_alert(self, trigger: bool, alert_text: str | None = None) -> None:
-        """Configure the provider to trigger an alert or not.
+    def set_trigger_alert(self, alert_text: str | None = None) -> None:
+        """Configure the provider to trigger an alert.
 
         Args:
         ----
-            trigger: Whether to trigger an alert
             alert_text: Optional new alert text to use
 
         """
-        logger.info("Setting trigger_alert to %s", trigger)
-        self._trigger_alert = trigger
+        logger.info("Setting trigger_alert to True")
+        self._trigger_alert = True
         if alert_text is not None:
             self._alert_text = alert_text
             logger.info("Setting alert_text to '%s'", alert_text)
+
+    def unset_trigger_alert(self) -> None:
+        """Configure the provider to not trigger an alert."""
+        logger.info("Setting trigger_alert to False")
+        self._trigger_alert = False
+        self._alert_text = None
 
     def check_server_config(self, config: MCPServerConfig) -> GuardrailAlert | None:
         """Check the server configuration based on the current trigger setting.
@@ -112,6 +112,7 @@ class MockGuardrailProvider(GuardrailProvider):
 
 class AlwaysAlertGuardrailProvider(GuardrailProvider):
     """A mock guardrail provider that always triggers an alert.
+
     Useful for testing guardrail blocking behavior.
     """
 
@@ -133,7 +134,7 @@ class AlwaysAlertGuardrailProvider(GuardrailProvider):
         return "Always Alert Provider"
 
     def check_server_config(self, config: MCPServerConfig) -> GuardrailAlert:
-        """Always returns a guardrail alert regardless of the config.
+        """Return a pre-written guardrail alert regardless of the config.
 
         Args:
         ----
@@ -155,7 +156,7 @@ class AlwaysAlertGuardrailProvider(GuardrailProvider):
         )
 
     def check_tool_response(self, tool_response: ToolResponse) -> GuardrailAlert:
-        """Always returns a guardrail alert regardless of the tool response.
+        """Return a pre-written guardrail alert regardless of the tool response.
 
         Args:
         ----
@@ -181,6 +182,7 @@ class AlwaysAlertGuardrailProvider(GuardrailProvider):
 
 class NeverAlertGuardrailProvider(GuardrailProvider):
     """A mock guardrail provider that never triggers an alert.
+
     Useful for testing normal operation without guardrails.
     """
 
@@ -194,8 +196,8 @@ class NeverAlertGuardrailProvider(GuardrailProvider):
         """Get the provider name."""
         return "Never Alert Provider"
 
-    def check_server_config(self, config: MCPServerConfig) -> None: # noqa: ARG002
-        """Always returns None, indicating no guardrail alert.
+    def check_server_config(self, _config: MCPServerConfig) -> None:
+        """Return None, indicating no guardrail alert.
 
         Args:
         ----

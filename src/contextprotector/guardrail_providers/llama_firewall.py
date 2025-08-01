@@ -1,4 +1,5 @@
 """Llama Firewall guardrail provider for mcp-context-protector.
+
 Provides server configuration checking capabilities.
 """
 
@@ -21,6 +22,7 @@ logger = logging.getLogger("llama_firewall_provider")
 
 class LlamaFirewallProvider(GuardrailProvider):
     """Llama Firewall guardrail provider.
+
     Checks server configurations against Llama Firewall guardrails.
     """
 
@@ -109,7 +111,9 @@ class LlamaFirewallProvider(GuardrailProvider):
             Optional GuardrailAlert if guardrail is triggered, or None if the response is safe
 
         """
-        logger.info("LlamaFirewallProvider checking tool response from: %s", tool_response.tool_name)
+        logger.info(
+            "LlamaFirewallProvider checking tool response from: %s", tool_response.tool_name
+        )
 
         try:
             lf = LlamaFirewall(scanners={Role.TOOL: [ScannerType.PROMPT_GUARD]})

@@ -119,8 +119,8 @@ async def test_dynamic_tool_addition_with_existing_server() -> None:
         # New tool should NOT be approved
         assert not approval_status["tools"]["new_test_tool"]
 
-        # This demonstrates the granular approval logic even if we can't test the full wrapper behavior
-        # due to the simple server not actually having the new tool
+        # This demonstrates the granular approval logic even if we can't test the full wrapper
+        # behavior due to the simple server not actually having the new tool
 
     await run_with_wrapper_session(
         callback_after_addition,
@@ -210,9 +210,8 @@ async def test_instruction_change_blocks_all_tools() -> None:
 
     # The wrapper should block everything when instructions are not approved,
     # even if individual tools are approved
-    assert (
+    assert not (
         db.are_instructions_approved(
             "stdio", "instruction_change_server", modified_config.instructions
         )
-        == False
     )

@@ -13,7 +13,6 @@ from collections.abc import AsyncGenerator
 from pathlib import Path
 
 import psutil
-import pytest
 import pytest_asyncio
 
 
@@ -21,7 +20,7 @@ class SSEServerManager:
     """Manages the lifecycle of an SSE server process for testing."""
 
     def __init__(self) -> None:
-        self.process: subprocess.Popen | None = None
+        self.process: asyncio.subprocess.Process | None = None
         self.port: int | None = None
         self.pid: int | None = None
 
@@ -38,17 +37,14 @@ class SSEServerManager:
         try:
             process = psutil.Process(pid)
             connections = process.net_connections()
-            ports = []
-            for conn in connections:
-                if conn.status == "LISTEN":
-                    ports.append(conn.laddr.port)
-            return ports
+            ports = [conn.laddr.port for conn in connections if conn.status == "LISTEN"]
         except psutil.NoSuchProcess:
             logging.warning("Process with PID %d not found.", pid)
             return []
         except psutil.AccessDenied:
             logging.warning("Access denied to process with PID %d.", pid)
             return []
+        return ports
 
     async def start_server(self) -> subprocess.Popen:
         """Start the SSE downstream server in a separate process."""
@@ -56,8 +52,9 @@ class SSEServerManager:
         server_script = str(Path(__file__).resolve().parent.joinpath("simple_sse_server.py"))
 
         # Start the server process
-        self.process = subprocess.Popen(
-            [sys.executable, server_script],
+        self.process = await asyncio.create_subprocess_exec(
+            sys.executable,
+            server_script,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -79,7 +76,8 @@ class SSEServerManager:
                 break
 
             logging.warning(
-                "Attempt %d/%d: No ports found for PID %d, waiting...", attempt + 1, max_attempts, self.pid
+                "Attempt %d/%d: No ports found for PID %d, waiting...",
+                attempt + 1, max_attempts, self.pid
             )
             await asyncio.sleep(1.0)
 
@@ -93,7 +91,7 @@ class SSEServerManager:
             await asyncio.sleep(0.5)
 
             # Make sure it's really gone
-            if self.process.poll() is None:
+            if self.process.returncode is None:
                 self.process.kill()
 
             self.process = None

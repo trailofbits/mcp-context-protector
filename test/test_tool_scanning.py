@@ -27,7 +27,7 @@ def mock_session() -> Generator[MagicMock, None, None]:
     async def mock_call_tool(name: str, _arguments: any) -> any:
         if name == "test_tool":
             return ToolCallResult(content=[TextContent(type="text", text="Test result")])
-        elif name == "dangerous_tool":
+        if name == "dangerous_tool":
             return ToolCallResult(
                 content=[
                     TextContent(
@@ -36,8 +36,7 @@ def mock_session() -> Generator[MagicMock, None, None]:
                     )
                 ]
             )
-        else:
-            return ToolCallResult(content=[])
+        return ToolCallResult(content=[])
 
     session.call_tool = mock_call_tool
     return session
@@ -47,7 +46,7 @@ def mock_session() -> Generator[MagicMock, None, None]:
 async def test_tool_scanning_no_alert() -> None:
     """Test tool response scanning when no alert is triggered."""
     # Create a guardrail provider that doesn't trigger alerts
-    provider = MockGuardrailProvider(trigger_alert=False)
+    provider = MockGuardrailProvider()
 
     # Create a wrapper server with the provider
     wrapper = MCPWrapperServer(guardrail_provider=provider)
@@ -136,7 +135,7 @@ async def test_tool_scanning_exception_handling() -> None:
 async def test_tool_vs_config_scanning_separation() -> None:
     """Test that tool response scanning and server config scanning are separate methods."""
     # Create a guardrail provider that tracks which methods were called
-    provider = MockGuardrailProvider(trigger_alert=False)
+    provider = MockGuardrailProvider()
 
     # Mock both methods to track calls
     provider.check_server_config = MagicMock(return_value=None)

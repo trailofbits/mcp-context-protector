@@ -1,10 +1,14 @@
 """Core guardrail types for mcp-context-protector.
+
 Defines the base classes and data structures used by guardrail providers.
 """
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .mcp_config import MCPServerConfig
 
 logger = logging.getLogger("guardrail_types")
 
@@ -49,9 +53,10 @@ class GuardrailProvider:
     @property
     def name(self) -> str:
         """Get the provider name."""
-        raise NotImplementedError("Guardrail providers must implement the name property")
+        msg = "Guardrail providers must implement the name property"
+        raise NotImplementedError(msg)
 
-    def check_server_config(self, config) -> GuardrailAlert | None: # noqa: ARG002
+    def check_server_config(self, _config: "MCPServerConfig") -> GuardrailAlert | None:
         """Check a server configuration against the guardrail.
 
         Args:
@@ -65,7 +70,7 @@ class GuardrailProvider:
         """
         return None
 
-    def check_tool_response(self, tool_response: ToolResponse) -> GuardrailAlert | None: # noqa: ARG002
+    def check_tool_response(self, _tool_response: ToolResponse) -> GuardrailAlert | None:
         """Check a tool response against the guardrail.
 
         Args:

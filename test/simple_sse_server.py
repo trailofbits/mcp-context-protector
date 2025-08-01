@@ -51,7 +51,7 @@ if __name__ == "__main__":
     # The default port for FastMCP's SSE transport is 8000, but just in case that port number is in
     # use, we will attempt fifty ports to try to find one that is available. uvicorn raises
     # SystemExit when it fails due to a port conflict, so that's how we detect this failure case.
-    class PortException(Exception):
+    class PortError(Exception):
         pass
 
     for port in range(8000, 8050):

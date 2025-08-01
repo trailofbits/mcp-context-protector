@@ -3,14 +3,15 @@ Tests for the dynamic downstream MCP server with signal-based tool updates.
 """
 
 import asyncio
+import contextlib
 import json
 import os
 import signal
 import tempfile
-import time
-from collections.abc import Generator
+from collections.abc import Awaitable, Callable, Generator
 from pathlib import Path
 
+import aiofiles
 import pytest
 from mcp import ClientSession, StdioServerParameters, types
 from mcp.client.stdio import stdio_client
@@ -31,7 +32,7 @@ class ToolUpdateTracker:
         self.latest_tools = []
         self.notification_event = asyncio.Event()
 
-    async def handle_message(self, message) -> None:
+    async def handle_message(self, message: types.ServerNotification) -> None:
         """
         Message handler function that processes notifications from the server.
 
@@ -52,16 +53,19 @@ class ToolUpdateTracker:
         else:
             print(f"Received non-notification message: {type(message)}")
 
-    async def wait_for_notification(self, timeout=2.0) -> bool:
+    async def wait_for_notification(self, timeout: float = 2.0) -> bool:
         """Wait for a tool update notification to be received."""
         try:
             await asyncio.wait_for(self.notification_event.wait(), timeout=timeout)
-            return True
         except asyncio.TimeoutError:
             return False
+        return True
 
 
-async def verify_tools(session: ClientSession, expected_tool_names) -> types.ListToolsResult:
+async def verify_tools(
+    session: ClientSession,
+    expected_tool_names: list[str]
+) -> types.ListToolsResult:
     """
     Verify that the session has the expected tools.
 
@@ -85,7 +89,11 @@ async def verify_tools(session: ClientSession, expected_tool_names) -> types.Lis
     return tools
 
 
-async def send_sighup_and_wait(session: ClientSession, expected_tools, tracker) -> None:
+async def send_sighup_and_wait(
+    session: ClientSession,
+    expected_tools: list[str],
+    tracker: ToolUpdateTracker
+) -> None:
     """
     Send SIGHUP to the server, verify a notification is received, then check tools were updated.
 
@@ -118,7 +126,7 @@ async def send_sighup_and_wait(session: ClientSession, expected_tools, tracker) 
     tracker.latest_tools = tools.tools
 
 
-def write_tool_count(count) -> str:
+def write_tool_count(count: int) -> str:
     """
     Write the specified tool count to a temporary file.
 
@@ -138,7 +146,10 @@ def write_tool_count(count) -> str:
     return TEMP_TOOLCOUNT_FILE
 
 
-async def start_dynamic_server(callback: callable, initial_tool_count=None) -> None:
+async def start_dynamic_server(
+    callback: Callable[[ClientSession, ToolUpdateTracker], Awaitable[None]],
+    initial_tool_count: int | None = None
+) -> None:
     """
     Start the dynamic server and run the provided callback with a client session.
 
@@ -185,13 +196,13 @@ async def start_dynamic_server(callback: callable, initial_tool_count=None) -> N
             attempts = 0
             while attempts < max_attempts:
                 try:
-                    with Path(TEMP_PIDFILE).open("r") as f:
-                        SERVER_PID = int(f.read().strip())
+                    async with aiofiles.open(TEMP_PIDFILE, "r") as f:
+                        SERVER_PID = int((await f.read()).strip())
                     break
                 except (FileNotFoundError, ValueError):
                     # Wait for the pidfile to be created
                     attempts += 1
-                    time.sleep(0.1)
+                    await asyncio.sleep(0.1)
 
             assert SERVER_PID is not None, f"Failed to read PID from {TEMP_PIDFILE}"
 
@@ -204,16 +215,12 @@ def cleanup_files() -> None:
     global TEMP_PIDFILE, TEMP_TOOLCOUNT_FILE
 
     if TEMP_PIDFILE and Path(TEMP_PIDFILE).exists():
-        try:
+        with contextlib.suppress(OSError):
             Path(TEMP_PIDFILE).unlink()
-        except OSError:
-            pass
 
     if TEMP_TOOLCOUNT_FILE and Path(TEMP_TOOLCOUNT_FILE).exists():
-        try:
+        with contextlib.suppress(OSError):
             Path(TEMP_TOOLCOUNT_FILE).unlink()
-        except OSError:
-            pass
 
 
 @pytest.fixture(autouse=True)
@@ -241,7 +248,7 @@ async def test_initial_tools() -> None:
     The timeout ensures the test won't hang indefinitely if there's an issue.
     """
 
-    async def callback(session: ClientSession, _tracker: any) -> None:
+    async def callback(session: ClientSession, _tracker: ToolUpdateTracker) -> None:
         """
         Test callback that verifies the initial tool state and tests the echo tool.
 
@@ -276,7 +283,7 @@ async def test_preconfigured_tools() -> None:
     2. The tools are properly initialized and functional
     """
 
-    async def callback(session: ClientSession, _tracker: any) -> None:
+    async def callback(session: ClientSession, _tracker: ToolUpdateTracker) -> None:
         """
         Test callback that verifies multiple tools are available at startup.
 
@@ -322,7 +329,7 @@ async def test_sighup_adds_tool() -> None:
     5. The notification contains the updated tool list
     """
 
-    async def callback(session: ClientSession, tracker) -> None:
+    async def callback(session: ClientSession, tracker: ToolUpdateTracker) -> None:
         """
         Test callback that verifies tool updates after SIGHUP signal.
 
@@ -377,7 +384,7 @@ async def test_notification_on_sighup() -> None:
     5. After each SIGHUP, the tool list is updated with the expected new tools
     """
 
-    async def callback(session: ClientSession, tracker) -> None:
+    async def callback(session: ClientSession, tracker: ToolUpdateTracker) -> None:
         """
         Test callback that explicitly checks notification receipt after SIGHUP signals.
 
@@ -432,7 +439,7 @@ async def test_preconfigured_with_sighup() -> None:
     3. Tool notifications work properly for servers with preconfigured tools
     """
 
-    async def callback(session: ClientSession, tracker) -> None:
+    async def callback(session: ClientSession, tracker: ToolUpdateTracker) -> None:
         """
         Test callback that verifies SIGHUP behavior with preconfigured tools.
 
@@ -477,7 +484,7 @@ async def test_multiple_sighups() -> None:
     5. The tools are added in the expected order based on the server implementation
     """
 
-    async def callback(session: ClientSession, tracker) -> None:
+    async def callback(session: ClientSession, tracker: ToolUpdateTracker) -> None:
         """
         Test callback that verifies multiple SIGHUP signals add tools in sequence.
 

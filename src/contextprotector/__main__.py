@@ -230,7 +230,7 @@ def _parse_args() -> argparse.Namespace:
 
     return parser.parse_args()
 
-async def list_unapproved_configs(config_path: str | None = None) -> None: # noqa: C901 PLR0912 PLR0915
+async def list_unapproved_configs(config_path: str | None = None) -> None:
     """List and provide a menu for reviewing unapproved server configurations.
 
     Args:
