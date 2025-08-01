@@ -79,6 +79,7 @@ async def _launch_review(
             guardrail_provider,
             args.quarantine_path,
         )
+
 async def main_async() -> None:
     """Launch the wrapped server or review process specified in arguments."""
     args = _parse_args()
@@ -269,7 +270,6 @@ async def list_unapproved_configs(config_path: str | None = None) -> None:
             print("  [q] Quit")
 
             choice = input("\nEnter your choice: ").strip().lower()
-
             if choice == "q":
                 break
             if choice == "a":
@@ -302,7 +302,7 @@ async def list_unapproved_configs(config_path: str | None = None) -> None:
                 continue
             index = _int_or_none(choice)
             if isinstance(index, int) and 1 <= index <= len(unapproved_servers):
-                server = unapproved_servers[index]
+                server = unapproved_servers[index-1]
                 print(f"\nReviewing: [{server['type'].upper()}] {server['identifier']}")
 
                 # Call the existing review function
