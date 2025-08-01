@@ -52,7 +52,7 @@ async def approve_server_config_using_review(
         cwd=Path(__file__).parent.parent.parent.resolve(),
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
+        stderr=subprocess.PIPE,
     )
 
     # Wait for the review process to start
@@ -77,9 +77,7 @@ async def approve_server_config_using_review(
 
 
 def _wrapper_args(
-    connection_type: Literal["stdio", "http", "sse"],
-    identifier: str,
-    config_path: str
+    connection_type: Literal["stdio", "http", "sse"], identifier: str, config_path: str
 ) -> list[str]:
     # Base arguments
     args = [
@@ -102,11 +100,12 @@ def _wrapper_args(
 
     return args
 
+
 async def run_with_wrapper_session(
     callback: Callable[[ClientSession], Awaitable[None]],
     connection_type: Literal["stdio", "http", "sse"],
     identifier: str,
-    config_path: str
+    config_path: str,
 ) -> None:
     """
     Run a test with a wrapper that connects to the specified downstream server.
@@ -139,7 +138,7 @@ async def run_with_wrapper_session_visualize_ansi(
     callback: Callable[[ClientSession], Awaitable[None]],
     connection_type: Literal["stdio", "http", "sse"],
     identifier: str,
-    config_path: str
+    config_path: str,
 ) -> None:
     """
     Run a test with a wrapper that connects to the specified downstream server.
@@ -168,9 +167,9 @@ async def run_with_wrapper_session_visualize_ansi(
             await session.initialize()
             await callback(session)
 
+
 async def run_with_simple_downstream_server(
-    callback: Callable[[ClientSession], Awaitable[None]],
-    config_path: str | None = None
+    callback: Callable[[ClientSession], Awaitable[None]], config_path: str | None = None
 ) -> None:
     """
     Run a test with a wrapper session that connects to the simple downstream server.
@@ -194,7 +193,7 @@ async def run_with_simple_downstream_server(
 async def run_with_sse_downstream_server(
     callback: Callable[[ClientSession], Awaitable[None]],
     server_port: int,
-    config_path: str | None = None
+    config_path: str | None = None,
 ) -> None:
     """
     Run a test with a wrapper session that connects to an SSE downstream server.

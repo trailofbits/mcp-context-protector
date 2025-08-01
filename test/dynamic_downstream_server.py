@@ -222,9 +222,7 @@ def write_pidfile(pidfile_path: str) -> None:
         f.write(str(pid))
 
     # Register cleanup function to remove pidfile on exit
-    atexit.register(
-        lambda: Path(pidfile_path).unlink() if Path(pidfile_path).exists() else None
-    )
+    atexit.register(lambda: Path(pidfile_path).unlink() if Path(pidfile_path).exists() else None)
 
     print(f"PID {pid} written to {pidfile_path}", file=sys.stderr)
 
@@ -256,10 +254,7 @@ async def my_run(self: "FastMCP") -> None:
         async with anyio.create_task_group() as tg:
             async for message in session.incoming_messages:
                 tg.start_soon(
-                    self._mcp_server._handle_message,
-                    message,
-                    self._session,
-                    lifespan_context
+                    self._mcp_server._handle_message, message, self._session, lifespan_context
                 )
 
 

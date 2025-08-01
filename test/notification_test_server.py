@@ -75,9 +75,7 @@ class NotificationTestServer:
                 except Exception as e:
                     logger.exception("Error sending notifications")
                     return [
-                        types.TextContent(
-                            type="text", text=f"Error sending notifications: {e!s}"
-                        )
+                        types.TextContent(type="text", text=f"Error sending notifications: {e!s}")
                     ]
             elif name == "get_received_notifications":
                 import json
@@ -151,12 +149,10 @@ class NotificationTestServer:
                 "timestamp": time.time(),
             }
             self.received_notifications.append(notification_data)
-            logger.info(
-                "Received cancelled notification from client: %s", notification.method
-            )
+            logger.info("Received cancelled notification from client: %s", notification.method)
 
         async def handle_initialized_notification(
-            notification: types.InitializedNotification
+            notification: types.InitializedNotification,
         ) -> None:
             """Handle initialized notifications from client."""
             import time

@@ -28,6 +28,7 @@ def _list_guardrails() -> None:
     else:
         print("No guardrail providers found.")
 
+
 def _load_guardrail_provider(args: argparse.Namespace) -> GuardrailProvider | None:
     if not args.guardrail_provider:
         return None
@@ -53,9 +54,10 @@ def _load_guardrail_provider(args: argparse.Namespace) -> GuardrailProvider | No
     logger.info("Using guardrail provider: %s", guardrail_provider.name)
     return guardrail_provider
 
+
 async def _launch_review(
-        args: argparse.Namespace, guardrail_provider: GuardrailProvider | None
-    ) -> None:
+    args: argparse.Namespace, guardrail_provider: GuardrailProvider | None
+) -> None:
     # For review mode, we need either command or url
     if args.command:
         await review_server_config(
@@ -81,6 +83,8 @@ async def _launch_review(
             guardrail_provider,
             args.quarantine_path,
         )
+
+
 async def main_async() -> None:
     """Launch the wrapped server or review process specified in arguments."""
     args = _parse_args()

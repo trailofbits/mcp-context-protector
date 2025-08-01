@@ -150,25 +150,19 @@ async def list_unapproved_configs(config_path: str | None = None) -> None:
                 print(f"\nReviewing: [{server['type'].upper()}] {server['identifier']}")
 
                 # Call the existing review function
-                await review_server_config(
-                    server["type"], server["identifier"], config_path
-                )
+                await review_server_config(server["type"], server["identifier"], config_path)
 
                 # Refresh the list and continue
                 unapproved_servers = config_db.list_unapproved_servers()
                 if not unapproved_servers:
                     print("\n✓ All server configurations have been reviewed!")
                     break
-                print(
-                    f"\n{len(unapproved_servers)} unapproved configuration(s) remaining."
-                )
+                print(f"\n{len(unapproved_servers)} unapproved configuration(s) remaining.")
             else:
                 print("Invalid selection. Please try again.")
         except KeyboardInterrupt:
             print("\n\nExiting...")
             break
-
-
 
 
 def _display_server_config(wrapper: MCPWrapperServer) -> None:

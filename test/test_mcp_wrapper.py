@@ -35,7 +35,7 @@ async def approve_server_config_using_review(command: str, config_path: str) -> 
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        cwd=Path(__file__).parent.parent.parent.resolve()
+        cwd=Path(__file__).parent.parent.parent.resolve(),
     )
 
     # Wait for the review process to start
@@ -57,7 +57,6 @@ async def approve_server_config_using_review(command: str, config_path: str) -> 
     assert (
         b"has been trusted and saved" in stdout
     ), f"Missing expected approval message in output: {stdout}"
-
 
 
 @pytest.mark.asyncio()

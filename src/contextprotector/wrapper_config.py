@@ -25,7 +25,7 @@ class MCPWrapperConfig:
 
     # Connection-specific parameters (exactly one should be set)
     command: str | None = None  # For stdio connections
-    url: str | None = None      # For http/sse connections
+    url: str | None = None  # For http/sse connections
 
     # File paths
     config_path: str | None = None
@@ -48,10 +48,12 @@ class MCPWrapperConfig:
         # Set default paths if not provided
         if self.config_path is None:
             from .mcp_config import MCPConfigDatabase
+
             self.config_path = MCPConfigDatabase.get_default_config_path()
 
         if self.quarantine_path is None:
             from .quarantine import ToolResponseQuarantine
+
             self.quarantine_path = ToolResponseQuarantine.get_default_db_path()
 
         self.use_guardrails = self.guardrail_provider is not None

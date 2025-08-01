@@ -1,5 +1,6 @@
 # ruff: noqa: T201
 """Core wrapper functionality for mcp-context-protector."""
+
 import asyncio
 import base64
 import json
@@ -640,7 +641,8 @@ Note: This tool is only available when tools are blocked due to security restric
                     # Log the alert but don't block the response yet
                     logger.exception(
                         "Guardrail alert triggered for tool '%s': %s",
-                        name, guardrail_alert.explanation
+                        name,
+                        guardrail_alert.explanation,
                     )
                     # Store in quarantine for future reference
                     # (when quarantine system is integrated)
@@ -658,9 +660,7 @@ Note: This tool is only available when tools are blocked due to security restric
                     )
 
             # Return both text and structured content, preserving all content types
-            return self._create_tool_response(
-                response_text, structured_content, processed_content
-            )
+            return self._create_tool_response(response_text, structured_content, processed_content)
 
         except McpError as e:
             logger.exception("Error calling downstream tool '%s'", name)
@@ -677,7 +677,7 @@ Note: This tool is only available when tools are blocked due to security restric
         return {
             "text": response_text,
             "structured_content": structured_content,
-            "content_list": content_list
+            "content_list": content_list,
         }
 
     def _guardrail_tool_response(
@@ -801,9 +801,8 @@ Note: This tool is only available when tools are blocked due to security restric
                 )
 
         # Update config_approved based on the new granular status
-        if (
-            self.approval_status.get("is_new_server", False)
-            or not self.approval_status.get("instructions_approved", False)
+        if self.approval_status.get("is_new_server", False) or not self.approval_status.get(
+            "instructions_approved", False
         ):
             self.config_approved = False
         else:
@@ -873,13 +872,13 @@ Note: This tool is only available when tools are blocked due to security restric
             logger.warning("Failed to forward %s notification: %s", method, e)
 
     async def _handle_client_message(
-            self,
-            message: (
-                RequestResponder[types.ServerRequest, types.ClientResult]
-                | types.ServerNotification
-                | Exception
-            )
-        ) -> None:
+        self,
+        message: (
+            RequestResponder[types.ServerRequest, types.ClientResult]
+            | types.ServerNotification
+            | Exception
+        ),
+    ) -> None:
         """Message handler for the ClientSession to process notifications.
 
         Args:
@@ -939,8 +938,6 @@ Note: This tool is only available when tools are blocked due to security restric
         else:
             logger.info("Received non-notification message: %s", type(message))
 
-
-
     async def update_tools(self) -> None:
         """Update tools from the downstream server."""
         try:
@@ -958,9 +955,7 @@ Note: This tool is only available when tools are blocked due to security restric
     async def update_tools_and_notify(self) -> None:
         """Update tools from the downstream server and send a notification to the client."""
         self.update_tools()
-        await self._forward_notification_to_upstream(
-            "notifications/tools/list_changed", None
-        )
+        await self._forward_notification_to_upstream("notifications/tools/list_changed", None)
 
     async def connect(self) -> None:
         """Initialize the connection to the downstream server."""
@@ -1037,7 +1032,7 @@ Note: This tool is only available when tools are blocked due to security restric
                 logger.info(
                     "Server partially approved - %d/%d tools approved",
                     approved_tool_count,
-                    total_tool_count
+                    total_tool_count,
                 )
                 self.config_approved = True  # Allow partial operation
             else:
@@ -1081,7 +1076,7 @@ Note: This tool is only available when tools are blocked due to security restric
             logger.info(
                 "Starting downstream server with command: %s %s",
                 command_parts[0],
-                " ".join(command_parts[1:])
+                " ".join(command_parts[1:]),
             )
             self.client_context = stdio_client(server_params)
             self.streams = await self.client_context.__aenter__()
@@ -1395,15 +1390,13 @@ Note: This tool is only available when tools are blocked due to security restric
                     async with anyio.create_task_group() as tg:
                         async for message in self.server_session.incoming_messages:
                             tg.start_soon(
-                                self.server._handle_message, # noqa: SLF001
+                                self.server._handle_message,  # noqa: SLF001
                                 message,
                                 self.server_session,
                                 None,  # No lifespan context needed
                             )
         finally:
             await self.stop_child_process()
-
-
 
 
 def make_ansi_escape_codes_visible(text: str) -> str:

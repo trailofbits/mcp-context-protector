@@ -65,6 +65,7 @@ def review_response_list(
         utc_timestamp = response_data["timestamp"]
         if isinstance(utc_timestamp, str):
             import datetime
+
             utc_dt = datetime.datetime.fromisoformat(utc_timestamp.replace("Z", "+00:00"))
             local_display = _utc_to_local_display(utc_dt)
             timestamp = local_display.split()[0]  # Just the date part for list view
@@ -98,7 +99,7 @@ def review_response_list(
                 print("\nError retrieving response from quarantine.")
             else:
                 print(f"\nInvalid choice. Please enter a number between 1 and {len(responses)}.")
-        except ValueError: # noqa: PERF203
+        except ValueError:  # noqa: PERF203
             print("\nPlease enter a valid number.")
 
 

@@ -53,7 +53,7 @@ async def _run_with_sse_server(
 
 
 @pytest.mark.asyncio()
-async def test_echo_tool_through_wrapper(sse_server_fixture: any) -> None: # noqa: F811 ARG001
+async def test_echo_tool_through_wrapper(sse_server_fixture: any) -> None:  # noqa: F811 ARG001
     """Test that the echo tool correctly works through the MCP wrapper using SSE transport."""
 
     async def callback(session: ClientSession) -> None:
@@ -126,7 +126,7 @@ async def test_echo_tool_through_wrapper(sse_server_fixture: any) -> None: # noq
 
 
 @pytest.mark.asyncio()
-async def test_invalid_tool_through_wrapper(sse_server_fixture: any) -> None: # noqa: F811 ARG001
+async def test_invalid_tool_through_wrapper(sse_server_fixture: any) -> None:  # noqa: F811 ARG001
     """Test error handling for invalid tools through the MCP wrapper using SSE transport."""
 
     async def callback(session: ClientSession) -> None:

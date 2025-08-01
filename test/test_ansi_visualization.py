@@ -26,8 +26,7 @@ TEST_SERVER_PATH = Path(__file__).resolve().parent / "ansi_test_server.py"
 
 
 async def run_without_ansi_visualization(
-    callback: Callable[[ClientSession], Awaitable[None]],
-    config_path: str
+    callback: Callable[[ClientSession], Awaitable[None]], config_path: str
 ) -> None:
     """
     Run a test with a wrapper that has ANSI visualization set accordingly.
@@ -42,8 +41,7 @@ async def run_without_ansi_visualization(
 
 
 async def run_with_ansi_visualization(
-    callback: Callable[[ClientSession], Awaitable[None]],
-    config_path: str
+    callback: Callable[[ClientSession], Awaitable[None]], config_path: str
 ) -> None:
     """
     Run a test with a wrapper that has ANSI visualization set accordingly.

@@ -1,4 +1,5 @@
 """Classes and data structures that store, parse, and compare MCP server configurations."""
+
 import hashlib
 import json
 import pathlib
