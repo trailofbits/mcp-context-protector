@@ -6,3 +6,4 @@ __pycache__/
 .idea
 html/
 dist/
+uv.lock
