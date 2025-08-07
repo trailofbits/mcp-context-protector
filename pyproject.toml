@@ -13,7 +13,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
-    "mcp==1.9.4",
+    "mcp==1.12.3",
     "llamafirewall>=1.0.3",
     "aiofiles>=24.1.0",
 ]
@@ -111,7 +111,7 @@ test = [
     "coverage[toml]",
 ]
 lint = [
-    "ruff >= 0.6.2",  # Use latest ruff for improved checks
+    "ruff >= 0.12.7",  # Use latest ruff for improved checks
     "interrogate",
 ]
 doc = [
