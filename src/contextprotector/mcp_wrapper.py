@@ -89,13 +89,12 @@ class MCPWrapperServer:
     ) -> None:
         """Initialize the wrapper server with common attributes.
 
-        Use wrap_stdio or wrap_http class methods instead of calling this directly.
+        Use from_config class method instead of calling this directly.
 
         Args:
         ----
             config_path: Optional path to the wrapper config file
             guardrail_provider: Optional guardrail provider object to use for checking configs
-            visualize_ansi_codes: Whether to make ANSI escape codes visible in tool outputs
             quarantine_path: Optional path to the quarantine database file
 
         """
@@ -194,9 +193,9 @@ class MCPWrapperServer:
                 result = await self.session.read_resource(name)
                 contents = []
                 for content_item in result.contents:
-                    content = getattr(content_item, "blob", None)
-                    if content is not None:
-                        content = base64.b64decode(content)
+                    blob = getattr(content_item, "blob", None)
+                    if blob is not None:
+                        content = base64.b64decode(blob)
                         contents.append(
                             ReadResourceContents(content=content, mime_type=content_item.mimeType)
                         )
@@ -219,7 +218,7 @@ class MCPWrapperServer:
                 logger.exception("Error fetching resource %s from downstream server", name)
                 error_msg = f"Error fetching resource from downstream server: {e!s}"
                 raise ConnectionError(error_msg) from e
-            return contents
+            return types.ReadResourceResult(contents=contents)
 
         @self.server.list_tools()
         async def list_tools() -> list[types.Tool]:
@@ -1218,12 +1217,17 @@ Note: This tool is only available when tools are blocked due to security restric
         # Handle other client notifications by registering them manually
         # Since there may not be decorators for all notification types, we'll register directly
 
-        async def handle_cancelled_notification(notification: types.CancelledNotification) -> None:
+        async def handle_cancelled_notification(
+            notification: types.CancelledNotification,
+        ) -> None:
             """Forward cancelled notifications from upstream client to downstream server."""
             logger.info("Forwarding cancelled notification from client to downstream server")
 
             if self.session:
-                await self._forward_notification_to_downstream(notification)
+                try:
+                    await self._forward_notification_to_downstream(notification)
+                except Exception as e:
+                    logger.warning("Failed to forward cancelled notification to downstream: %s", e)
 
         async def handle_initialized_notification(
             notification: types.InitializedNotification,
@@ -1232,7 +1236,10 @@ Note: This tool is only available when tools are blocked due to security restric
             logger.info("Forwarding initialized notification from client to downstream server")
 
             if self.session:
-                await self._forward_notification_to_downstream(notification)
+                try:
+                    await self._forward_notification_to_downstream(notification)
+                except Exception as e:
+                    logger.warning("Failed to forward initialized notification to downstream: %s", e)
 
         async def handle_message_notification(
             notification: types.LoggingMessageNotification,
@@ -1241,7 +1248,10 @@ Note: This tool is only available when tools are blocked due to security restric
             logger.info("Forwarding message notification from client to downstream server")
 
             if self.session:
-                await self._forward_notification_to_downstream(notification)
+                try:
+                    await self._forward_notification_to_downstream(notification)
+                except Exception as e:
+                    logger.warning("Failed to forward message notification to downstream: %s", e)
 
         # Register the handlers manually in the notification_handlers dict
         self.server.notification_handlers[types.CancelledNotification] = (
