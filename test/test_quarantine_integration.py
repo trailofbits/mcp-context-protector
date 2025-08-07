@@ -8,10 +8,11 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from mcp.types import CallToolResult, TextContent
+
 from contextprotector.guardrail_providers.mock_provider import AlwaysAlertGuardrailProvider
 from contextprotector.mcp_wrapper import MCPWrapperServer
 from contextprotector.quarantine import ToolResponseQuarantine
-from mcp.types import CallToolResult, TextContent
 
 
 @pytest.fixture()

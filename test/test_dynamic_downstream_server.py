@@ -57,7 +57,7 @@ class ToolUpdateTracker:
         """Wait for a tool update notification to be received."""
         try:
             await asyncio.wait_for(self.notification_event.wait(), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return False
         return True
 
@@ -76,9 +76,9 @@ async def verify_tools(
         tools_list: The list of tools from the server
     """
     tools = await session.list_tools()
-    assert len(tools.tools) == len(
-        expected_tool_names
-    ), f"Expected {len(expected_tool_names)} tools, got {len(tools.tools)}"
+    assert len(tools.tools) == len(expected_tool_names), (
+        f"Expected {len(expected_tool_names)} tools, got {len(tools.tools)}"
+    )
 
     # Check that all expected tools are present
     actual_names = [tool.name for tool in tools.tools]
@@ -193,7 +193,7 @@ async def start_dynamic_server(
             attempts = 0
             while attempts < max_attempts:
                 try:
-                    async with aiofiles.open(TEMP_PIDFILE, "r") as f:
+                    async with aiofiles.open(TEMP_PIDFILE) as f:
                         SERVER_PID = int((await f.read()).strip())
                     break
                 except (FileNotFoundError, ValueError):

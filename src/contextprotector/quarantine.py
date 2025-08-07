@@ -25,7 +25,7 @@ def _utc_to_local_display(utc_dt: datetime.datetime) -> str:
 
     """
     # Convert UTC to local timezone
-    local_dt = utc_dt.replace(tzinfo=datetime.timezone.utc).astimezone()
+    local_dt = utc_dt.replace(tzinfo=datetime.UTC).astimezone()
     return local_dt.strftime("%Y-%m-%d %H:%M:%S %Z")
 
 
@@ -52,7 +52,7 @@ class QuarantinedToolResponse:
     tool_output: Any
     reason: str
     timestamp: datetime.datetime = field(
-        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)
+        default_factory=lambda: datetime.datetime.now(datetime.UTC)
     )
     released: bool = False
     released_at: datetime.datetime | None = None
@@ -60,7 +60,7 @@ class QuarantinedToolResponse:
     def release(self) -> None:
         """Mark this quarantined response as released."""
         self.released = True
-        self.released_at = datetime.datetime.now(datetime.timezone.utc)
+        self.released_at = datetime.datetime.now(datetime.UTC)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to a dictionary representation for storage."""

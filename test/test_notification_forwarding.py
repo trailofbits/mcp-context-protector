@@ -107,20 +107,20 @@ async def test_notification_forwarding() -> None:
 
         # Check that all valid notifications were received
         for expected_method in expected_valid_notifications:
-            assert (
-                expected_method in received_methods
-            ), f"Missing expected notification: {expected_method}"
+            assert expected_method in received_methods, (
+                f"Missing expected notification: {expected_method}"
+            )
 
         # Check that invalid notification was NOT received
-        assert (
-            invalid_notification not in received_methods
-        ), f"Invalid notification was forwarded: {invalid_notification}"
+        assert invalid_notification not in received_methods, (
+            f"Invalid notification was forwarded: {invalid_notification}"
+        )
 
         # Verify we didn't receive any unexpected notifications
         unexpected_notifications = received_methods - expected_valid_notifications
-        assert (
-            not unexpected_notifications
-        ), f"Received unexpected notifications: {unexpected_notifications}"
+        assert not unexpected_notifications, (
+            f"Received unexpected notifications: {unexpected_notifications}"
+        )
 
         logger.info("✓ All valid notifications received, invalid notification filtered")
 
@@ -200,9 +200,9 @@ async def test_notification_forwarding_without_invalid() -> None:
         # Verify we received exactly the expected notifications
         received_methods = {notif["method"] for notif in notification_client.received_notifications}
 
-        assert (
-            received_methods == expected_valid_notifications
-        ), f"Expected {expected_valid_notifications}, got {received_methods}"
+        assert received_methods == expected_valid_notifications, (
+            f"Expected {expected_valid_notifications}, got {received_methods}"
+        )
 
         logger.info("✓ All valid notifications received, no invalid notifications sent")
 
@@ -314,16 +314,15 @@ async def test_client_to_server_notification_forwarding() -> None:
         logger.info("Received notification methods: %s", received_methods)
 
         # At minimum, we should receive the initialized notification (which we know works)
-        assert (
-            "notifications/initialized" in received_methods
-        ), "Should receive initialized notification"
+        assert "notifications/initialized" in received_methods, (
+            "Should receive initialized notification"
+        )
 
         # Verify we received at least one notification
         assert received_count >= 1, "Expected at least 1 notification, got %d" % received_count
 
         logger.info(
-            "✅ Verified client→server notification forwarding works "
-            "(received %d notifications)",
+            "✅ Verified client→server notification forwarding works (received %d notifications)",
             received_count,
         )
 

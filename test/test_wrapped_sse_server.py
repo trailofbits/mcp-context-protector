@@ -42,9 +42,9 @@ async def _run_with_sse_server(
     from .test_utils import run_with_sse_downstream_server
 
     # Make sure we have a valid port
-    assert (
-        sse_server_utils.SERVER_PORT is not None
-    ), "Server port must be detected before connecting"
+    assert sse_server_utils.SERVER_PORT is not None, (
+        "Server port must be detected before connecting"
+    )
 
     logging.warning("Connecting wrapper to SSE server at port: %s", sse_server_utils.SERVER_PORT)
 
@@ -112,7 +112,7 @@ async def test_echo_tool_through_wrapper(sse_server_fixture: any) -> None:  # no
     # Now we need to run the review process to approve this config
     await approve_server_config_using_review(sse_url, temp_file.name)
 
-    async with aiofiles.open(temp_file.name, "r") as f:
+    async with aiofiles.open(temp_file.name) as f:
         logging.exception(await f.read())
     from contextprotector.mcp_config import MCPConfigDatabase
 

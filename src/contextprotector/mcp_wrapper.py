@@ -1,4 +1,3 @@
-# ruff: noqa: T201
 """Core wrapper functionality for mcp-context-protector."""
 
 import asyncio
@@ -1239,7 +1238,9 @@ Note: This tool is only available when tools are blocked due to security restric
                 try:
                     await self._forward_notification_to_downstream(notification)
                 except Exception as e:
-                    logger.warning("Failed to forward initialized notification to downstream: %s", e)
+                    logger.warning(
+                        "Failed to forward initialized notification to downstream: %s", e
+                    )
 
         async def handle_message_notification(
             notification: types.LoggingMessageNotification,
@@ -1400,7 +1401,7 @@ Note: This tool is only available when tools are blocked due to security restric
                     async with anyio.create_task_group() as tg:
                         async for message in self.server_session.incoming_messages:
                             tg.start_soon(
-                                self.server._handle_message,  # noqa: SLF001
+                                self.server._handle_message,
                                 message,
                                 self.server_session,
                                 None,  # No lifespan context needed

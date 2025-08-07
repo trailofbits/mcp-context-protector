@@ -62,20 +62,9 @@ class MCPParameterDefinition:
     items: dict[str, Any | None] = None  # For array types
     properties: dict[str, Any | None] = None  # For object types
 
-    def __eq__(self, other: object) -> bool:
-        """Evaluate whether two MCPParameterDefinitions are semantically equal."""
-        if not isinstance(other, MCPParameterDefinition):
-            return False
-        return (
-            self.name == other.name
-            and self.description == other.description
-            and self.type == other.type
-            and self.required == other.required
-            and self.default == other.default
-            and self.enum == other.enum
-            and self.items == other.items
-            and self.properties == other.properties
-        )
+    def __hash__(self) -> int:
+        """Compute hash based on immutable fields."""
+        return hash((self.name, self.type))
 
 
 @dataclass
@@ -117,6 +106,10 @@ class MCPToolDefinition:
             lines.append(f"Output Schema: {json.dumps(self.output_schema, indent=2)}")
 
         return "\n".join(lines)
+
+    def __hash__(self) -> int:
+        """Compute hash based on tool name."""
+        return hash(self.name)
 
     def __eq__(self, other: object) -> bool:
         """Compare two tool definitions for equality."""
@@ -414,6 +407,10 @@ class MCPServerConfig:
             config.add_tool(tool)
 
         return config
+
+    def __hash__(self) -> int:
+        """Compute hash based on server name."""
+        return hash(self.server_name) if self.server_name else hash(id(self))
 
     def __eq__(self, other: object) -> bool:
         """Compare two server configurations semantically."""

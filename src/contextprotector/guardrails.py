@@ -26,7 +26,7 @@ TEST_ONLY_PROVIDERS = {
 }
 
 
-def _is_provider_class(obj: Any) -> bool:  # noqa: ANN401
+def _is_provider_class(obj: Any) -> bool:
     """Check if an object is a valid guardrail provider class.
 
     Args:

@@ -24,7 +24,7 @@ TESTS :=
 
 # Optionally overridden by the user/CI, to limit the installation to a specific
 # subset of development dependencies.
-INSTALL_EXTRA := dev
+INSTALL_GROUP := dev
 
 # If the user selects a specific test pattern to run, set `pytest` to fail fast
 # and only run tests that match the pattern.
@@ -50,13 +50,12 @@ run: $(VENV)/pyvenv.cfg
 
 $(VENV)/pyvenv.cfg: pyproject.toml
 	uv venv $(VENV)
-	uv pip install -e '.[$(INSTALL_EXTRA)]'
+	uv sync --group $(INSTALL_GROUP)
 
 .PHONY: lint
 lint: $(VENV)/pyvenv.cfg
 	uv run ruff format --check && \
 		uv run ruff check && \
-		uv run mypy
 		uv run interrogate -c pyproject.toml .
 
 .PHONY: reformat

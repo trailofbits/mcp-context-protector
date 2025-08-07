@@ -41,22 +41,22 @@ async def test_zero_information_leakage_unapproved_config() -> None:
         tool_names = [t.name for t in tools_result.tools]
 
         # Must include context-protector-block
-        assert (
-            "context-protector-block" in tool_names
-        ), f"Expected 'context-protector-block' tool, got {tool_names}"
+        assert "context-protector-block" in tool_names, (
+            f"Expected 'context-protector-block' tool, got {tool_names}"
+        )
 
         # Should not include any downstream server tools
         downstream_tools = ["test_tool", "toggle_prompts", "ansi_echo", "echo"]
         for downstream_tool in downstream_tools:
-            assert (
-                downstream_tool not in tool_names
-            ), f"Downstream tool '{downstream_tool}' leaked in unapproved config: {tool_names}"
+            assert downstream_tool not in tool_names, (
+                f"Downstream tool '{downstream_tool}' leaked in unapproved config: {tool_names}"
+            )
 
         # Find the context-protector-block tool
         config_tool = next(t for t in tools_result.tools if t.name == "context-protector-block")
-        assert (
-            "blocked server configuration" in config_tool.description.lower()
-        ), f"Unexpected description: {config_tool.description}"
+        assert "blocked server configuration" in config_tool.description.lower(), (
+            f"Unexpected description: {config_tool.description}"
+        )
 
         logger.info("✓ list_tools() correctly shows only context-protector-block tool")
 
@@ -96,25 +96,25 @@ async def test_zero_information_leakage_unapproved_config() -> None:
             blocked_str = json.dumps(blocked_data).lower()
 
             # Should NOT contain any downstream server tool names
-            assert (
-                "test_tool" not in blocked_str
-            ), "Blocked response leaked downstream tool name 'test_tool'"
-            assert (
-                "toggle_prompts" not in blocked_str
-            ), "Blocked response leaked downstream tool name 'toggle_prompts'"
+            assert "test_tool" not in blocked_str, (
+                "Blocked response leaked downstream tool name 'test_tool'"
+            )
+            assert "toggle_prompts" not in blocked_str, (
+                "Blocked response leaked downstream tool name 'toggle_prompts'"
+            )
 
             # Should NOT contain any downstream server descriptions
-            assert (
-                "simple test tool" not in blocked_str
-            ), "Blocked response leaked downstream tool description"
-            assert (
-                "echo" not in blocked_str
-            ), "Blocked response leaked downstream functionality info"
+            assert "simple test tool" not in blocked_str, (
+                "Blocked response leaked downstream tool description"
+            )
+            assert "echo" not in blocked_str, (
+                "Blocked response leaked downstream functionality info"
+            )
 
             # Should NOT contain any server-specific error messages
-            assert (
-                "unknown tool" not in blocked_str
-            ), "Blocked response leaked downstream server error message"
+            assert "unknown tool" not in blocked_str, (
+                "Blocked response leaked downstream server error message"
+            )
 
         except json.JSONDecodeError:
             pytest.fail(f"Blocked response is not valid JSON: {blocked_text}")
@@ -148,13 +148,13 @@ async def test_zero_information_leakage_unapproved_config() -> None:
                     ).lower()
 
                     # Should not contain downstream server prompt names
-                    assert (
-                        "greeting" not in prompt_str
-                    ), "list_prompts leaked downstream prompt 'greeting'"
+                    assert "greeting" not in prompt_str, (
+                        "list_prompts leaked downstream prompt 'greeting'"
+                    )
                     assert "help" not in prompt_str, "list_prompts leaked downstream prompt 'help'"
-                    assert (
-                        "farewell" not in prompt_str
-                    ), "list_prompts leaked downstream prompt 'farewell'"
+                    assert "farewell" not in prompt_str, (
+                        "list_prompts leaked downstream prompt 'farewell'"
+                    )
 
             logger.info("✓ list_prompts() does not leak downstream server information")
         except McpError as e:
@@ -167,9 +167,9 @@ async def test_zero_information_leakage_unapproved_config() -> None:
             # If resources are supported, should be empty or contain no downstream info
             if isinstance(resources_result, types.ListResourcesResult):
                 # Should not expose any downstream resource information
-                assert (
-                    len(resources_result.resources) == 0
-                ), "list_resources() leaked downstream resource information"
+                assert len(resources_result.resources) == 0, (
+                    "list_resources() leaked downstream resource information"
+                )
 
             logger.info("✓ list_resources() does not leak downstream server information")
         except McpError as e:
@@ -212,14 +212,14 @@ async def test_information_visible_after_approval() -> None:
 
         # Should include the downstream server's tools
         assert "test_tool" in tool_names, f"Expected 'test_tool' after approval, got: {tool_names}"
-        assert (
-            "toggle_prompts" in tool_names
-        ), f"Expected 'toggle_prompts' after approval, got: {tool_names}"
+        assert "toggle_prompts" in tool_names, (
+            f"Expected 'toggle_prompts' after approval, got: {tool_names}"
+        )
 
         # Should NOT include context-protector-block anymore
-        assert (
-            "context-protector-block" not in tool_names
-        ), f"context-protector-block should not be visible after approval, got: {tool_names}"
+        assert "context-protector-block" not in tool_names, (
+            f"context-protector-block should not be visible after approval, got: {tool_names}"
+        )
 
         # Test that the tools actually work
         result = await session.call_tool(
