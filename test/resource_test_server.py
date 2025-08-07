@@ -119,7 +119,7 @@ class ResourceTestServer:
             return [types.TextContent(type="text", text="Unknown tool")]
 
         @self.server.read_resource()
-        async def read_resource(uri: str) -> types.ReadResourceResult:
+        async def read_resource(uri: str) -> list[ReadResourceContents]:
             """Handle resource content requests."""
             if str(uri) == "contextprotector://sample_data":
                 # Return JSON sample data

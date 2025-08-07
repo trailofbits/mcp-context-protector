@@ -194,17 +194,13 @@ class MCPWrapperServer:
                 for content_item in result.contents:
                     blob = getattr(content_item, "blob", None)
                     if blob is not None:
+                        # For binary data, decode base64 to bytes
                         content = base64.b64decode(blob)
                         contents.append(
                             ReadResourceContents(content=content, mime_type=content_item.mimeType)
                         )
-                        if not isinstance(contents[-1].content, bytes):
-                            msg = (
-                                f"Expected bytes, got {type(contents[-1].content)} "
-                                f"with value {content}"
-                            )
-                            raise TypeError(msg)
                     else:
+                        # For text data, use text directly
                         contents.append(
                             ReadResourceContents(
                                 content=content_item.text,
@@ -217,7 +213,8 @@ class MCPWrapperServer:
                 logger.exception("Error fetching resource %s from downstream server", name)
                 error_msg = f"Error fetching resource from downstream server: {e!s}"
                 raise ConnectionError(error_msg) from e
-            return types.ReadResourceResult(contents=contents)
+            # Return just the contents list - the decorator wraps it in ReadResourceResult
+            return contents
 
         @self.server.list_tools()
         async def list_tools() -> list[types.Tool]:
