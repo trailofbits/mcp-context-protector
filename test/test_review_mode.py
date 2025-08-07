@@ -70,17 +70,26 @@ async def test_review_mode_new_server_approval() -> None:
     temp_file.close()
 
     # Set up a mock wrapper that simulates an untrusted configuration
-    mock_wrapper = AsyncMock()
+    # Use MagicMock for the wrapper itself to avoid coroutine issues with sync methods
+    mock_wrapper = MagicMock()
     mock_wrapper.config_approved = False
     mock_wrapper.server_identifier = "test_command"
     mock_wrapper.saved_config = None
     mock_wrapper.current_config = MCPServerConfig()
-    mock_wrapper.tool_specs = [AsyncMock(name="tool1", description="Tool 1 description")]
+    mock_wrapper.tool_specs = [MagicMock(name="tool1", description="Tool 1 description")]
     mock_wrapper.guardrail_alert = None
     mock_wrapper.guardrail_provider = None
+    # Explicitly mock synchronous methods
+    mock_wrapper.get_server_identifier = MagicMock(return_value="test_command")
+    mock_wrapper.connection_type = "stdio"
+    # Use AsyncMock only for actual async methods
     mock_wrapper.connect = AsyncMock(return_value=None)
     mock_wrapper.stop_child_process = AsyncMock(return_value=None)
-    mock_wrapper.config_db.save_server_config = AsyncMock()
+    # Mock the config_db with proper methods (all are synchronous)
+    mock_wrapper.config_db = MagicMock()
+    mock_wrapper.config_db.save_server_config = MagicMock()
+    mock_wrapper.config_db.approve_instructions = MagicMock()
+    mock_wrapper.config_db.approve_tool = MagicMock()
 
     # Patch the MCPWrapperServer.from_config to return our mock
     with (
@@ -135,7 +144,7 @@ async def test_review_mode_modified_server_rejection() -> None:
     mock_wrapper.guardrail_alert = None
     mock_wrapper.connect = AsyncMock(return_value=None)
     mock_wrapper.stop_child_process = AsyncMock(return_value=None)
-    mock_wrapper.config_db.save_server_config = AsyncMock()
+    mock_wrapper.config_db.save_server_config = MagicMock()
 
     # Patch the MCPWrapperServer.from_config to return our mock
     with (
@@ -184,7 +193,7 @@ async def test_review_mode_with_guardrail_alert() -> None:
 
     mock_wrapper.connect = AsyncMock(return_value=None)
     mock_wrapper.stop_child_process = AsyncMock(return_value=None)
-    mock_wrapper.config_db.save_server_config = AsyncMock()
+    mock_wrapper.config_db.save_server_config = MagicMock()
 
     # Mock guardrail provider - use regular MagicMock
     mock_provider = MagicMock()
