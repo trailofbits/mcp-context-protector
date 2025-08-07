@@ -13,7 +13,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
-    "mcp==1.9.4",
+    "mcp==1.12.3",
     "llamafirewall>=1.0.3",
     "aiofiles>=24.1.0",
 ]
@@ -28,7 +28,7 @@ test = ["pytest", "pytest-cov", "pretend", "coverage[toml]"]
 lint = [
     # NOTE: ruff is under active development, so we pin conservatively here
     # and let Dependabot periodically perform this update.
-    "ruff ~= 0.6.2",
+    "ruff ~= 0.12.7",
     "mypy >= 1.0",
     "types-html5lib",
     "types-requests",
