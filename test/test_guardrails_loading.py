@@ -24,13 +24,13 @@ def test_load_guardrail_providers() -> None:
     # Get provider names
     providers = get_provider_names()
 
-    # We should have at least one provider (Llama Firewall)
-    assert "Llama Firewall" in providers, "Llama Firewall provider not found"
+    # We should have at least one provider (LlamaFirewall)
+    assert "LlamaFirewall" in providers, "LlamaFirewall provider not found"
 
     # Try to get a provider instance
-    provider = get_provider("Llama Firewall")
-    assert provider is not None, "Failed to instantiate Llama Firewall provider"
-    assert provider.name == "Llama Firewall"
+    provider = get_provider("LlamaFirewall")
+    assert provider is not None, "Failed to instantiate LlamaFirewall provider"
+    assert provider.name == "LlamaFirewall"
 
 
 def test_get_nonexistent_provider() -> None:
@@ -43,9 +43,9 @@ def test_provider_check_server_config() -> None:
     """Test that a provider can check a server config and log the results."""
     from contextprotector.mcp_config import MCPServerConfig, MCPToolDefinition
 
-    # Get the Llama Firewall provider
-    provider = get_provider("Llama Firewall")
-    assert provider is not None, "Failed to get Llama Firewall provider"
+    # Get the LlamaFirewall provider
+    provider = get_provider("LlamaFirewall")
+    assert provider is not None, "Failed to get LlamaFirewall provider"
     logger.info("Got provider: %s", provider.name)
 
     # Create a simple config to check
