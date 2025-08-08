@@ -110,15 +110,22 @@ async def test_dynamic_tool_addition_with_existing_server() -> None:
     # Get the existing config from the database to avoid subprocess conflicts
     # The config was already captured when the server was first approved
     from contextprotector.mcp_config import MCPServerEntry
-    server_key = MCPServerEntry.create_key("stdio", get_server_command("simple_downstream_server.py"))
+    server_key = MCPServerEntry.create_key(
+        "stdio", get_server_command("simple_downstream_server.py")
+    )
     existing_entry = db.servers.get(server_key)
     if existing_entry and existing_entry.config:
         from contextprotector.mcp_config import MCPServerConfig
         fresh_config = MCPServerConfig.from_dict(existing_entry.config)
     else:
         # Create a minimal config that matches simple_downstream_server.py
-        from contextprotector.mcp_config import MCPServerConfig, MCPToolDefinition, MCPParameterDefinition, ParameterType
-        
+        from contextprotector.mcp_config import (
+            MCPParameterDefinition,
+            MCPServerConfig,
+            MCPToolDefinition,
+            ParameterType,
+        )
+
         echo_tool = MCPToolDefinition(
             name="echo",
             description="Echo back the provided message",
@@ -129,7 +136,7 @@ async def test_dynamic_tool_addition_with_existing_server() -> None:
                 )
             ]
         )
-        
+
         fresh_config = MCPServerConfig(
             tools=[echo_tool],
             instructions="Test simple downstream server configuration"

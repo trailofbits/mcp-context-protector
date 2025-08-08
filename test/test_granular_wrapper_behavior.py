@@ -56,7 +56,7 @@ async def test_granular_tool_filtering_in_list_tools() -> None:
     from contextprotector.mcp_config import MCPServerEntry
 
     key = MCPServerEntry.create_key("stdio", get_server_command("multi_tool_downstream_server.py"))
-    
+
     # Save the existing config before deleting to preserve instructions hash
     existing_config = None
     if key in db.servers:
@@ -70,15 +70,20 @@ async def test_granular_tool_filtering_in_list_tools() -> None:
         fresh_config = MCPServerConfig.from_dict(existing_config)
     else:
         # If no config exists, create a minimal one with known tool definitions
-        from contextprotector.mcp_config import MCPServerConfig, MCPToolDefinition, MCPParameterDefinition, ParameterType
-        
+        from contextprotector.mcp_config import (
+            MCPParameterDefinition,
+            MCPServerConfig,
+            MCPToolDefinition,
+            ParameterType,
+        )
+
         # Create tool definitions that match what multi_tool_downstream_server.py provides
         echo_tool = MCPToolDefinition(
             name="echo",
             description="Echo back the provided message",
             parameters=[
                 MCPParameterDefinition(
-                    name="message", description="The message to echo back", 
+                    name="message", description="The message to echo back",
                     type=ParameterType.STRING, required=True
                 )
             ]
@@ -93,7 +98,7 @@ async def test_granular_tool_filtering_in_list_tools() -> None:
                 )
             ]
         )
-        
+
         fresh_config = MCPServerConfig(
             tools=[echo_tool, greet_tool],
             instructions="Test multi-tool downstream server configuration"
