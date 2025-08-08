@@ -57,14 +57,13 @@ class ToolUpdateTracker:
         """Wait for a tool update notification to be received."""
         try:
             await asyncio.wait_for(self.notification_event.wait(), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return False
         return True
 
 
 async def verify_tools(
-    session: ClientSession,
-    expected_tool_names: list[str]
+    session: ClientSession, expected_tool_names: list[str]
 ) -> types.ListToolsResult:
     """
     Verify that the session has the expected tools.
@@ -77,9 +76,9 @@ async def verify_tools(
         tools_list: The list of tools from the server
     """
     tools = await session.list_tools()
-    assert len(tools.tools) == len(
-        expected_tool_names
-    ), f"Expected {len(expected_tool_names)} tools, got {len(tools.tools)}"
+    assert len(tools.tools) == len(expected_tool_names), (
+        f"Expected {len(expected_tool_names)} tools, got {len(tools.tools)}"
+    )
 
     # Check that all expected tools are present
     actual_names = [tool.name for tool in tools.tools]
@@ -90,9 +89,7 @@ async def verify_tools(
 
 
 async def send_sighup_and_wait(
-    session: ClientSession,
-    expected_tools: list[str],
-    tracker: ToolUpdateTracker
+    session: ClientSession, expected_tools: list[str], tracker: ToolUpdateTracker
 ) -> None:
     """
     Send SIGHUP to the server, verify a notification is received, then check tools were updated.
@@ -148,7 +145,7 @@ def write_tool_count(count: int) -> str:
 
 async def start_dynamic_server(
     callback: Callable[[ClientSession, ToolUpdateTracker], Awaitable[None]],
-    initial_tool_count: int | None = None
+    initial_tool_count: int | None = None,
 ) -> None:
     """
     Start the dynamic server and run the provided callback with a client session.
@@ -196,7 +193,7 @@ async def start_dynamic_server(
             attempts = 0
             while attempts < max_attempts:
                 try:
-                    async with aiofiles.open(TEMP_PIDFILE, "r") as f:
+                    async with aiofiles.open(TEMP_PIDFILE) as f:
                         SERVER_PID = int((await f.read()).strip())
                     break
                 except (FileNotFoundError, ValueError):

@@ -1,11 +1,11 @@
-# ruff: noqa: T201
 """Core wrapper functionality for mcp-context-protector."""
+
 import asyncio
 import base64
 import json
 import logging
 import re
-from typing import Any, Literal
+from typing import Any
 
 from mcp import types
 from mcp.server.lowlevel import NotificationOptions, Server
@@ -17,7 +17,6 @@ from mcp.shared.session import RequestResponder
 # Import guardrail types for type hints
 from .guardrail_types import GuardrailAlert, GuardrailProvider, ToolResponse
 from .mcp_config import (
-    ApprovalStatus,
     MCPConfigDatabase,
     MCPParameterDefinition,
     MCPServerConfig,
@@ -28,6 +27,7 @@ from .mcp_config import (
 
 # Import quarantine functionality
 from .quarantine import ToolResponseQuarantine
+from .wrapper_config import MCPWrapperConfig
 
 logger = logging.getLogger("mcp_wrapper")
 
@@ -48,108 +48,52 @@ class MCPWrapperServer:
     """
 
     @classmethod
-    def wrap_stdio(
-        cls,
-        command: str,
-        config_path: str | None = None,
-        guardrail_provider: GuardrailProvider | None = None,
-        visualize_ansi_codes: bool = False,
-        quarantine_path: str | None = None,
-    ) -> "MCPWrapperServer":
-        """Create a wrapper server that connects to a child process via stdio.
+    def from_config(cls, config: MCPWrapperConfig) -> "MCPWrapperServer":
+        """Create a wrapper server from a configuration object.
 
         Args:
         ----
-            command: The command to run as a child process
-            config_path: Optional path to the wrapper config file
-            guardrail_provider: Optional guardrail provider object to use
-            visualize_ansi_codes: Whether to make ANSI escape codes visible in tool outputs
-            quarantine_path: Optional path to the quarantine database file
+            config: MCPWrapperConfig object containing all configuration parameters
 
         Returns:
         -------
-            An instance of MCPWrapperServer configured for stdio
+            An instance of MCPWrapperServer configured according to the config
 
         """
-        instance = cls(config_path, guardrail_provider, visualize_ansi_codes, quarantine_path)
-        instance.connection_type = "stdio"
-        instance.child_command = command
-        return instance
+        # Import here to avoid circular imports
 
-    @classmethod
-    def wrap_http(
-        cls,
-        url: str,
-        config_path: str | None = None,
-        guardrail_provider: GuardrailProvider | None = None,
-        visualize_ansi_codes: bool = False,
-        quarantine_path: str | None = None,
-    ) -> "MCPWrapperServer":
-        """Create a wrapper server that connects to a remote MCP server via HTTP.
+        instance = cls(
+            config_path=config.config_path,
+            guardrail_provider=config.guardrail_provider,
+            quarantine_path=config.quarantine_path,
+        )
 
-        Args:
-        ----
-            url: The URL to connect to for a remote MCP server
-            config_path: Optional path to the wrapper config file
-            guardrail_provider: Optional guardrail provider object to use
-            visualize_ansi_codes: Whether to make ANSI escape codes visible in tool outputs
-            quarantine_path: Optional path to the quarantine database file
+        # Set connection-specific attributes
+        instance.connection_type = config.connection_type
 
-        Returns:
-        -------
-            An instance of MCPWrapperServer configured for HTTP
+        if config.connection_type == "stdio":
+            instance.child_command = config.command
+        else:  # http or sse
+            instance.server_url = config.url
 
-        """
-        instance = cls(config_path, guardrail_provider, visualize_ansi_codes, quarantine_path)
-        instance.connection_type = "sse"
-        instance.server_url = url
-        return instance
+        instance.visualize_ansi_codes = config.visualize_ansi_codes
 
-    @classmethod
-    def wrap_streamable_http(
-        cls,
-        url: str,
-        config_path: str | None = None,
-        guardrail_provider: GuardrailProvider | None = None,
-        visualize_ansi_codes: bool = False,
-        quarantine_path: str | None = None,
-    ) -> "MCPWrapperServer":
-        """Create a wrapper server that connects to a remote MCP server via streamable HTTP.
-
-        Args:
-        ----
-            url: The URL to connect to for a remote MCP server
-            config_path: Optional path to the wrapper config file
-            guardrail_provider: Optional guardrail provider object to use
-            visualize_ansi_codes: Whether to make ANSI escape codes visible in tool outputs
-            quarantine_path: Optional path to the quarantine database file
-
-        Returns:
-        -------
-            An instance of MCPWrapperServer configured for streamable HTTP
-
-        """
-        instance = cls(config_path, guardrail_provider, visualize_ansi_codes, quarantine_path)
-        instance.connection_type = "http"
-        instance.server_url = url
         return instance
 
     def __init__(
         self,
         config_path: str | None = None,
         guardrail_provider: GuardrailProvider | None = None,
-        visualize_ansi_codes: bool = False,
         quarantine_path: str | None = None,
     ) -> None:
         """Initialize the wrapper server with common attributes.
 
-        Use wrap_stdio or wrap_http class methods instead of calling this directly.
+        Use from_config class method instead of calling this directly.
 
         Args:
         ----
             config_path: Optional path to the wrapper config file
             guardrail_provider: Optional guardrail provider object to use for checking configs
-            visualize_ansi_codes: Whether to make ANSI escape codes visible in tool outputs
             quarantine_path: Optional path to the quarantine database file
 
         """
@@ -170,7 +114,7 @@ class MCPWrapperServer:
         self.server = Server("mcp_wrapper")
         self.guardrail_provider = guardrail_provider
         self.use_guardrails = guardrail_provider is not None
-        self.visualize_ansi_codes = visualize_ansi_codes
+        self.visualize_ansi_codes = False
         self.server_session = None  # Track the server session for sending notifications
         self.quarantine = ToolResponseQuarantine(quarantine_path) if self.use_guardrails else None
         self.tasks = set()
@@ -248,19 +192,15 @@ class MCPWrapperServer:
                 result = await self.session.read_resource(name)
                 contents = []
                 for content_item in result.contents:
-                    content = getattr(content_item, "blob", None)
-                    if content is not None:
-                        content = base64.b64decode(content)
+                    blob = getattr(content_item, "blob", None)
+                    if blob is not None:
+                        # For binary data, decode base64 to bytes
+                        content = base64.b64decode(blob)
                         contents.append(
                             ReadResourceContents(content=content, mime_type=content_item.mimeType)
                         )
-                        if not isinstance(contents[-1].content, bytes):
-                            msg = (
-                                f"Expected bytes, got {type(contents[-1].content)} "
-                                f"with value {content}"
-                            )
-                            raise TypeError(msg)
                     else:
+                        # For text data, use text directly
                         contents.append(
                             ReadResourceContents(
                                 content=content_item.text,
@@ -272,7 +212,8 @@ class MCPWrapperServer:
             except McpError as e:
                 logger.exception("Error fetching resource %s from downstream server", name)
                 error_msg = f"Error fetching resource from downstream server: {e!s}"
-                raise ConnectionError(error_msg)
+                raise ConnectionError(error_msg) from e
+            # Return just the contents list - the decorator wraps it in ReadResourceResult
             return contents
 
         @self.server.list_tools()
@@ -405,7 +346,7 @@ class MCPWrapperServer:
             except McpError as e:
                 logger.exception("Error from downstream server during prompt dispatch")
                 error_msg = f"Error from downstream server: {e!s}"
-                raise ConnectionError(error_msg)
+                raise ConnectionError(error_msg) from e
 
         @self.server.call_tool()
         async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
@@ -532,7 +473,7 @@ class MCPWrapperServer:
             except McpError as e:
                 logger.exception("Error from child MCP server")
                 error_msg = f"Error from child MCP server: {e!s}"
-                raise ConnectionError(error_msg)
+                raise ConnectionError(error_msg) from e
 
     async def _handle_context_protector_block(self) -> list[types.TextContent]:
         """Handle the context-protector-block tool call.
@@ -688,14 +629,6 @@ Note: This tool is only available when tools are blocked due to security restric
             ):
                 structured_content = result.structuredContent
 
-            # Check if response_text is already valid JSON (from FastMCP tools)
-            # If so, we should not double-wrap it in our legacy format
-            try:
-                json.loads(response_text)
-                is_json_response = True
-            except (json.JSONDecodeError, TypeError):
-                is_json_response = False
-
             # Scan the tool response with guardrail provider if configured
             if self.use_guardrails and self.guardrail_provider is not None:
                 guardrail_alert = self._scan_tool_response(name, arguments, response_text)
@@ -703,7 +636,8 @@ Note: This tool is only available when tools are blocked due to security restric
                     # Log the alert but don't block the response yet
                     logger.exception(
                         "Guardrail alert triggered for tool '%s': %s",
-                        name, guardrail_alert.explanation
+                        name,
+                        guardrail_alert.explanation,
                     )
                     # Store in quarantine for future reference
                     # (when quarantine system is integrated)
@@ -721,28 +655,24 @@ Note: This tool is only available when tools are blocked due to security restric
                     )
 
             # Return both text and structured content, preserving all content types
-            return self._create_tool_response(
-                response_text, structured_content, processed_content, is_json_response
-            )
+            return self._create_tool_response(response_text, structured_content, processed_content)
 
         except McpError as e:
             logger.exception("Error calling downstream tool '%s'", name)
             error_msg = f"Error calling downstream tool: {e!s}"
-            raise ConnectionError(error_msg)
+            raise ConnectionError(error_msg) from e
 
     def _create_tool_response(
         self,
         response_text: str,
         structured_content: dict[str, Any | None],
         content_list: list[types.Content],
-        is_json_response: bool = False,
     ) -> dict[str, Any]:
         """Create a tool response dict with text, structured content, and all content types."""
         return {
             "text": response_text,
             "structured_content": structured_content,
             "content_list": content_list,
-            "is_json_response": is_json_response,
         }
 
     def _guardrail_tool_response(
@@ -866,9 +796,8 @@ Note: This tool is only available when tools are blocked due to security restric
                 )
 
         # Update config_approved based on the new granular status
-        if (
-            self.approval_status.get("is_new_server", False)
-            or not self.approval_status.get("instructions_approved", False)
+        if self.approval_status.get("is_new_server", False) or not self.approval_status.get(
+            "instructions_approved", False
         ):
             self.config_approved = False
         else:
@@ -938,13 +867,13 @@ Note: This tool is only available when tools are blocked due to security restric
             logger.warning("Failed to forward %s notification: %s", method, e)
 
     async def _handle_client_message(
-            self,
-            message: (
-                RequestResponder[types.ServerRequest, types.ClientResult]
-                | types.ServerNotification
-                | Exception
-            )
-        ) -> None:
+        self,
+        message: (
+            RequestResponder[types.ServerRequest, types.ClientResult]
+            | types.ServerNotification
+            | Exception
+        ),
+    ) -> None:
         """Message handler for the ClientSession to process notifications.
 
         Args:
@@ -972,7 +901,7 @@ Note: This tool is only available when tools are blocked due to security restric
                 self.config_approved = False
                 logger.info("Tool list changed - invalidating config approval")
                 # Schedule tool update as a separate task to avoid deadlock with message handler
-                self._task = asyncio.create_task(self.update_tools(send_notification=True))
+                self._task = asyncio.create_task(self.update_tools_and_notify())
                 await self._forward_notification_to_upstream(method, params)
             elif method == "notifications/prompts/list_changed":
                 # Prompt changes do NOT affect the config approval status
@@ -1004,9 +933,7 @@ Note: This tool is only available when tools are blocked due to security restric
         else:
             logger.info("Received non-notification message: %s", type(message))
 
-
-
-    async def update_tools(self, send_notification: bool = False) -> None:
+    async def update_tools(self) -> None:
         """Update tools from the downstream server."""
         try:
             downstream_tools = await self.session.list_tools()
@@ -1017,12 +944,13 @@ Note: This tool is only available when tools are blocked due to security restric
             logger.info("Received %d tools after update notification", len(downstream_tools.tools))
 
             await self._handle_tool_updates(downstream_tools.tools)
-            if send_notification:
-                await self._forward_notification_to_upstream(
-                    "notifications/tools/list_changed", None
-                )
         except McpError as e:
             logger.warning("Error handling tool update notification: %s", e)
+
+    async def update_tools_and_notify(self) -> None:
+        """Update tools from the downstream server and send a notification to the client."""
+        self.update_tools()
+        await self._forward_notification_to_upstream("notifications/tools/list_changed", None)
 
     async def connect(self) -> None:
         """Initialize the connection to the downstream server."""
@@ -1099,7 +1027,7 @@ Note: This tool is only available when tools are blocked due to security restric
                 logger.info(
                     "Server partially approved - %d/%d tools approved",
                     approved_tool_count,
-                    total_tool_count
+                    total_tool_count,
                 )
                 self.config_approved = True  # Allow partial operation
             else:
@@ -1143,7 +1071,7 @@ Note: This tool is only available when tools are blocked due to security restric
             logger.info(
                 "Starting downstream server with command: %s %s",
                 command_parts[0],
-                " ".join(command_parts[1:])
+                " ".join(command_parts[1:]),
             )
             self.client_context = stdio_client(server_params)
             self.streams = await self.client_context.__aenter__()
@@ -1280,18 +1208,14 @@ Note: This tool is only available when tools are blocked due to security restric
             logger.info("Forwarding progress notification from client to downstream server")
 
             if self.session:
-                try:
-                    # Forward the notification to the downstream server's session
-                    # Note: ClientSession doesn't have send_notification, so we'll need
-                    # to send as JSON-RPC
-                    await self._forward_notification_to_downstream(notification)
-                except Exception as e:
-                    logger.warning("Failed to forward progress notification to downstream: %s", e)
+                await self._forward_notification_to_downstream(notification)
 
         # Handle other client notifications by registering them manually
         # Since there may not be decorators for all notification types, we'll register directly
 
-        async def handle_cancelled_notification(notification: types.CancelledNotification) -> None:
+        async def handle_cancelled_notification(
+            notification: types.CancelledNotification,
+        ) -> None:
             """Forward cancelled notifications from upstream client to downstream server."""
             logger.info("Forwarding cancelled notification from client to downstream server")
 
@@ -1474,123 +1398,13 @@ Note: This tool is only available when tools are blocked due to security restric
                     async with anyio.create_task_group() as tg:
                         async for message in self.server_session.incoming_messages:
                             tg.start_soon(
-                                self.server._handle_message, # noqa: SLF001
+                                self.server._handle_message,
                                 message,
                                 self.server_session,
                                 None,  # No lifespan context needed
                             )
         finally:
             await self.stop_child_process()
-
-
-async def review_server_config(
-    connection_type: Literal["stdio", "http", "sse"],
-    identifier: str,
-    config_path: str | None = None,
-    guardrail_provider: GuardrailProvider | None = None,
-    quarantine_path: str | None = None,
-) -> None:
-    """Review and approve server configuration for the given connection.
-
-    This function connects to the downstream server, retrieves its configuration,
-    and prompts the user to approve it. If approved, the configuration is saved
-    as trusted in the config database.
-
-    Args:
-    ----
-        connection_type: Type of connection ("stdio", "http", or "sse")
-        identifier: The command or URL to connect to
-        config_path: Optional path to config file
-        guardrail_provider: Optional guardrail provider to use
-        quarantine_path: Optional path to the quarantine database file
-
-    """
-    if connection_type == "stdio":
-        wrapper = MCPWrapperServer.wrap_stdio(
-            command=identifier,
-            config_path=config_path,
-            guardrail_provider=guardrail_provider,
-            quarantine_path=quarantine_path,
-        )
-    else:  # http
-        wrapper = MCPWrapperServer.wrap_http(
-            url=identifier,
-            config_path=config_path,
-            guardrail_provider=guardrail_provider,
-            quarantine_path=quarantine_path,
-        )
-
-    try:
-        await wrapper.connect()
-
-        if wrapper.config_approved:
-            print(f"\nServer configuration for {identifier} is already trusted.")
-            return
-
-        print(f"\nServer configuration for {identifier} is not trusted or has changed.")
-
-        if wrapper.saved_config:
-            print("\nPrevious configuration found. Checking for changes...")
-
-            diff = wrapper.saved_config.compare(wrapper.current_config)
-            if diff.has_differences():
-                print("\n===== CONFIGURATION DIFFERENCES =====")
-                print(make_ansi_escape_codes_visible(str(diff)))
-                print("====================================\n")
-            else:
-                print("No differences found (configs are identical)")
-        else:
-            print("\nThis appears to be a new server.")
-
-        print("\n===== TOOL LIST =====")
-        for tool_spec in wrapper.tool_specs:
-            print(f"• {tool_spec.name}: {make_ansi_escape_codes_visible(tool_spec.description)}")
-        print("=====================\n")
-
-        guardrail_alert = None
-        if wrapper.guardrail_provider is not None:
-            guardrail_alert = wrapper.guardrail_provider.check_server_config(wrapper.current_config)
-
-        if guardrail_alert:
-            print("\n==== GUARDRAIL CHECK: ALERT ====")
-            print(f"Provider: {wrapper.guardrail_provider.name}")
-            print(f"Alert: {guardrail_alert.explanation}")
-            print("==================================\n")
-
-        response = (
-            input("Do you want to trust this server configuration? (yes/no): ").strip().lower()
-        )
-        if response in ("yes", "y"):
-            # First approve instructions
-            wrapper.config_db.approve_instructions(
-                wrapper.connection_type,
-                wrapper.get_server_identifier(),
-                wrapper.current_config.instructions,
-            )
-
-            # Then approve each tool individually
-            for tool in wrapper.current_config.tools:
-                wrapper.config_db.approve_tool(
-                    wrapper.connection_type,
-                    wrapper.get_server_identifier(),
-                    tool.name,
-                    tool,
-                )
-
-            # Finally set the server as approved
-            wrapper.config_db.save_server_config(
-                wrapper.connection_type,
-                wrapper.get_server_identifier(),
-                wrapper.current_config,
-                ApprovalStatus.APPROVED,
-            )
-            print(f"\nThe server configuration for {identifier} has been trusted and saved.")
-        else:
-            print(f"\nThe server configuration for {identifier} has NOT been trusted.")
-
-    finally:
-        # Clean up
-        await wrapper.stop_child_process()
 
 
 def make_ansi_escape_codes_visible(text: str) -> str:

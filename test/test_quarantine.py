@@ -4,7 +4,7 @@ Tests for the quarantine system.
 
 import tempfile
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from contextprotector.quarantine import QuarantinedToolResponse, ToolResponseQuarantine
@@ -51,7 +51,7 @@ class TestQuarantinedToolResponse(unittest.TestCase):
 
     def test_to_dict(self) -> None:
         """Test conversion to dictionary."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         response = QuarantinedToolResponse(
             id="test-id",
             tool_name="test-tool",
@@ -74,7 +74,7 @@ class TestQuarantinedToolResponse(unittest.TestCase):
 
     def test_from_dict(self) -> None:
         """Test creation from dictionary."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         released_at = now + timedelta(minutes=5)
 
         data = {
@@ -187,13 +187,13 @@ class TestToolCallQuarantine(unittest.TestCase):
         self.quarantine.release_response(response_id1)
 
         # List responses without released
-        responses = self.quarantine.list_responses(include_released=False)
+        responses = self.quarantine.list_responses()
 
         assert len(responses) == 1
         assert responses[0]["id"] == response_id2
 
         # List responses with released
-        responses = self.quarantine.list_responses(include_released=True)
+        responses = self.quarantine.list_responses_with_released()
 
         assert len(responses) == 2
         assert any(r["id"] == response_id1 for r in responses)
@@ -254,8 +254,8 @@ class TestToolCallQuarantine(unittest.TestCase):
 
         assert not result
 
-    def test_clear_quarantine(self) -> None:
-        """Test clearing the quarantine."""
+    def test_purge_tidy_quarantine(self) -> None:
+        """Test purging and tidying the quarantine."""
         # Quarantine two responses
         response_id1 = self.quarantine.quarantine_response(
             tool_name="test-tool-1",
@@ -275,7 +275,7 @@ class TestToolCallQuarantine(unittest.TestCase):
         self.quarantine.release_response(response_id1)
 
         # Clear only released responses
-        cleared = self.quarantine.clear_quarantine(only_released=True)
+        cleared = self.quarantine.tidy_quarantine()
 
         assert cleared == 1
 
@@ -287,7 +287,7 @@ class TestToolCallQuarantine(unittest.TestCase):
         assert response2 is not None
 
         # Clear all responses
-        cleared = self.quarantine.clear_quarantine()
+        cleared = self.quarantine.purge_quarantine()
 
         assert cleared == 1
 
