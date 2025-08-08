@@ -9,9 +9,11 @@ import asyncio
 import logging
 import sys
 
+from .approval_cli import list_unapproved_configs, review_server_config
 from .guardrails import GuardrailProvider, get_provider, get_provider_names
-from .mcp_wrapper import MCPWrapperServer, review_server_config
+from .mcp_wrapper import MCPWrapperServer
 from .quarantine_cli import review_quarantine
+from .wrapper_config import MCPWrapperConfig
 
 logger = logging.getLogger("mcp_wrapper")
 
@@ -25,6 +27,7 @@ def _list_guardrails() -> None:
             print(f"  - {provider}")
     else:
         print("No guardrail providers found.")
+
 
 def _load_guardrail_provider(args: argparse.Namespace) -> GuardrailProvider | None:
     if not args.guardrail_provider:
@@ -51,9 +54,10 @@ def _load_guardrail_provider(args: argparse.Namespace) -> GuardrailProvider | No
     logger.info("Using guardrail provider: %s", guardrail_provider.name)
     return guardrail_provider
 
+
 async def _launch_review(
-        args: argparse.Namespace, guardrail_provider: GuardrailProvider | None
-    ) -> None:
+    args: argparse.Namespace, guardrail_provider: GuardrailProvider | None
+) -> None:
     # For review mode, we need either command or url
     if args.command:
         await review_server_config(
@@ -79,6 +83,7 @@ async def _launch_review(
             guardrail_provider,
             args.quarantine_path,
         )
+
 
 async def main_async() -> None:
     """Launch the wrapped server or review process specified in arguments."""
@@ -107,39 +112,12 @@ async def main_async() -> None:
         return
 
     # Normal operation mode (not review)
-    # Determine which source was provided and create appropriate wrapper
-    if args.command:
-        wrapper = MCPWrapperServer.wrap_stdio(
-            args.command,
-            args.server_config_file,
-            guardrail_provider,
-            args.visualize_ansi_codes,
-            args.quarantine_path,
-        )
-    elif args.url:
-        wrapper = MCPWrapperServer.wrap_streamable_http(
-            args.url,
-            args.server_config_file,
-            guardrail_provider,
-            args.visualize_ansi_codes,
-            args.quarantine_path,
-        )
-    elif args.sse_url:
-        wrapper = MCPWrapperServer.wrap_http(
-            args.sse_url,
-            args.server_config_file,
-            guardrail_provider,
-            args.visualize_ansi_codes,
-            args.quarantine_path,
-        )
-    else:
-        # This should never happen due to the validation above
-        # But we'll keep it as a fallback error message
-        print(
-            "Error: Either --command, --url, --sse-url, or "
-            "--list-guardrail-providers must be provided",
-            file=sys.stderr,
-        )
+    # Create wrapper configuration from args
+    try:
+        config = MCPWrapperConfig.from_args(args, guardrail_provider)
+        wrapper = MCPWrapperServer.from_config(config)
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
     try:
@@ -231,105 +209,6 @@ def _parse_args() -> argparse.Namespace:
 
     return parser.parse_args()
 
-async def list_unapproved_configs(config_path: str | None = None) -> None:
-    """List and provide a menu for reviewing unapproved server configurations.
-
-    Args:
-    ----
-        config_path: Optional path to the configuration database file.
-                    If None, uses the default path.
-
-    """
-    from .mcp_config import MCPConfigDatabase
-    from .mcp_wrapper import review_server_config
-
-    config_db = MCPConfigDatabase(config_path if config_path else None)
-
-    unapproved_servers = config_db.list_unapproved_servers()
-
-    if not unapproved_servers:
-        print("No unapproved server configurations found.")
-        return
-
-    print(f"\nFound {len(unapproved_servers)} unapproved server configuration(s):\n")
-
-    for i, server in enumerate(unapproved_servers, 1):
-        print(f"{i}. [{server['type'].upper()}] {server['identifier']}")
-        if server["has_config"]:
-            print("   Status: Configuration available for review")
-        else:
-            print("   Status: No configuration data available")
-        print()
-
-    # Interactive menu
-    while True:
-        try:
-            print("Options:")
-            print(f"  [1-{len(unapproved_servers)}] Review and approve a specific server")
-            print("  [a] Approve all servers")
-            print("  [q] Quit")
-
-            choice = input("\nEnter your choice: ").strip().lower()
-            if choice == "q":
-                break
-            if choice == "a":
-                # Approve all servers
-                confirm = (
-                    input("Are you sure you want to approve ALL unapproved servers? (yes/no): ")
-                    .strip()
-                    .lower()
-                )
-                if confirm in ("yes", "y"):
-                    approved_count = 0
-                    for server in unapproved_servers:
-                        success = config_db.approve_server_config(
-                            server["type"], server["identifier"]
-                        )
-                        if success:
-                            approved_count += 1
-                            print(f"✓ Approved: [{server['type'].upper()}] {server['identifier']}")
-                        else:
-                            print(
-                                f"✗ Failed to approve: [{server['type'].upper()}] "
-                                f"{server['identifier']}"
-                            )
-                    print(
-                        f"\nApproved {approved_count} out of {len(unapproved_servers)} "
-                        f"server configurations."
-                    )
-                    break
-                print("Bulk approval cancelled.")
-                continue
-            index = _int_or_none(choice)
-            if isinstance(index, int) and 1 <= index <= len(unapproved_servers):
-                server = unapproved_servers[index-1]
-                print(f"\nReviewing: [{server['type'].upper()}] {server['identifier']}")
-
-                # Call the existing review function
-                await review_server_config(
-                    server["type"], server["identifier"], config_path
-                )
-
-                # Refresh the list and continue
-                unapproved_servers = config_db.list_unapproved_servers()
-                if not unapproved_servers:
-                    print("\n✓ All server configurations have been reviewed!")
-                    break
-                print(
-                    f"\n{len(unapproved_servers)} unapproved configuration(s) remaining."
-                )
-            else:
-                print("Invalid selection. Please try again.")
-        except KeyboardInterrupt:
-            print("\n\nExiting...")
-            break
-
-
-def _int_or_none(s: str) -> int | None:
-    try:
-        return int(s)
-    except ValueError:
-        return None
 
 def main() -> None:
     """Launch async main function."""

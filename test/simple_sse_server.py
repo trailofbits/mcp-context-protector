@@ -45,7 +45,6 @@ app.add_tool(echo_handler, "echo")
 
 # Run the server if executed directly
 if __name__ == "__main__":
-
     app.settings.host = "127.0.0.1"
 
     # The default port for FastMCP's SSE transport is 8000, but just in case that port number is in

@@ -65,7 +65,7 @@ def create_approved_config(server_cmd: str) -> str:
 
     # Use the review command to pre-approve the server config
     subprocess.run(
-        [ # noqa: S603
+        [
             sys.executable,
             "-m",
             "contextprotector",
@@ -84,8 +84,7 @@ def create_approved_config(server_cmd: str) -> str:
 
 
 async def run_with_dynamic_server_session(
-    callback: Callable[[ClientSession], Awaitable[None]],
-    initial_tool_count: int | None = None
+    callback: Callable[[ClientSession], Awaitable[None]], initial_tool_count: int | None = None
 ) -> None:
     """
     Run a test with a direct connection to the dynamic downstream server.
@@ -136,7 +135,7 @@ async def run_with_dynamic_server_session(
             attempts = 0
             while attempts < max_attempts:
                 try:
-                    async with aiofiles.open(TEMP_PIDFILE, "r") as f:
+                    async with aiofiles.open(TEMP_PIDFILE) as f:
                         SERVER_PID = int((await f.read()).strip())
                     break
                 except (FileNotFoundError, ValueError):

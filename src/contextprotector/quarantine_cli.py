@@ -1,5 +1,6 @@
 """CLI interface for reviewing and managing quarantined tool responses."""
 
+import datetime
 import json
 import logging
 from typing import Any
@@ -24,7 +25,7 @@ async def review_quarantine(
     """
     quarantine = ToolResponseQuarantine(quarantine_path)
 
-    responses = quarantine.list_responses(include_released=False)
+    responses = quarantine.list_responses()
     if not responses:
         print("\nNo quarantined tool responses found.")
         return
@@ -64,15 +65,13 @@ def review_response_list(
         # Parse ISO timestamp and convert to local display
         utc_timestamp = response_data["timestamp"]
         if isinstance(utc_timestamp, str):
-            import datetime
             utc_dt = datetime.datetime.fromisoformat(utc_timestamp.replace("Z", "+00:00"))
             local_display = _utc_to_local_display(utc_dt)
             timestamp = local_display.split()[0]  # Just the date part for list view
         else:
             timestamp = str(utc_timestamp)[:10]  # Fallback
-        print(
-            f"{i+1}. [{timestamp}] {response_data['tool_name']} - {response_data['reason'][:50]}..."
-        )
+        reason_preview = response_data["reason"][:50]
+        print(f"{i + 1}. [{timestamp}] {response_data['tool_name']} - {reason_preview}...")
     print("========================================\n")
 
     # Prompt user to select a response to review
@@ -89,7 +88,7 @@ def review_response_list(
                 if response:
                     review_response(quarantine, response)
                     # After reviewing, show the list again with updated data
-                    responses = quarantine.list_responses(include_released=False)
+                    responses = quarantine.list_responses()
                     if not responses:
                         print("\nNo more quarantined responses to review.")
                         return
@@ -98,7 +97,7 @@ def review_response_list(
                 print("\nError retrieving response from quarantine.")
             else:
                 print(f"\nInvalid choice. Please enter a number between 1 and {len(responses)}.")
-        except ValueError: # noqa: PERF203
+        except ValueError:
             print("\nPlease enter a valid number.")
 
 

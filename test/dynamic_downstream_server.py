@@ -222,26 +222,12 @@ def write_pidfile(pidfile_path: str) -> None:
         f.write(str(pid))
 
     # Register cleanup function to remove pidfile on exit
-    atexit.register(
-        lambda: Path(pidfile_path).unlink() if Path(pidfile_path).exists() else None
-    )
+    atexit.register(lambda: Path(pidfile_path).unlink() if Path(pidfile_path).exists() else None)
 
     print(f"PID {pid} written to {pidfile_path}", file=sys.stderr)
 
 
-async def my_run(
-    self: "FastMCP",
-    # When False, exceptions are returned as messages to the client.
-    # When True, exceptions are raised, which will cause the server to shut down
-    # but also make tracing exceptions much easier during testing and when using
-    # in-process servers.
-    raise_exceptions: bool = False,
-    # When True, the server is stateless and
-    # clients can perform initialization with any node. The client must still follow
-    # the initialization lifecycle, but can do so with any available node
-    # rather than requiring initialization for each connection.
-    _stateless: bool = False,
-) -> None:
+async def my_run(self: "FastMCP") -> None:
     """
     Server startup function that allows us to send notifications.
 
@@ -268,12 +254,8 @@ async def my_run(
         async with anyio.create_task_group() as tg:
             async for message in session.incoming_messages:
                 tg.start_soon(
-                    self._mcp_server._handle_message,
-                    message,
-                    self._session,
-                    lifespan_context,
-                    raise_exceptions,
-                    )
+                    self._mcp_server._handle_message, message, self._session, lifespan_context
+                )
 
 
 def main() -> None:

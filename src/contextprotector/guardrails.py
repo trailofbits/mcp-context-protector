@@ -26,7 +26,7 @@ TEST_ONLY_PROVIDERS = {
 }
 
 
-def _is_provider_class(obj: Any) -> bool:  # noqa: ANN401
+def _is_provider_class(obj: Any) -> bool:
     """Check if an object is a valid guardrail provider class.
 
     Args:
@@ -43,9 +43,7 @@ def _is_provider_class(obj: Any) -> bool:  # noqa: ANN401
     if obj.__name__ == "GuardrailProvider":
         return False
     has_name = hasattr(obj, "name") and isinstance(obj.name, property)
-    has_check = hasattr(obj, "check_server_config") and callable(
-        obj.check_server_config
-    )
+    has_check = hasattr(obj, "check_server_config") and callable(obj.check_server_config)
 
     return has_name and has_check
 

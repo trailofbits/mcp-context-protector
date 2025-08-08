@@ -12,7 +12,6 @@ from pathlib import Path
 
 import aiofiles
 import pytest
-from contextprotector.mcp_config import MCPServerConfig
 from mcp import ClientSession, types
 
 from .sse_server_utils import sse_server_fixture  # noqa: F401
@@ -34,37 +33,27 @@ async def approve_server_config_using_review(url: str, config_path: str) -> None
 # Import global SERVER_PORT from sse_server_utils
 
 
-async def run_with_wrapper_session(
-    callback: Callable[[ClientSession], Awaitable[None]],
-    config_path: str | None = None
+# Helper function to run tests with the SSE server
+async def _run_with_sse_server(
+    callback: Callable[[ClientSession], Awaitable[None]], config_path: str
 ) -> None:
-    """
-    Run a test with a wrapper session that connects to the SSE downstream server via URL.
-
-    Args:
-        callback: Async function to call with the client session
-        config_path: Path to the wrapper config file
-    """
+    """Helper to run tests with the SSE server at the detected port."""
     from . import sse_server_utils
-    from .test_utils import run_with_wrapper_session as _run_with_wrapper_session
+    from .test_utils import run_with_sse_downstream_server
 
     # Make sure we have a valid port
-    assert (
-        sse_server_utils.SERVER_PORT is not None
-    ), "Server port must be detected before connecting"
+    assert sse_server_utils.SERVER_PORT is not None, (
+        "Server port must be detected before connecting"
+    )
 
-    config_path = config_path or MCPServerConfig.get_default_config_path()
-
-    # Build the URL for the SSE server
-    sse_url = f"http://localhost:{sse_server_utils.SERVER_PORT}/sse"
-    logging.warning("Connecting wrapper to SSE server at: %s", sse_url)
+    logging.warning("Connecting wrapper to SSE server at port: %s", sse_server_utils.SERVER_PORT)
 
     # Use the shared utility function
-    await _run_with_wrapper_session(callback, "sse", sse_url, config_path)
+    await run_with_sse_downstream_server(callback, sse_server_utils.SERVER_PORT, config_path)
 
 
 @pytest.mark.asyncio()
-async def test_echo_tool_through_wrapper(sse_server_fixture: any) -> None: # noqa: F811 ARG001
+async def test_echo_tool_through_wrapper(sse_server_fixture: any) -> None:  # noqa: F811 ARG001
     """Test that the echo tool correctly works through the MCP wrapper using SSE transport."""
 
     async def callback(session: ClientSession) -> None:
@@ -114,7 +103,7 @@ async def test_echo_tool_through_wrapper(sse_server_fixture: any) -> None: # noq
 
     # Run the test with a temporary config file
     temp_file = tempfile.NamedTemporaryFile(delete=False)
-    await run_with_wrapper_session(callback, temp_file.name)
+    await _run_with_sse_server(callback, temp_file.name)
     # Build the URL for the SSE server to be used in the review process
     from . import sse_server_utils
 
@@ -123,7 +112,7 @@ async def test_echo_tool_through_wrapper(sse_server_fixture: any) -> None: # noq
     # Now we need to run the review process to approve this config
     await approve_server_config_using_review(sse_url, temp_file.name)
 
-    async with aiofiles.open(temp_file.name, "r") as f:
+    async with aiofiles.open(temp_file.name) as f:
         logging.exception(await f.read())
     from contextprotector.mcp_config import MCPConfigDatabase
 
@@ -131,13 +120,13 @@ async def test_echo_tool_through_wrapper(sse_server_fixture: any) -> None: # noq
     conf = cdb.get_server_config("sse", sse_url)
     assert conf is not None, "couldn't find approved config"
 
-    await run_with_wrapper_session(callback2, temp_file.name)
+    await _run_with_sse_server(callback2, temp_file.name)
 
     Path(temp_file.name).unlink()
 
 
 @pytest.mark.asyncio()
-async def test_invalid_tool_through_wrapper(sse_server_fixture: any) -> None: # noqa: F811 ARG001
+async def test_invalid_tool_through_wrapper(sse_server_fixture: any) -> None:  # noqa: F811 ARG001
     """Test error handling for invalid tools through the MCP wrapper using SSE transport."""
 
     async def callback(session: ClientSession) -> None:
@@ -179,7 +168,7 @@ async def test_invalid_tool_through_wrapper(sse_server_fixture: any) -> None: # 
 
     # Run the test with a temporary config file
     temp_file = tempfile.NamedTemporaryFile(delete=False)
-    await run_with_wrapper_session(callback, temp_file.name)
+    await _run_with_sse_server(callback, temp_file.name)
     # Build the URL for the SSE server to be used in the review process
     from . import sse_server_utils
 
@@ -187,5 +176,5 @@ async def test_invalid_tool_through_wrapper(sse_server_fixture: any) -> None: # 
 
     # Run the review process to approve this config
     await approve_server_config_using_review(sse_url, temp_file.name)
-    await run_with_wrapper_session(callback2, temp_file.name)
+    await _run_with_sse_server(callback2, temp_file.name)
     Path(temp_file.name).unlink()

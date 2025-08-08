@@ -15,9 +15,7 @@ class MockGuardrailProvider(GuardrailProvider):
     Only available when running tests.
     """
 
-    def __init__(
-        self
-    ) -> None:
+    def __init__(self) -> None:
         """Initialize the mock guardrail provider."""
         logger.info("Initializing MockGuardrailProvider")
         super().__init__()

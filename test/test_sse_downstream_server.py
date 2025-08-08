@@ -20,9 +20,9 @@ async def run_with_sse_client(callback: Callable[[ClientSession], Awaitable[None
     from . import sse_server_utils
 
     # Make sure we have a valid port
-    assert (
-        sse_server_utils.SERVER_PORT is not None
-    ), "Server port must be detected before connecting"
+    assert sse_server_utils.SERVER_PORT is not None, (
+        "Server port must be detected before connecting"
+    )
 
     # Use the dynamically determined port
     server_url = f"http://localhost:{sse_server_utils.SERVER_PORT}/sse"
@@ -39,7 +39,7 @@ async def run_with_sse_client(callback: Callable[[ClientSession], Awaitable[None
 
 
 @pytest.mark.asyncio()
-async def test_list_tools_via_sse(sse_server: any) -> None: # noqa: F811 ARG001
+async def test_list_tools_via_sse(sse_server: any) -> None:  # noqa: F811 ARG001
     """Test that the tool listing works correctly via SSE transport."""
 
     async def callback(session: ClientSession) -> None:
@@ -65,7 +65,7 @@ async def test_list_tools_via_sse(sse_server: any) -> None: # noqa: F811 ARG001
 
 
 @pytest.mark.asyncio()
-async def test_echo_tool_via_sse(sse_server: any) -> None: # noqa: F811 ARG001
+async def test_echo_tool_via_sse(sse_server: any) -> None:  # noqa: F811 ARG001
     """Test that the echo tool works correctly via SSE transport."""
 
     async def callback(session: ClientSession) -> None:
@@ -94,7 +94,7 @@ async def test_echo_tool_via_sse(sse_server: any) -> None: # noqa: F811 ARG001
 
 
 @pytest.mark.asyncio()
-async def test_invalid_tool_call_via_sse(sse_server: any) -> None: # noqa: F811 ARG001
+async def test_invalid_tool_call_via_sse(sse_server: any) -> None:  # noqa: F811 ARG001
     """Test error handling when an invalid tool is called via SSE transport."""
 
     async def callback(session: ClientSession) -> None:
@@ -110,6 +110,6 @@ async def test_invalid_tool_call_via_sse(sse_server: any) -> None: # noqa: F811 
         assert len(result.content) == 1
         text = result.content[0].text.lower()
         assert "error" in text
-        assert ("missing" in text or "required" in text)
+        assert "missing" in text or "required" in text
 
     await run_with_sse_client(callback)
