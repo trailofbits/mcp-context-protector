@@ -1,4 +1,4 @@
-"""Llama Firewall guardrail provider for mcp-context-protector.
+"""LlamaFirewall guardrail provider for mcp-context-protector.
 
 Provides server configuration checking capabilities.
 """
@@ -21,23 +21,23 @@ logger = logging.getLogger("llama_firewall_provider")
 
 
 class LlamaFirewallProvider(GuardrailProvider):
-    """Llama Firewall guardrail provider.
+    """LlamaFirewall guardrail provider.
 
-    Checks server configurations against Llama Firewall guardrails.
+    Checks server configurations against LlamaFirewall guardrails.
     """
 
     def __init__(self) -> None:
-        """Initialize the Llama Firewall provider."""
+        """Initialize the LlamaFirewall provider."""
         logger.info("Initializing LlamaFirewallProvider")
         super().__init__()
 
     @property
     def name(self) -> str:
         """Get the provider name."""
-        return "Llama Firewall"
+        return "LlamaFirewall"
 
     def check_server_config(self, config: MCPServerConfig) -> GuardrailAlert | None:
-        """Check the provided server configuration against Llama Firewall guardrails.
+        """Check the provided server configuration against LlamaFirewall guardrails.
 
         Args:
         ----
@@ -64,7 +64,7 @@ class LlamaFirewallProvider(GuardrailProvider):
             message = UserMessage(content=config_str)
             logger.info("Created UserMessage for scanning")
 
-            logger.info("Scanning config with Llama Firewall...")
+            logger.info("Scanning config with LlamaFirewall...")
             result = lf.scan(message)
 
             logger.info("Scan result decision: %s", result.decision)
@@ -100,7 +100,7 @@ class LlamaFirewallProvider(GuardrailProvider):
         return alert
 
     def check_tool_response(self, tool_response: ToolResponse) -> GuardrailAlert | None:
-        """Check the provided tool response against Llama Firewall guardrails.
+        """Check the provided tool response against LlamaFirewall guardrails.
 
         Args:
         ----
@@ -120,7 +120,7 @@ class LlamaFirewallProvider(GuardrailProvider):
 
             message = ToolMessage(content=tool_response.tool_output)
 
-            logger.info("Scanning tool response with Llama Firewall...")
+            logger.info("Scanning tool response with LlamaFirewall...")
             result = lf.scan(message)
 
             logger.info("Scan result decision: %s", result.decision)
