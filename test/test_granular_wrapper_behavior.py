@@ -56,29 +56,50 @@ async def test_granular_tool_filtering_in_list_tools() -> None:
     from contextprotector.mcp_config import MCPServerEntry
 
     key = MCPServerEntry.create_key("stdio", get_server_command("multi_tool_downstream_server.py"))
+    
+    # Save the existing config before deleting to preserve instructions hash
+    existing_config = None
     if key in db.servers:
+        existing_config = db.servers[key].config
         del db.servers[key]
         db._save()
 
-    # Instead of using the old config, let's connect fresh and get the current tools
-    # to ensure we're approving the exact same tool definitions the wrapper will see
+    # Use the existing config that was already approved to preserve instructions hash
+    if existing_config:
+        from contextprotector.mcp_config import MCPServerConfig
+        fresh_config = MCPServerConfig.from_dict(existing_config)
+    else:
+        # If no config exists, create a minimal one with known tool definitions
+        from contextprotector.mcp_config import MCPServerConfig, MCPToolDefinition, MCPParameterDefinition, ParameterType
+        
+        # Create tool definitions that match what multi_tool_downstream_server.py provides
+        echo_tool = MCPToolDefinition(
+            name="echo",
+            description="Echo back the provided message",
+            parameters=[
+                MCPParameterDefinition(
+                    name="message", description="The message to echo back", 
+                    type=ParameterType.STRING, required=True
+                )
+            ]
+        )
+        greet_tool = MCPToolDefinition(
+            name="greet",
+            description="Generate a greeting message for a person",
+            parameters=[
+                MCPParameterDefinition(
+                    name="name", description="The name of the person to greet",
+                    type=ParameterType.STRING, required=True
+                )
+            ]
+        )
+        
+        fresh_config = MCPServerConfig(
+            tools=[echo_tool, greet_tool],
+            instructions="Test multi-tool downstream server configuration"
+        )
 
-    # Create a fresh connection to get the current tool definitions
-    from contextprotector.mcp_wrapper import MCPWrapperServer
-    from contextprotector.wrapper_config import MCPWrapperConfig
-
-    wrapper_config = MCPWrapperConfig.for_stdio(
-        get_server_command("multi_tool_downstream_server.py")
-    )
-    wrapper_config.config_path = temp_file.name
-    fresh_wrapper = MCPWrapperServer.from_config(wrapper_config)
-
-    # Connect and get fresh config
-    await fresh_wrapper.connect()
-    fresh_config = fresh_wrapper.current_config
-    await fresh_wrapper.stop_child_process()
-
-    # Save as unapproved config using the fresh config
+    # Save as unapproved config
     db.save_unapproved_config(
         "stdio", get_server_command("multi_tool_downstream_server.py"), fresh_config
     )

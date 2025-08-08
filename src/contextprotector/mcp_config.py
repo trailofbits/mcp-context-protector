@@ -635,8 +635,6 @@ class MCPConfigDatabase:
     It provides thread-safe access to the configuration file to prevent race conditions.
     """
 
-    _file_lock = threading.RLock()  # Class-level lock for file operations
-
     def __init__(self, config_path: str | None = None) -> None:
         """Initialize the config database.
 
@@ -647,6 +645,7 @@ class MCPConfigDatabase:
         """
         self.config_path = config_path or self.get_default_config_path()
         self.servers: dict[str, MCPServerEntry] = {}
+        self._file_lock = threading.RLock()  # Instance-level lock for file operations
         self._load()
 
     @staticmethod
@@ -667,7 +666,7 @@ class MCPConfigDatabase:
 
     def _load(self) -> None:
         """Load server configurations from the config file."""
-        with MCPConfigDatabase._file_lock:
+        with self._file_lock:
             try:
                 if pathlib.Path(self.config_path).exists():
                     with pathlib.Path(self.config_path).open("r") as f:
@@ -698,7 +697,7 @@ class MCPConfigDatabase:
 
     def _save(self) -> None:
         """Save server configurations to the config file."""
-        with MCPConfigDatabase._file_lock:
+        with self._file_lock:
             data = {
                 "servers": [
                     {

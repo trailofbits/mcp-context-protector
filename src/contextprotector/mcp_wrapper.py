@@ -1399,6 +1399,23 @@ Note: This tool is only available when tools are blocked due to security restric
                 self.streams = None
                 self.child_process = None
                 logger.info("Closed MCP client connection (type: %s)", self.connection_type)
+                
+                # Add a brief delay to ensure subprocess cleanup is complete
+                # This prevents race conditions in tests where multiple wrapper instances
+                # are created and destroyed rapidly
+                import asyncio
+                await asyncio.sleep(0.1)
+                
+            except RuntimeError as e:
+                if "cancel scope" in str(e):
+                    # Context was already cancelled (e.g., by timeout), just clean up state
+                    self.client_context = None
+                    self.session = None
+                    self.streams = None
+                    self.child_process = None
+                    logger.info("MCP client connection was cancelled, cleaned up state")
+                else:
+                    logger.exception("Runtime error closing MCP client")
             except Exception:
                 logger.exception("Error closing MCP client")
 

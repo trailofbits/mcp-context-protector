@@ -107,18 +107,33 @@ async def test_dynamic_tool_addition_with_existing_server() -> None:
 
     db = MCPConfigDatabase(temp_file.name)
 
-    # Get the FRESH config to ensure tool definitions match what wrapper will see
-    # (same approach as previous fix for hash consistency)
-    from contextprotector.mcp_wrapper import MCPWrapperServer
-    from contextprotector.wrapper_config import MCPWrapperConfig
-
-    wrapper_config = MCPWrapperConfig.for_stdio(get_server_command("simple_downstream_server.py"))
-    wrapper_config.config_path = temp_file.name
-    fresh_wrapper = MCPWrapperServer.from_config(wrapper_config)
-
-    await fresh_wrapper.connect()
-    fresh_config = fresh_wrapper.current_config  # Fresh tool definitions
-    await fresh_wrapper.stop_child_process()
+    # Get the existing config from the database to avoid subprocess conflicts
+    # The config was already captured when the server was first approved
+    from contextprotector.mcp_config import MCPServerEntry
+    server_key = MCPServerEntry.create_key("stdio", get_server_command("simple_downstream_server.py"))
+    existing_entry = db.servers.get(server_key)
+    if existing_entry and existing_entry.config:
+        from contextprotector.mcp_config import MCPServerConfig
+        fresh_config = MCPServerConfig.from_dict(existing_entry.config)
+    else:
+        # Create a minimal config that matches simple_downstream_server.py
+        from contextprotector.mcp_config import MCPServerConfig, MCPToolDefinition, MCPParameterDefinition, ParameterType
+        
+        echo_tool = MCPToolDefinition(
+            name="echo",
+            description="Echo back the provided message",
+            parameters=[
+                MCPParameterDefinition(
+                    name="message", description="The message to echo back",
+                    type=ParameterType.STRING, required=True
+                )
+            ]
+        )
+        
+        fresh_config = MCPServerConfig(
+            tools=[echo_tool],
+            instructions="Test simple downstream server configuration"
+        )
 
     # Add new tool to the fresh config
     new_tool = MCPToolDefinition(
