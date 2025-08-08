@@ -6,13 +6,13 @@ import json
 import tempfile
 from collections.abc import Generator
 from pathlib import Path
+from typing import Any
 
 import pytest
-from mcp import types
-
 from contextprotector.guardrail_providers.mock_provider import MockGuardrailProvider
 from contextprotector.mcp_wrapper import MCPWrapperServer
 from contextprotector.quarantine import ToolResponseQuarantine
+from mcp import types
 
 
 @pytest.fixture()
@@ -67,7 +67,7 @@ def setup_quarantine_test() -> Generator[tuple[ToolResponseQuarantine, str, str]
 
 
 @pytest.mark.asyncio()
-async def test_quarantine_release_tool_lists_in_tools(setup_quarantine_test: any) -> None:
+async def test_quarantine_release_tool_lists_in_tools(setup_quarantine_test: Any) -> None:
     """Test that the quarantine_release tool is added to the tool list."""
     test_data = setup_quarantine_test
 
@@ -95,7 +95,7 @@ async def test_quarantine_release_tool_lists_in_tools(setup_quarantine_test: any
 
 
 @pytest.mark.asyncio()
-async def test_quarantine_release_success(setup_quarantine_test: any) -> None:
+async def test_quarantine_release_success(setup_quarantine_test: Any) -> None:
     """Test successfully releasing a quarantined response."""
     test_data = setup_quarantine_test
 
@@ -130,7 +130,7 @@ async def test_quarantine_release_success(setup_quarantine_test: any) -> None:
 
 
 @pytest.mark.asyncio()
-async def test_quarantine_release_unreleased_fails(setup_quarantine_test: any) -> None:
+async def test_quarantine_release_unreleased_fails(setup_quarantine_test: Any) -> None:
     """Test that attempting to release an unreleased response fails."""
     test_data = setup_quarantine_test
 
@@ -156,7 +156,7 @@ async def test_quarantine_release_unreleased_fails(setup_quarantine_test: any) -
 
 
 @pytest.mark.asyncio()
-async def test_quarantine_release_invalid_uuid(setup_quarantine_test: any) -> None:
+async def test_quarantine_release_invalid_uuid(setup_quarantine_test: Any) -> None:
     """Test that attempting to release with an invalid UUID fails."""
     test_data = setup_quarantine_test
 
@@ -172,7 +172,7 @@ async def test_quarantine_release_invalid_uuid(setup_quarantine_test: any) -> No
 
 
 @pytest.mark.asyncio()
-async def test_quarantine_release_missing_uuid(setup_quarantine_test: any) -> None:
+async def test_quarantine_release_missing_uuid(setup_quarantine_test: Any) -> None:
     """Test that attempting to release without a UUID fails."""
     test_data = setup_quarantine_test
 

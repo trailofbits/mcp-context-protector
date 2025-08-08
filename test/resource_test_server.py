@@ -16,7 +16,6 @@ from contextlib import AsyncExitStack
 
 from mcp import types
 from mcp.server.lowlevel import NotificationOptions, Server
-from mcp.server.lowlevel.helper_types import ReadResourceContents
 from mcp.server.models import InitializationOptions
 from mcp.server.session import ServerSession
 from mcp.server.stdio import stdio_server
@@ -119,7 +118,7 @@ class ResourceTestServer:
             return [types.TextContent(type="text", text="Unknown tool")]
 
         @self.server.read_resource()
-        async def read_resource(uri: str) -> list[ReadResourceContents]:
+        async def read_resource(uri: str) -> str | bytes:
             """Handle resource content requests."""
             if str(uri) == "contextprotector://sample_data":
                 # Return JSON sample data
@@ -134,19 +133,16 @@ class ResourceTestServer:
                         ],
                     }
                 )
-                return [ReadResourceContents(content=content, mime_type="application/json")]
+                return content
             if str(uri) == "contextprotector://image_resource":
-                # Just return placeholder text for testing
-                content = b"[Binary image data]"
-                return [ReadResourceContents(content=content, mime_type="image/png")]
+                # Just return placeholder bytes for testing
+                return b"[Binary image data]"
             if str(uri) == "contextprotector://document_resource":
                 # Return text document
                 content = "This is a sample document resource.\nIt contains multiple lines.\nFor testing purposes."  # noqa: E501
-                return [ReadResourceContents(content=content, mime_type="text/plain")]
+                return content
 
-            return [
-                ReadResourceContents(content="Unknown resource requested", mime_type="text/plain")
-            ]
+            return "Unknown resource requested"
 
     async def run(self) -> None:
         """Run the server with session tracking."""

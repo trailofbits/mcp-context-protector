@@ -166,9 +166,6 @@ class NotificationTestServer:
             logger.info("Received initialized notification from client: %s", notification.method)
 
         # Register handlers in the notification_handlers dict
-        self.server.notification_handlers[types.LoggingMessageNotification] = (
-            handle_message_notification
-        )
         self.server.notification_handlers[types.CancelledNotification] = (
             handle_cancelled_notification
         )

@@ -34,7 +34,7 @@ class MCPToolSpec:
     description: str
     parameters: dict[str, Any]
     required: list[str]
-    output_schema: dict[str, Any | None] = None
+    output_schema: dict[str, Any | None] | None = None
 
     def model_dump(self) -> dict[str, Any]:
         """Convert to a dictionary representation."""
@@ -58,9 +58,9 @@ class MCPParameterDefinition:
     type: ParameterType
     required: bool = True
     default: Any | None = None
-    enum: list[str | None] = None
-    items: dict[str, Any | None] = None  # For array types
-    properties: dict[str, Any | None] = None  # For object types
+    enum: list[str | None] | None = None
+    items: dict[str, Any | None] | None = None  # For array types
+    properties: dict[str, Any | None] | None = None  # For object types
 
     def __hash__(self) -> int:
         """Compute hash based on immutable fields."""
@@ -74,7 +74,7 @@ class MCPToolDefinition:
     name: str
     description: str
     parameters: list[MCPParameterDefinition]
-    output_schema: dict[str, Any | None] = None
+    output_schema: dict[str, Any | None] | None = None
 
     def __str__(self) -> str:
         """Generate a string representation of the tool with its parameters.
@@ -338,9 +338,13 @@ class MCPServerConfig:
                 pass
         elif fp:
             data = json.load(fp)
-        else:
+        elif json_str is not None:
             data = json.loads(json_str)
-        return cls.from_dict(data)
+        if data is not None:
+            return cls.from_dict(data)
+        else:
+            # Return empty config if no data was loaded
+            return cls(instructions="", tools=[])
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the server configuration to a dictionary."""
@@ -373,16 +377,22 @@ class MCPServerConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any | None]) -> "MCPServerConfig":
+    def from_dict(cls, data: dict[str, Any | None] | None) -> "MCPServerConfig":
         """Create a server configuration from a dictionary."""
         config = cls()
 
         if data is None:
             return config
 
-        config.instructions = data.get("instructions", "")
+        instructions = data.get("instructions")
+        if instructions and isinstance(instructions, str):
+            config.instructions = instructions
 
-        for tool_data in data.get("tools", {}):
+        tools = data.get("tools", [])
+        if not isinstance(tools, list):
+            tools = []
+
+        for tool_data in tools:
             parameters = []
 
             for param_data in tool_data.get("parameters", []):
@@ -408,9 +418,9 @@ class MCPServerConfig:
 
         return config
 
-    def __hash__(self) -> int:
+    '''def __hash__(self) -> int:
         """Compute hash based on server name."""
-        return hash(self.server_name) if self.server_name else hash(id(self))
+        return hash(self.server_name) if self.server_name else hash(id(self))'''
 
     def __eq__(self, other: object) -> bool:
         """Compare two server configurations semantically."""
@@ -460,7 +470,7 @@ class MCPServerConfig:
             if self_tool == other_tool:
                 continue
 
-            tool_changes = {}
+            tool_changes: dict[str, Any] = {}
 
             if self_tool.description != other_tool.description:
                 tool_changes["description"] = {
@@ -535,7 +545,7 @@ class MCPServerEntry:
 
     type: Literal["stdio", "http", "sse"]
     identifier: str  # URL for HTTP/SSE servers, command for stdio servers
-    config: dict[str, Any | None] = None  # Serialized MCPServerConfig
+    config: dict[str, Any | None] | None = None  # Serialized MCPServerConfig
     approval_status: ApprovalStatus = ApprovalStatus.UNAPPROVED
     approved_tools: dict[str, str] = field(default_factory=dict)  # tool_name -> tool_signature_hash
     approved_instructions_hash: str | None = None  # Hash of approved instructions
@@ -600,7 +610,7 @@ class MCPServerEntry:
                     }
                     for p in tool_definition.parameters
                 ],
-                key=lambda x: x["name"],
+                key=lambda x: str(x["name"]),  # type: ignore[index]
             ),
             "output_schema": tool_definition.output_schema,
         }
@@ -610,7 +620,7 @@ class MCPServerEntry:
         return hashlib.sha256(json_str.encode("utf-8")).hexdigest()
 
     @staticmethod
-    def _hash_instructions(instructions: str) -> str:
+    def _hash_instructions(instructions: str | None) -> str:
         """Create a hash of server instructions."""
         # Handle None instructions (empty string)
         if instructions is None:
@@ -636,7 +646,7 @@ class MCPConfigDatabase:
 
         """
         self.config_path = config_path or self.get_default_config_path()
-        self.servers = {}  # dict[str, MCPServerEntry]
+        self.servers: dict[str, MCPServerEntry] = {}
         self._load()
 
     @staticmethod
@@ -736,7 +746,7 @@ class MCPConfigDatabase:
 
     def save_server_config(
         self,
-        server_type: str,
+        server_type: Literal["stdio", "http", "sse"],
         identifier: str,
         config: MCPServerConfig,
         approval_status: ApprovalStatus = ApprovalStatus.APPROVED,
@@ -820,7 +830,7 @@ class MCPConfigDatabase:
         ]
 
     def save_unapproved_config(
-        self, server_type: str, identifier: str, config: MCPServerConfig
+        self, server_type: Literal["stdio", "http", "sse"], identifier: str, config: MCPServerConfig
     ) -> None:
         """Save an unapproved server configuration to the database.
 
@@ -1011,7 +1021,7 @@ class MCPConfigDatabase:
         """
         key = MCPServerEntry.create_key(server_type, identifier)
 
-        result = {
+        result: dict[Any, Any] = {
             "server_approved": False,
             "instructions_approved": False,
             "tools": {},
