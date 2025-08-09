@@ -613,6 +613,25 @@ Note: This tool is only available when tools are blocked due to security restric
         )
         return [types.TextContent(type="text", text=error)]
 
+    def _quarantine_and_log(
+        self, name: str, arguments: dict, response_text: str, guardrail_alert
+    ) -> str | None:
+        """Log guardrail alert and quarantine response if quarantine is enabled."""
+        logger.exception(
+            "Guardrail alert triggered for tool '%s': %s",
+            name,
+            guardrail_alert.explanation,
+        )
+        quarantine_id = None
+        if self.quarantine:
+            quarantine_id = self.quarantine.quarantine_response(
+                tool_name=name,
+                tool_input=arguments,
+                tool_output=response_text,
+                reason=guardrail_alert.explanation,
+            )
+        return quarantine_id
+
     async def _proxy_tool_to_downstream(self, name: str, arguments: dict) -> str | dict[str, Any]:
         """Proxy a tool call to the downstream server using MCP client."""
         if not self.session:
@@ -634,10 +653,8 @@ Note: This tool is only available when tools are blocked due to security restric
                 text_parts = []
                 for content in result.content:
                     if content.type == "text" and content.text:
-                        # Apply ANSI escape code processing if enabled
                         processed_text = self._make_ansi_escape_codes_visible(content.text)
                         text_parts.append(processed_text)
-                        # Create processed text content for the response
                         processed_content.append(
                             types.TextContent(type="text", text=processed_text)
                         )
@@ -662,22 +679,9 @@ Note: This tool is only available when tools are blocked due to security restric
             if self.use_guardrails and self.guardrail_provider is not None:
                 guardrail_alert = self._scan_tool_response(name, arguments, response_text)
                 if guardrail_alert:
-                    # Log the alert but don't block the response yet
-                    logger.exception(
-                        "Guardrail alert triggered for tool '%s': %s",
-                        name,
-                        guardrail_alert.explanation,
+                    quarantine_id = self._quarantine_and_log(
+                        name, arguments, response_text, guardrail_alert
                     )
-                    # Store in quarantine for future reference
-                    # (when quarantine system is integrated)
-                    quarantine_id = None
-                    if self.quarantine:
-                        quarantine_id = self.quarantine.quarantine_response(
-                            tool_name=name,
-                            tool_input=arguments,
-                            tool_output=response_text,
-                            reason=guardrail_alert.explanation,
-                        )
 
                     return self._guardrail_tool_response(
                         name, arguments, response_text, guardrail_alert, quarantine_id
