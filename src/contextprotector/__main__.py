@@ -139,6 +139,15 @@ def _parse_args() -> argparse.Namespace:
         help="Start a wrapped server over the stdio transport using the specified command",
     )
     source_group.add_argument(
+        "--command-args",
+        nargs="+",
+        help=(
+            "Start a wrapped server over the stdio transport using "
+            "the specified command arguments (space-separated). "
+            "Supports arguments with dashes (e.g. docker run --rm -i)"
+        ),
+    )
+    source_group.add_argument(
         "--url",
         help="Connect to a remote MCP server over streamable HTTP at the specified URL",
     )
@@ -155,7 +164,7 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help=(
             "Review and approve changes to a specific server configuration "
-            "(must be used with --command, --url or --sse-url)"
+            "(must be used with --command, --command-args, --url or --sse-url)"
         ),
     )
     source_group.add_argument(
@@ -207,7 +216,31 @@ def _parse_args() -> argparse.Namespace:
         ),
     )
 
-    return parser.parse_args()
+    # Handle --command-args specially to support arguments with dashes
+    if "--command-args" in sys.argv:
+        # Use parse_known_args to get known args and let unknown args be part of command
+        args, unknown_args = parser.parse_known_args()
+
+        if args.command_args:
+            # Combine the explicitly parsed command_args with any unknown args
+            all_command_args = args.command_args + unknown_args
+            args.command_args = all_command_args
+        elif unknown_args:
+            # If we have unknown args but no command_args, this is an error
+            parser.error(f"unrecognized arguments: {' '.join(unknown_args)}")
+    else:
+        # Normal parsing when --command-args is not used
+        args = parser.parse_args()
+
+    # Validate that --command and --command-args are mutually exclusive
+    if args.command and args.command_args:
+        parser.error("--command and --command-args are mutually exclusive")
+
+    # If --command-args is provided, convert it to a --command string
+    if args.command_args:
+        args.command = " ".join(args.command_args)
+
+    return args
 
 
 def main() -> None:

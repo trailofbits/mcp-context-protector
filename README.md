@@ -40,6 +40,23 @@ Now configure your client to run your MCP servers through `mcp-context-protector
 }
 ```
 
+Alternatively, use `--command-args` to have `mcp-context-protector` concatenate all arguments that follow into one command string:
+
+```
+{
+  "mcpServers": {
+    "wrapped_acme_server": {
+      "command": "/path/to/mcp-context-protector/mcp-context-protector.sh",
+      "args": ["--command-args", "/path/to/node", "/path/to/acme/server.js", "--acme-enhanced"]
+    }
+  }
+}
+```
+
+TL;DR: use `--command-args` if your MCP client mangles your stdio server command, but be careful with escaping of shell metacharacters.
+
+Longer explanation: Some clients (including, as of this writing, Cursor) will construct their MCP server commands by concatenating the arguments together into a space-delimited string. That is, `mcp-context-protector.sh --command "cmd arg1 arg2 --arg3"` will become `mcp-context-protector.sh --command cmd arg1 arg2 --arg3`, and `mcp-context-protector` will think `arg1` through `--arg3` are meant as arguments to the wrapper, not to the child command. The `--command-args` option addresses this issue.
+
 ## Security risks and controls
 
 | Risk    | Relevant control |
@@ -71,11 +88,14 @@ To review the response and release it from the quarantine, run the app with the 
 
 ## Configuring mcp-context-protector
 
-`mcp-context-protector` is packaged with `uv` and can be run with `uv run mcp-context-protector`. To start a server through the wrapper, run the `mcp-context-protector.sh` launcher script with the arguments `--command <COMMAND>` or `--url <URL>`:
+`mcp-context-protector` is packaged with `uv` and can be run with `uv run mcp-context-protector`. To start a server through the wrapper, run the `mcp-context-protector.sh` launcher script with the arguments `--command <COMMAND>`, `--command-args <CMD> <ARG1> <ARG2>` or `--url <URL>`:
 
 ```
 # Start the wrapper with an stdio server
-/path/mcp-context-protector.sh --command DOWNSTREAM_SERVER_COMMAND
+/path/mcp-context-protector.sh --command "DOWNSTREAM_SERVER_COMMAND ARG1 ARG2"
+
+# Start the wrapper with an stdio server (alternative)
+/path/mcp-context-protector.sh --command-args DOWNSTREAM_SERVER_COMMAND ARG1 ARG2
 
 # Start the wrapper with an HTTP server
 /path/mcp-context-protector.sh --url DOWNSTREAM_SERVER_URL
@@ -99,9 +119,10 @@ mcp-context-protector.sh --review-quarantine --quarantine-id <ID>
 ## Usage
 
 ```
-usage: mcp-context-protector [-h] [--command COMMAND] [--url URL] [--sse-url SSE_URL] [--list-guardrail-providers] [--review-server] [--review-quarantine]
-                        [--review-all-servers] [--server-config-file SERVER_CONFIG_FILE] [--guardrail-provider GUARDRAIL_PROVIDER] [--visualize-ansi-codes]
-                        [--quarantine-id QUARANTINE_ID] [--quarantine-path QUARANTINE_PATH]
+usage: mcp-context-protector [-h] [--command COMMAND] [--command-args COMMAND_ARGS [COMMAND_ARGS ...]] [--url URL] [--sse-url SSE_URL]
+                             [--list-guardrail-providers] [--review-server] [--review-quarantine] [--review-all-servers]
+                             [--server-config-file SERVER_CONFIG_FILE] [--guardrail-provider GUARDRAIL_PROVIDER] [--visualize-ansi-codes]
+                             [--quarantine-id QUARANTINE_ID] [--quarantine-path QUARANTINE_PATH]
 
 options:
   -h, --help            show this help message and exit
@@ -117,11 +138,14 @@ options:
                         The path to the quarantine database file (default: ~/.mcp-context-protector/quarantine.json)
 
   --command COMMAND     Start a wrapped server over the stdio transport using the specified command
+  --command-args COMMAND_ARGS [COMMAND_ARGS ...]
+                        Start a wrapped server over the stdio transport using the specified command arguments (space-separated). Supports arguments with
+                        dashes (e.g. docker run --rm -i)
   --url URL             Connect to a remote MCP server over streamable HTTP at the specified URL
   --sse-url SSE_URL     Connect to a remote MCP server over SSE at the specified URL
   --list-guardrail-providers
                         List available guardrail providers and exit
-  --review-server       Review and approve changes to a specific server configuration (must be used with --command, --url or --sse-url)
+  --review-server       Review and approve changes to a specific server configuration (must be used with --command, --command-args, --url or --sse-url)
   --review-quarantine   Review quarantined tool responses
   --review-all-servers  Review all unapproved server configurations
 ```
