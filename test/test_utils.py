@@ -66,14 +66,14 @@ async def approve_server_config_using_review(
     stdout, stderr = await review_process.communicate()
 
     # Verify the review process output
-    assert review_process.returncode == 0, (
-        f"Review process failed with return code {review_process.returncode}: {stderr}"
-    )
+    assert (
+        review_process.returncode == 0
+    ), f"Review process failed with return code {review_process.returncode}: {stderr}"
 
     # Check for expected output in the review process
-    assert b"has been trusted and saved" in stdout, (
-        f"Missing expected approval message in output: {stdout}"
-    )
+    assert (
+        b"has been trusted and saved" in stdout
+    ), f"Missing expected approval message in output: {stdout}"
 
 
 def _wrapper_args(

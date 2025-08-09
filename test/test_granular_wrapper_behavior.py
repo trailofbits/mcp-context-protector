@@ -67,6 +67,7 @@ async def test_granular_tool_filtering_in_list_tools() -> None:
     # Use the existing config that was already approved to preserve instructions hash
     if existing_config:
         from contextprotector.mcp_config import MCPServerConfig
+
         fresh_config = MCPServerConfig.from_dict(existing_config)
     else:
         # If no config exists, create a minimal one with known tool definitions
@@ -83,25 +84,29 @@ async def test_granular_tool_filtering_in_list_tools() -> None:
             description="Echo back the provided message",
             parameters=[
                 MCPParameterDefinition(
-                    name="message", description="The message to echo back",
-                    type=ParameterType.STRING, required=True
+                    name="message",
+                    description="The message to echo back",
+                    type=ParameterType.STRING,
+                    required=True,
                 )
-            ]
+            ],
         )
         greet_tool = MCPToolDefinition(
             name="greet",
             description="Generate a greeting message for a person",
             parameters=[
                 MCPParameterDefinition(
-                    name="name", description="The name of the person to greet",
-                    type=ParameterType.STRING, required=True
+                    name="name",
+                    description="The name of the person to greet",
+                    type=ParameterType.STRING,
+                    required=True,
                 )
-            ]
+            ],
         )
 
         fresh_config = MCPServerConfig(
             tools=[echo_tool, greet_tool],
-            instructions="Test multi-tool downstream server configuration"
+            instructions="Test multi-tool downstream server configuration",
         )
 
     # Save as unapproved config
@@ -136,9 +141,9 @@ async def test_granular_tool_filtering_in_list_tools() -> None:
         assert "echo" in tool_names, f"Echo tool should be available, got: {tool_names}"
 
         # Should NOT have the unapproved greet tool
-        assert "greet" not in tool_names, (
-            f"Unapproved greet tool should not be visible, got: {tool_names}"
-        )
+        assert (
+            "greet" not in tool_names
+        ), f"Unapproved greet tool should not be visible, got: {tool_names}"
 
         # Test that approved tool works (skip detailed validation due to schema issues)
         # The key success is that the tool is available and can be called
@@ -156,9 +161,9 @@ async def test_granular_tool_filtering_in_list_tools() -> None:
             result = await session.call_tool(name="greet", arguments={"name": "test"})
             response_json = json.loads(result.content[0].text)
             assert response_json["status"] == "blocked", "Unapproved tool should be blocked"
-            assert "not approved" in response_json["reason"].lower(), (
-                "Should indicate tool not approved"
-            )
+            assert (
+                "not approved" in response_json["reason"].lower()
+            ), "Should indicate tool not approved"
         except ValueError as e:
             # The wrapper should raise a ValueError with JSON error details for blocked tools
             error_message = str(e)
@@ -402,9 +407,9 @@ async def test_new_server_complete_blocking() -> None:
 
         # Should ONLY have context-protector-block tool
         assert "context-protector-block" in tool_names
-        assert len([t for t in tool_names if t != "context-protector-block"]) == 0, (
-            f"New server should only show context-protector-block, got: {tool_names}"
-        )
+        assert (
+            len([t for t in tool_names if t != "context-protector-block"]) == 0
+        ), f"New server should only show context-protector-block, got: {tool_names}"
 
         # All downstream tools should be blocked
         result = await session.call_tool(name="echo", arguments={"message": "test"})

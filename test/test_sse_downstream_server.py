@@ -21,9 +21,9 @@ async def run_with_sse_client(callback: Callable[[ClientSession], Awaitable[None
     from . import sse_server_utils
 
     # Make sure we have a valid port
-    assert sse_server_utils.SERVER_PORT is not None, (
-        "Server port must be detected before connecting"
-    )
+    assert (
+        sse_server_utils.SERVER_PORT is not None
+    ), "Server port must be detected before connecting"
 
     # Use the dynamically determined port
     server_url = f"http://localhost:{sse_server_utils.SERVER_PORT}/sse"

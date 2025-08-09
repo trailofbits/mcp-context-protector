@@ -221,6 +221,7 @@ class MCPWrapperServer:
                     if isinstance(content_item, types.BlobResourceContents):
                         # For binary data, decode base64 blob to bytes
                         import base64
+
                         return base64.b64decode(content_item.blob)
                     elif isinstance(content_item, types.TextResourceContents):
                         # For text data, return the text as string
@@ -582,7 +583,7 @@ Note: This tool is only available when tools are blocked due to security restric
 
         if self.quarantine is None:
             msg = "Quarantine not initialized"
-            raise ValueError(msg) # TODO: better exception
+            raise ValueError(msg)  # TODO: better exception
 
         response_id = arguments["uuid"]
         logger.info("Processing quarantine_release request for UUID: %s", response_id)
@@ -700,7 +701,7 @@ Note: This tool is only available when tools are blocked due to security restric
         self,
         response_text: str,
         structured_content: dict[str, Any | None],
-        content_list: list[Any], # TODO: figure out mypy's inability to find ContentBlock
+        content_list: list[Any],  # TODO: figure out mypy's inability to find ContentBlock
     ) -> dict[str, Any]:
         """Create a tool response dict with text, structured content, and all content types."""
         return {
@@ -1404,6 +1405,7 @@ Note: This tool is only available when tools are blocked due to security restric
                 # This prevents race conditions in tests where multiple wrapper instances
                 # are created and destroyed rapidly
                 import asyncio
+
                 await asyncio.sleep(0.1)
 
             except RuntimeError as e:
@@ -1508,11 +1510,7 @@ def make_ansi_escape_codes_visible(
         return _make_ansi_escape_codes_visible_str(content)
     elif isinstance(content, types.TextContent):
         processed_text = _make_ansi_escape_codes_visible_str(content.text)
-        return types.TextContent(
-            type="text",
-            text=processed_text,
-            annotations=content.annotations
-        )
+        return types.TextContent(type="text", text=processed_text, annotations=content.annotations)
     else:
         # For ImageContent and EmbeddedResource, return unchanged
         return content

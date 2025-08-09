@@ -110,12 +110,14 @@ async def test_dynamic_tool_addition_with_existing_server() -> None:
     # Get the existing config from the database to avoid subprocess conflicts
     # The config was already captured when the server was first approved
     from contextprotector.mcp_config import MCPServerEntry
+
     server_key = MCPServerEntry.create_key(
         "stdio", get_server_command("simple_downstream_server.py")
     )
     existing_entry = db.servers.get(server_key)
     if existing_entry and existing_entry.config:
         from contextprotector.mcp_config import MCPServerConfig
+
         fresh_config = MCPServerConfig.from_dict(existing_entry.config)
     else:
         # Create a minimal config that matches simple_downstream_server.py
@@ -131,15 +133,16 @@ async def test_dynamic_tool_addition_with_existing_server() -> None:
             description="Echo back the provided message",
             parameters=[
                 MCPParameterDefinition(
-                    name="message", description="The message to echo back",
-                    type=ParameterType.STRING, required=True
+                    name="message",
+                    description="The message to echo back",
+                    type=ParameterType.STRING,
+                    required=True,
                 )
-            ]
+            ],
         )
 
         fresh_config = MCPServerConfig(
-            tools=[echo_tool],
-            instructions="Test simple downstream server configuration"
+            tools=[echo_tool], instructions="Test simple downstream server configuration"
         )
 
     # Add new tool to the fresh config
@@ -156,9 +159,7 @@ async def test_dynamic_tool_addition_with_existing_server() -> None:
 
     # Save the updated fresh config as unapproved (simulating dynamic tool addition)
     db.save_unapproved_config(
-        "stdio",
-        get_server_command("simple_downstream_server.py"),
-        fresh_config
+        "stdio", get_server_command("simple_downstream_server.py"), fresh_config
     )
     config = fresh_config  # Use fresh_config for consistency
 

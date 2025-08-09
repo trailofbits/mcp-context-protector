@@ -76,9 +76,9 @@ async def verify_tools(
         tools_list: The list of tools from the server
     """
     tools = await session.list_tools()
-    assert len(tools.tools) == len(expected_tool_names), (
-        f"Expected {len(expected_tool_names)} tools, got {len(tools.tools)}"
-    )
+    assert len(tools.tools) == len(
+        expected_tool_names
+    ), f"Expected {len(expected_tool_names)} tools, got {len(tools.tools)}"
 
     # Check that all expected tools are present
     actual_names = [tool.name for tool in tools.tools]
