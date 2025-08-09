@@ -441,12 +441,12 @@ class MCPServerConfig:
         """Compute hash based on semantic comparison scheme."""
         # Hash the instructions
         instructions_hash = hash(self.instructions)
-        
+
         # Create a hash that's order-independent for tools
         # Sort tools by name to ensure consistent ordering
         tool_hashes = tuple(sorted(hash(tool) for tool in self.tools))
         tools_hash = hash(tool_hashes)
-        
+
         return hash((instructions_hash, tools_hash))
 
     def compare(self, other: "MCPServerConfig") -> ConfigDiff:
