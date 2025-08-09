@@ -7,7 +7,7 @@ object is constructed and configured.
 
 import argparse
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Any, Literal
 
 from .guardrails import GuardrailProvider
 
@@ -81,9 +81,11 @@ class MCPWrapperConfig:
 
     def _compute_server_identifier(self) -> str:
         """Compute the server identifier based on connection type and parameters."""
-        if self.connection_type == "stdio":
+        if self.connection_type == "stdio" and self.command is not None:
             return self.command
-        return self.url
+        if self.url is not None:
+            return self.url
+        raise ValueError
 
     @classmethod
     def from_args(
@@ -189,7 +191,7 @@ class MCPWrapperConfig:
             url=url,
         )
 
-    def to_dict(self) -> dict[str, any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert configuration to dictionary representation.
 
         Returns

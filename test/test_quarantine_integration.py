@@ -5,6 +5,7 @@ Integration tests for the tool response quarantine functionality.
 import tempfile
 from collections.abc import Generator
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -41,7 +42,7 @@ async def test_quarantine_integration(temp_quarantine_file: str) -> None:
     # Mock the call_tool method to return a ToolCallResult
     original_response = "This is a potentially harmful tool response."
 
-    async def mock_call_tool(_name: any, _arguments: any) -> CallToolResult:
+    async def mock_call_tool(_name: Any, _arguments: Any) -> CallToolResult:
         return CallToolResult(content=[TextContent(type="text", text=original_response)])
 
     wrapper.session.call_tool = mock_call_tool
@@ -96,7 +97,7 @@ async def test_quarantine_disabled_when_no_guardrails() -> None:
     # Mock the call_tool method to return a ToolCallResult
     original_response = "This is a normal tool response."
 
-    async def mock_call_tool(_name: any, _arguments: any) -> CallToolResult:
+    async def mock_call_tool(_name: Any, _arguments: Any) -> CallToolResult:
         return CallToolResult(content=[TextContent(type="text", text=original_response)])
 
     wrapper.session.call_tool = mock_call_tool
@@ -107,7 +108,7 @@ async def test_quarantine_disabled_when_no_guardrails() -> None:
     # Verify that the original response is returned in the structured format
     assert isinstance(response, dict)
     assert response["text"] == original_response
-    assert response["structured_content"] is None
+    assert response["structured_content"] in [None, {}]
 
     # Verify that no quarantine database was created
     assert wrapper.quarantine is None

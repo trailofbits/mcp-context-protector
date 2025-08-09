@@ -6,18 +6,6 @@ Uses fastmcp from the official Python SDK for MCP.
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
-from mcp.types import Tool
-
-# Define the echo tool
-echo_tool = Tool(
-    name="echo",
-    description="Echoes back the input message",
-    inputSchema={
-        "type": "object",
-        "properties": {"message": {"type": "string", "description": "The message to echo back"}},
-        "required": ["message"],
-    },
-)
 
 
 # Echo handler function

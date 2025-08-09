@@ -41,9 +41,6 @@ async def review_server_config(
         config = MCPWrapperConfig.for_http(identifier)
     elif connection_type == "sse":
         config = MCPWrapperConfig.for_sse(identifier)
-    else:
-        msg = f"Unsupported connection type: {connection_type}"
-        raise ValueError(msg)
 
     # Set additional configuration properties
     if config_path:
@@ -201,11 +198,11 @@ def _display_server_config(wrapper: MCPWrapperServer) -> None:
     if wrapper.guardrail_provider is not None:
         guardrail_alert = wrapper.guardrail_provider.check_server_config(wrapper.current_config)
 
-    if guardrail_alert:
-        print("\n==== GUARDRAIL CHECK: ALERT ====")
-        print(f"Provider: {wrapper.guardrail_provider.name}")
-        print(f"Alert: {guardrail_alert.explanation}")
-        print("==================================\n")
+        if guardrail_alert:
+            print("\n==== GUARDRAIL CHECK: ALERT ====")
+            print(f"Provider: {wrapper.guardrail_provider.name}")
+            print(f"Alert: {guardrail_alert.explanation}")
+            print("==================================\n")
 
 
 def _approve_server_config(wrapper: MCPWrapperServer) -> None:

@@ -4,6 +4,7 @@ Tests for the tool response scanning feature.
 
 import logging
 from collections.abc import Generator
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -25,7 +26,7 @@ def mock_session() -> Generator[MagicMock, None, None]:
     session = MagicMock()
 
     # Mock the call_tool method to return a ToolCallResult
-    async def mock_call_tool(name: str, _arguments: any) -> any:
+    async def mock_call_tool(name: str, _arguments: Any) -> Any:
         if name == "test_tool":
             return ToolCallResult(content=[TextContent(type="text", text="Test result")])
         if name == "dangerous_tool":
@@ -54,7 +55,7 @@ async def test_tool_scanning_no_alert() -> None:
     wrapper.session = MagicMock()
 
     # Mock the call_tool method to return a ToolCallResult
-    async def mock_call_tool(_name: any, _arguments: any) -> ToolCallResult:
+    async def mock_call_tool(_name: Any, _arguments: Any) -> ToolCallResult:
         return ToolCallResult(content=[TextContent(type="text", text="Safe result")])
 
     wrapper.session.call_tool = mock_call_tool
@@ -82,7 +83,7 @@ async def test_tool_scanning_with_alert() -> None:
     wrapper.quarantine = MagicMock()
 
     # Mock the call_tool method to return a ToolCallResult
-    async def mock_call_tool(_name: any, _arguments: any) -> ToolCallResult:
+    async def mock_call_tool(_name: Any, _arguments: Any) -> ToolCallResult:
         return ToolCallResult(
             content=[TextContent(type="text", text="Potentially dangerous result")]
         )
@@ -116,7 +117,7 @@ async def test_tool_scanning_exception_handling() -> None:
     wrapper.session = MagicMock()
 
     # Mock the call_tool method to return a ToolCallResult
-    async def mock_call_tool(_name: any, _arguments: any) -> ToolCallResult:
+    async def mock_call_tool(_name: Any, _arguments: Any) -> ToolCallResult:
         return ToolCallResult(content=[TextContent(type="text", text="Test result")])
 
     wrapper.session.call_tool = mock_call_tool
@@ -147,7 +148,7 @@ async def test_tool_vs_config_scanning_separation() -> None:
     wrapper.session = MagicMock()
 
     # Mock the call_tool method to return a ToolCallResult
-    async def mock_call_tool(_name: any, _arguments: any) -> ToolCallResult:
+    async def mock_call_tool(_name: Any, _arguments: Any) -> ToolCallResult:
         return ToolCallResult(content=[TextContent(type="text", text="Test result")])
 
     wrapper.session.call_tool = mock_call_tool

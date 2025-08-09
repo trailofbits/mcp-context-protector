@@ -19,8 +19,8 @@ class MockGuardrailProvider(GuardrailProvider):
         """Initialize the mock guardrail provider."""
         logger.info("Initializing MockGuardrailProvider")
         super().__init__()
-        self._trigger_alert = False
-        self._alert_text = None
+        self._trigger_alert: bool = False
+        self._alert_text: str = ""
 
     @property
     def name(self) -> str:
@@ -45,7 +45,7 @@ class MockGuardrailProvider(GuardrailProvider):
         """Configure the provider to not trigger an alert."""
         logger.info("Setting trigger_alert to False")
         self._trigger_alert = False
-        self._alert_text = None
+        self._alert_text = ""
 
     def check_server_config(self, config: MCPServerConfig) -> GuardrailAlert | None:
         """Check the server configuration based on the current trigger setting.

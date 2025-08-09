@@ -35,6 +35,28 @@ Source = "https://github.com/trailofbits/mcp-context-protector"
 # don't attempt code coverage for the CLI entrypoints
 omit = ["src/contextprotector/__main__.py"]
 
+[tool.mypy]
+mypy_path = "src"
+packages = "contextprotector"
+allow_redefinition = true
+check_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+no_implicit_optional = true
+show_error_codes = true
+sqlite_cache = true
+strict_equality = true
+warn_no_return = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_unreachable = true
+warn_unused_configs = true
+warn_unused_ignores = true
+# Suppress errors since pydantic_settings uses X | Y typing
+python_version = "3.11"
+plugins = ["pydantic.mypy"]
+
 [tool.ruff]
 line-length = 100
 include = ["src/**/*.py", "test/**/*.py"]

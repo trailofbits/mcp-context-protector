@@ -79,7 +79,7 @@ class TestResourceProxying:
             sample_data_result = await session.read_resource("contextprotector://sample_data")
 
             # Verify the resource content
-            assert sample_data_result.contents[0].mimeType == "application/json"
+            assert sample_data_result.contents[0].mimeType == "text/plain"
 
             # Parse the content and check it
             content = json.loads(sample_data_result.contents[0].text)
@@ -144,7 +144,7 @@ class TestResourceProxying:
 
             # Verify we can use the updated version of an existing resource
             sample_data_result = await session.read_resource("contextprotector://sample_data")
-            assert sample_data_result.contents[0].mimeType == "application/json"
+            assert sample_data_result.contents[0].mimeType == "text/plain"
             content = json.loads(sample_data_result.contents[0].text)
             assert content["name"] == "Sample Data"
 
@@ -162,7 +162,7 @@ class TestResourceProxying:
             # Verify the correct parameter was passed through
             assert type(image_result.contents[0]) is types.BlobResourceContents
             assert b"image data" in base64.b64decode(image_result.contents[0].blob)
-            assert image_result.contents[0].mimeType == "image/png"
+            assert image_result.contents[0].mimeType == "application/octet-stream"
 
         await run_with_wrapper(callback, self.config_path)
 

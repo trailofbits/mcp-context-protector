@@ -6,6 +6,7 @@ import json
 import tempfile
 from collections.abc import Generator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -66,7 +67,7 @@ def setup_quarantine_test() -> Generator[tuple[ToolResponseQuarantine, str, str]
 
 
 @pytest.mark.asyncio()
-async def test_quarantine_release_success(setup_quarantine_test: any) -> None:
+async def test_quarantine_release_success(setup_quarantine_test: Any) -> None:
     """Test successfully releasing a quarantined response."""
     test_data = setup_quarantine_test
 
@@ -101,7 +102,7 @@ async def test_quarantine_release_success(setup_quarantine_test: any) -> None:
 
 
 @pytest.mark.asyncio()
-async def test_quarantine_release_unreleased_fails(setup_quarantine_test: any) -> None:
+async def test_quarantine_release_unreleased_fails(setup_quarantine_test: Any) -> None:
     """Test that attempting to release an unreleased response fails."""
     test_data = setup_quarantine_test
 
@@ -127,7 +128,7 @@ async def test_quarantine_release_unreleased_fails(setup_quarantine_test: any) -
 
 
 @pytest.mark.asyncio()
-async def test_quarantine_release_invalid_uuid(setup_quarantine_test: any) -> None:
+async def test_quarantine_release_invalid_uuid(setup_quarantine_test: Any) -> None:
     """Test that attempting to release with an invalid UUID fails."""
     test_data = setup_quarantine_test
 

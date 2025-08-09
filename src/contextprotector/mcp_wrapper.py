@@ -1,19 +1,19 @@
 """Core wrapper functionality for mcp-context-protector."""
 
 import asyncio
-import base64
 import json
 import logging
 import re
-from typing import Any
+from typing import Any, Literal
 
-from mcp import types
+from mcp import ClientSession, types
 from mcp.server.lowlevel import NotificationOptions, Server
-from mcp.server.lowlevel.helper_types import ReadResourceContents
 from mcp.server.models import InitializationOptions
 from mcp.shared.exceptions import McpError
 from mcp.shared.session import RequestResponder
+from pydantic import AnyUrl
 
+# ContentBlock import removed - using types.Content instead
 # Import guardrail types for type hints
 from .guardrail_types import GuardrailAlert, GuardrailProvider, ToolResponse
 from .mcp_config import (
@@ -71,10 +71,12 @@ class MCPWrapperServer:
         # Set connection-specific attributes
         instance.connection_type = config.connection_type
 
-        if config.connection_type == "stdio":
+        if config.connection_type == "stdio" and config.command is not None:
             instance.child_command = config.command
-        else:  # http or sse
-            instance.server_url = config.url
+        elif config.url is not None:  # http or sse
+            instance.server_url = AnyUrl(config.url)
+        else:
+            raise ValueError
 
         instance.visualize_ansi_codes = config.visualize_ansi_codes
 
@@ -97,28 +99,44 @@ class MCPWrapperServer:
             quarantine_path: Optional path to the quarantine database file
 
         """
-        self.child_command = None
-        self.server_url = None
-        self.connection_type = None
-        self.server_identifier = None  # Will be set after determining connection details
-        self.child_process = None
-        self.client_context = None
-        self.streams = None
-        self.session = None
-        self.initialize_result = None
-        self.tool_specs = []
+        self.child_command: str | None = None
+        self.server_url: AnyUrl | None = None
+        self.connection_type: Literal["stdio", "http", "sse"] = "stdio"
+        # Will be set after determining connection details
+        self.server_identifier: str | None = None
+        self.child_process: Any = None
+        self.client_context: Any = None
+        self.streams: Any = None
+        self.session: ClientSession | None = None
+        self.initialize_result: Any = None
+        self.tool_specs: list[Any] = []
         self.config_approved = False
         self.config_db = MCPConfigDatabase(config_path)
-        self.saved_config = None  # Will be loaded after server_identifier is set
+        # Will be loaded after server_identifier is set
+        self.saved_config: MCPServerConfig | None = None
         self.current_config = MCPServerConfig()
-        self.server = Server("mcp_wrapper")
+        self.server: Server = Server("mcp_wrapper")
         self.guardrail_provider = guardrail_provider
         self.use_guardrails = guardrail_provider is not None
         self.visualize_ansi_codes = False
-        self.server_session = None  # Track the server session for sending notifications
+        self.server_session: Any = None  # Track the server session for sending notifications
         self.quarantine = ToolResponseQuarantine(quarantine_path) if self.use_guardrails else None
-        self.tasks = set()
+        self.tasks: set[asyncio.Task[Any]] = set()
         self._setup_handlers()
+
+    async def _get_resource_mime_type(self, uri: str) -> str:
+        """Get the original mime type for a resource from the resource list."""
+        if not self.session:
+            return "text/plain"
+        try:
+            resources_result = await self.session.list_resources()
+            if resources_result and resources_result.resources:
+                for resource in resources_result.resources:
+                    if resource.uri == uri:
+                        return resource.mimeType or "text/plain"
+        except McpError:
+            pass
+        return "text/plain"
 
     def _setup_handlers(self) -> None:
         """Set up MCP server handlers."""
@@ -132,6 +150,9 @@ class MCPWrapperServer:
 
             When config isn't approved, we don't reveal any prompts to clients.
             """
+            if self.session is None:
+                raise ChildServerNotConnectedError
+
             if not self.config_approved:
                 logger.warning("Blocking list_prompts - server configuration not approved")
                 return []
@@ -154,6 +175,9 @@ class MCPWrapperServer:
 
             Unlike prompts and tools, resources are always available regardless of config approval.
             """
+            if self.session is None:
+                raise ChildServerNotConnectedError
+
             try:
                 downstream_resources = await self.session.list_resources()
                 if downstream_resources and downstream_resources.resources:
@@ -168,7 +192,7 @@ class MCPWrapperServer:
             return []
 
         @self.server.read_resource()
-        async def read_resource(name: str) -> types.ReadResourceResult:
+        async def read_resource(name: AnyUrl) -> str | bytes:
             """Handle resource content requests - proxy directly to downstream server.
 
             Resources are always accessible regardless of server config approval status.
@@ -190,31 +214,27 @@ class MCPWrapperServer:
             try:
                 # Directly proxy the resource request to the downstream server
                 result = await self.session.read_resource(name)
-                contents = []
-                for content_item in result.contents:
-                    blob = getattr(content_item, "blob", None)
-                    if blob is not None:
-                        # For binary data, decode base64 to bytes
-                        content = base64.b64decode(blob)
-                        contents.append(
-                            ReadResourceContents(content=content, mime_type=content_item.mimeType)
-                        )
-                    else:
-                        # For text data, use text directly
-                        contents.append(
-                            ReadResourceContents(
-                                content=content_item.text,
-                                mime_type=content_item.mimeType,
-                            )
-                        )
 
-                logger.info("Successfully fetched resource %s from downstream server", name)
+                # Extract the raw content from the first content item
+                if result.contents:
+                    content_item = result.contents[0]
+                    if isinstance(content_item, types.BlobResourceContents):
+                        # For binary data, decode base64 blob to bytes
+                        import base64
+
+                        return base64.b64decode(content_item.blob)
+                    elif isinstance(content_item, types.TextResourceContents):
+                        # For text data, return the text as string
+                        return content_item.text
+
+                # Fallback - return empty string if no content
+                logger.warning("No content found in resource response for %s", name)
+                return ""
+
             except McpError as e:
                 logger.exception("Error fetching resource %s from downstream server", name)
                 error_msg = f"Error fetching resource from downstream server: {e!s}"
                 raise ConnectionError(error_msg) from e
-            # Return just the contents list - the decorator wraps it in ReadResourceResult
-            return contents
 
         @self.server.list_tools()
         async def list_tools() -> list[types.Tool]:
@@ -308,11 +328,14 @@ class MCPWrapperServer:
             return all_tools
 
         @self.server.get_prompt()
-        async def get_prompt(name: str, arguments: dict) -> list[types.TextContent]:
+        async def get_prompt(name: str, arguments: dict) -> types.GetPromptResult:
             """Handle prompt dispatch requests - proxy to downstream server if config is approved.
 
             If the server config isn't approved, return an empty message list.
             """
+            if self.session is None:
+                raise ChildServerNotConnectedError
+
             logger.info(
                 "Prompt dispatch with name %s and config_approved %s", name, self.config_approved
             )
@@ -333,7 +356,9 @@ class MCPWrapperServer:
                 for content in result.messages:
                     if content.content:
                         if self.visualize_ansi_codes:
-                            content.content = make_ansi_escape_codes_visible(content.content)
+                            processed_content = make_ansi_escape_codes_visible(content.content)
+                            if not isinstance(processed_content, str):
+                                content.content = processed_content
                         text_parts.append(content.content)
 
                 return types.GetPromptResult(
@@ -349,7 +374,9 @@ class MCPWrapperServer:
                 raise ConnectionError(error_msg) from e
 
         @self.server.call_tool()
-        async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
+        async def call_tool(
+            name: str, arguments: dict
+        ) -> types.CallToolResult | list[types.TextContent]:
             """Handle tool use requests.
 
             Either approve config, proxy to downstream server, handle quarantine release, or block
@@ -414,6 +441,7 @@ class MCPWrapperServer:
                         ),
                     }
                 error_json = json.dumps(blocked_response)
+                error_json = json.dumps(blocked_response)
                 raise ValueError(error_json)
 
             # Check if this specific tool is approved
@@ -458,12 +486,9 @@ class MCPWrapperServer:
                         content = [types.TextContent(type="text", text=json_response)]
 
                     # Return with all content types preserved
-                    if tool_result["structured_content"] is not None:
-                        return types.CallToolResult(
-                            content=content,
-                            structuredContent=tool_result["structured_content"],
-                        )
-                    # For backward compatibility, return content list or text
+                    # Due to a bug/compatibility issue with CallToolResult when structured content
+                    # is present, we return the content list directly instead of wrapping it in
+                    # a CallToolResult
                     return content if isinstance(content, list) else [content]
                 # Legacy text-only response (backward compatibility)
                 wrapped_response = {"status": "completed", "response": tool_result}
@@ -552,6 +577,10 @@ Note: This tool is only available when tools are blocked due to security restric
             msg = "Missing required parameter 'uuid' for quarantine_release tool"
             raise ValueError(msg)
 
+        if self.quarantine is None:
+            msg = "Quarantine not initialized"
+            raise ValueError(msg)
+
         response_id = arguments["uuid"]
         logger.info("Processing quarantine_release request for UUID: %s", response_id)
 
@@ -584,7 +613,26 @@ Note: This tool is only available when tools are blocked due to security restric
         )
         return [types.TextContent(type="text", text=error)]
 
-    async def _proxy_tool_to_downstream(self, name: str, arguments: dict) -> str:
+    def _quarantine_and_log(
+        self, name: str, arguments: dict, response_text: str, guardrail_alert: GuardrailAlert
+    ) -> str | None:
+        """Log guardrail alert and quarantine response if quarantine is enabled."""
+        logger.exception(
+            "Guardrail alert triggered for tool '%s': %s",
+            name,
+            guardrail_alert.explanation,
+        )
+        quarantine_id = None
+        if self.quarantine:
+            quarantine_id = self.quarantine.quarantine_response(
+                tool_name=name,
+                tool_input=arguments,
+                tool_output=response_text,
+                reason=guardrail_alert.explanation,
+            )
+        return quarantine_id
+
+    async def _proxy_tool_to_downstream(self, name: str, arguments: dict) -> str | dict[str, Any]:
         """Proxy a tool call to the downstream server using MCP client."""
         if not self.session:
             raise ChildServerNotConnectedError
@@ -595,18 +643,18 @@ Note: This tool is only available when tools are blocked due to security restric
 
             # Extract content, structured content, and preserve all content types
             response_text = ""
-            structured_content = None
-            processed_content = []
+            structured_content: dict[str, Any] = {}
+            processed_content: list[
+                types.TextContent | types.ImageContent | types.EmbeddedResource
+            ] = []
 
             if result and len(result.content) > 0:
                 # Process all content types, preserving non-text content like EmbeddedResource
                 text_parts = []
                 for content in result.content:
                     if content.type == "text" and content.text:
-                        # Apply ANSI escape code processing if enabled
                         processed_text = self._make_ansi_escape_codes_visible(content.text)
                         text_parts.append(processed_text)
-                        # Create processed text content for the response
                         processed_content.append(
                             types.TextContent(type="text", text=processed_text)
                         )
@@ -617,8 +665,6 @@ Note: This tool is only available when tools are blocked due to security restric
                 if text_parts:
                     response_text = " ".join(text_parts)
             else:
-                # No content from downstream, use default text
-                response_text = f"Tool call to '{name}' succeeded but returned no content"
                 processed_content = [types.TextContent(type="text", text=response_text)]
 
             # Extract structured content if present
@@ -633,22 +679,9 @@ Note: This tool is only available when tools are blocked due to security restric
             if self.use_guardrails and self.guardrail_provider is not None:
                 guardrail_alert = self._scan_tool_response(name, arguments, response_text)
                 if guardrail_alert:
-                    # Log the alert but don't block the response yet
-                    logger.exception(
-                        "Guardrail alert triggered for tool '%s': %s",
-                        name,
-                        guardrail_alert.explanation,
+                    quarantine_id = self._quarantine_and_log(
+                        name, arguments, response_text, guardrail_alert
                     )
-                    # Store in quarantine for future reference
-                    # (when quarantine system is integrated)
-                    quarantine_id = None
-                    if self.quarantine:
-                        quarantine_id = self.quarantine.quarantine_response(
-                            tool_name=name,
-                            tool_input=arguments,
-                            tool_output=response_text,
-                            reason=guardrail_alert.explanation,
-                        )
 
                     return self._guardrail_tool_response(
                         name, arguments, response_text, guardrail_alert, quarantine_id
@@ -666,7 +699,7 @@ Note: This tool is only available when tools are blocked due to security restric
         self,
         response_text: str,
         structured_content: dict[str, Any | None],
-        content_list: list[types.Content],
+        content_list: list[Any],
     ) -> dict[str, Any]:
         """Create a tool response dict with text, structured content, and all content types."""
         return {
@@ -756,7 +789,7 @@ Note: This tool is only available when tools are blocked due to security restric
 
             tool_spec = MCPToolSpec(
                 name=tool.name,
-                description=tool.description,
+                description=tool.description or "",
                 parameters=parameters,
                 required=required,
                 output_schema=output_schema,
@@ -830,13 +863,10 @@ Note: This tool is only available when tools are blocked due to security restric
             return
 
         try:
+            notification: Any
             # Create appropriate notification type based on method
             if method == "notifications/progress":
                 notification = types.ProgressNotification(
-                    method=method, params=params if params else None
-                )
-            elif method == "notifications/message":
-                notification = types.LoggingMessageNotification(
                     method=method, params=params if params else None
                 )
             elif method == "notifications/tools/list_changed":
@@ -855,6 +885,10 @@ Note: This tool is only available when tools are blocked due to security restric
                 )
             elif method == "notifications/initialized":
                 notification = types.InitializedNotification(method=method)
+            elif method == "notifications/message":
+                notification = types.LoggingMessageNotification(
+                    method=method, params=params if params else None
+                )
             else:
                 # Fallback for any other valid notifications
                 notification = types.JSONRPCNotification(
@@ -895,14 +929,16 @@ Note: This tool is only available when tools are blocked due to security restric
 
             method = message.root.method
             params = message.root.params
-            task = None
+            task: asyncio.Task[Any] | None = None
 
             if method == "notifications/tools/list_changed":
                 self.config_approved = False
                 logger.info("Tool list changed - invalidating config approval")
                 # Schedule tool update as a separate task to avoid deadlock with message handler
                 self._task = asyncio.create_task(self.update_tools_and_notify())
-                await self._forward_notification_to_upstream(method, params)
+                await self._forward_notification_to_upstream(
+                    method, params.model_dump() if params else None
+                )
             elif method == "notifications/prompts/list_changed":
                 # Prompt changes do NOT affect the config approval status
                 logger.info(
@@ -910,7 +946,9 @@ Note: This tool is only available when tools are blocked due to security restric
                     "(not affecting approval status)"
                 )
                 # Simply forward the notification - no caching needed for prompts
-                await self._forward_notification_to_upstream(method, params)
+                await self._forward_notification_to_upstream(
+                    method, params.model_dump() if params else None
+                )
             elif method == "notifications/resources/list_changed":
                 # Resource changes do NOT affect the config approval status
                 logger.info(
@@ -918,11 +956,15 @@ Note: This tool is only available when tools are blocked due to security restric
                     "(not affecting approval status)"
                 )
                 # Simply forward the notification - no caching needed for resources
-                await self._forward_notification_to_upstream(method, params)
+                await self._forward_notification_to_upstream(
+                    method, params.model_dump() if params else None
+                )
             elif method in spec_compliant_notifications:
                 # Forward other specification-compliant notifications to upstream client
                 logger.info("Forwarding notification to upstream client: %s", method)
-                await self._forward_notification_to_upstream(method, params)
+                await self._forward_notification_to_upstream(
+                    method, params.model_dump() if params else None
+                )
             else:
                 # Discard non-specification notifications
                 logger.info("Discarding non-specification notification: %s", method)
@@ -935,6 +977,8 @@ Note: This tool is only available when tools are blocked due to security restric
 
     async def update_tools(self) -> None:
         """Update tools from the downstream server."""
+        if self.session is None:
+            raise ChildServerNotConnectedError
         try:
             downstream_tools = await self.session.list_tools()
 
@@ -949,7 +993,7 @@ Note: This tool is only available when tools are blocked due to security restric
 
     async def update_tools_and_notify(self) -> None:
         """Update tools from the downstream server and send a notification to the client."""
-        self.update_tools()
+        await self.update_tools()
         await self._forward_notification_to_upstream("notifications/tools/list_changed", None)
 
     async def connect(self) -> None:
@@ -960,13 +1004,13 @@ Note: This tool is only available when tools are blocked due to security restric
             await self._connect_via_streamable_http()
         elif self.connection_type == "sse":
             await self._connect_via_http()
-        else:
-            error_msg = f"Unknown connection type: {self.connection_type}"
-            raise ValueError(error_msg)
         await self._initialize_config()
 
     async def _initialize_config(self) -> None:
         """Complete setup after connecting to a downstream server."""
+        if self.session is None:
+            raise ChildServerNotConnectedError
+
         self.initialize_result = await self.session.initialize()
 
         downstream_tools = await self.session.list_tools()
@@ -1036,15 +1080,18 @@ Note: This tool is only available when tools are blocked due to security restric
 
     def get_server_identifier(self) -> str:
         """Get the server identifier for database storage."""
-        if self.connection_type == "stdio":
+        if self.connection_type == "stdio" and self.child_command is not None:
             return self.child_command
-        if self.connection_type in ["http", "sse"]:
-            return self.server_url
+        if self.connection_type in ["http", "sse"] and self.server_url is not None:
+            return str(self.server_url)
         error_msg = f"Unknown connection type: {self.connection_type}"
         raise ValueError(error_msg)
 
     async def _connect_via_stdio(self) -> None:
         """Connect to a downstream server via stdio."""
+        if self.child_command is None:
+            raise ValueError("child_command must be set for stdio connection")
+
         logger.info("Connecting to downstream server via stdio: %s", self.child_command)
 
         from mcp import ClientSession, StdioServerParameters
@@ -1088,6 +1135,9 @@ Note: This tool is only available when tools are blocked due to security restric
 
     async def _connect_via_http(self) -> None:
         """Connect to a downstream server via SSE (Server-Sent Events)."""
+        if self.server_url is None:
+            raise ValueError("server_url must be set for SSE connection")
+
         logger.info("Connecting to downstream server via SSE: %s", self.server_url)
 
         # Set up imports
@@ -1097,13 +1147,13 @@ Note: This tool is only available when tools are blocked due to security restric
         try:
             logger.info("Connecting to SSE server at %s", self.server_url)
 
-            self.server_identifier = self.server_url
+            self.server_identifier = str(self.server_url)
 
             self.saved_config = self.config_db.get_server_config("sse", self.server_identifier)
 
             # Add MCP-Protocol-Version header for SSE client
             headers = {"MCP-Protocol-Version": "2025-06-18"}
-            self.client_context = sse_client(self.server_url, headers=headers)
+            self.client_context = sse_client(str(self.server_url), headers=headers)
             self.streams = await self.client_context.__aenter__()
 
             self.session = await ClientSession(
@@ -1118,6 +1168,9 @@ Note: This tool is only available when tools are blocked due to security restric
 
     async def _connect_via_streamable_http(self) -> None:
         """Connect to a downstream server via streamable HTTP."""
+        if self.server_url is None:
+            raise ValueError("server_url must be set for streamable HTTP connection")
+
         logger.info("Connecting to downstream server via streamable HTTP: %s", self.server_url)
 
         # Set up imports
@@ -1127,7 +1180,7 @@ Note: This tool is only available when tools are blocked due to security restric
         try:
             logger.info("Connecting to streamable HTTP server at %s", self.server_url)
 
-            self.server_identifier = self.server_url
+            self.server_identifier = str(self.server_url)
 
             self.saved_config = self.config_db.get_server_config("http", self.server_identifier)
 
@@ -1236,20 +1289,9 @@ Note: This tool is only available when tools are blocked due to security restric
                     await self._forward_notification_to_downstream(notification)
                 except Exception as e:
                     logger.warning(
-                        "Failed to forward initialized notification to downstream: %s", e
+                        "Failed to forward initialized notification to downstream: %s",
+                        e,
                     )
-
-        async def handle_message_notification(
-            notification: types.LoggingMessageNotification,
-        ) -> None:
-            """Forward log message notifications from upstream client to downstream server."""
-            logger.info("Forwarding message notification from client to downstream server")
-
-            if self.session:
-                try:
-                    await self._forward_notification_to_downstream(notification)
-                except Exception as e:
-                    logger.warning("Failed to forward message notification to downstream: %s", e)
 
         # Register the handlers manually in the notification_handlers dict
         self.server.notification_handlers[types.CancelledNotification] = (
@@ -1258,12 +1300,12 @@ Note: This tool is only available when tools are blocked due to security restric
         self.server.notification_handlers[types.InitializedNotification] = (
             handle_initialized_notification
         )
-        self.server.notification_handlers[types.LoggingMessageNotification] = (
-            handle_message_notification
-        )
 
     async def _forward_notification_to_downstream(
-        self, notification: types.ClientNotification
+        self,
+        notification: types.CancelledNotification
+        | types.InitializedNotification
+        | types.ProgressNotification,
     ) -> None:
         """Forward a notification from upstream client to downstream server."""
         if not self.session:
@@ -1276,7 +1318,7 @@ Note: This tool is only available when tools are blocked due to security restric
             notification_data = notification.model_dump(exclude={"jsonrpc"})
             clean_notification = type(notification)(**notification_data)
 
-            await self.session.send_notification(clean_notification)
+            await self.session.send_notification(clean_notification)  # type: ignore[arg-type]
             logger.info(
                 "Successfully forwarded notification %s to downstream server", notification.method
             )
@@ -1301,7 +1343,7 @@ Note: This tool is only available when tools are blocked due to security restric
         if not self.visualize_ansi_codes:
             return text
 
-        return make_ansi_escape_codes_visible(text)
+        return _make_ansi_escape_codes_visible_str(text)
 
     def _scan_tool_response(
         self, tool_name: str, tool_input: dict[str, Any], tool_output: str
@@ -1356,6 +1398,24 @@ Note: This tool is only available when tools are blocked due to security restric
                 self.streams = None
                 self.child_process = None
                 logger.info("Closed MCP client connection (type: %s)", self.connection_type)
+
+                # Add a brief delay to ensure subprocess cleanup is complete
+                # This prevents race conditions in tests where multiple wrapper instances
+                # are created and destroyed rapidly
+                import asyncio
+
+                await asyncio.sleep(0.1)
+
+            except RuntimeError as e:
+                if "cancel scope" in str(e):
+                    # Context was already cancelled (e.g., by timeout), just clean up state
+                    self.client_context = None
+                    self.session = None
+                    self.streams = None
+                    self.child_process = None
+                    logger.info("MCP client connection was cancelled, cleaned up state")
+                else:
+                    logger.exception("Runtime error closing MCP client")
             except Exception:
                 logger.exception("Error closing MCP client")
 
@@ -1407,11 +1467,48 @@ Note: This tool is only available when tools are blocked due to security restric
             await self.stop_child_process()
 
 
-def make_ansi_escape_codes_visible(text: str) -> str:
+def _make_ansi_escape_codes_visible_str(text: str) -> str:
+    r"""Neutralize ANSI escape codes in a string.
+
+    Replace the escape character (ASCII 27, typically \x1b or \033) with "ESC"
+    This will convert escape sequences like "\x1b[31m" (red text) to "ESC[31m"
+    making them visible instead of changing the terminal colors.
+
+    Args:
+    ----
+        text: String to process
+
+    Returns:
+    -------
+        String with ANSI escape codes made visible
+
+    """
+    return re.sub(r"\x1b", "ESC", text)
+
+
+def make_ansi_escape_codes_visible(
+    content: str | types.TextContent | types.ImageContent | types.EmbeddedResource,
+) -> str | types.TextContent | types.ImageContent | types.EmbeddedResource:
     r"""Neutralize ANSI escape codes.
 
     Replace the escape character (ASCII 27, typically \x1b or \033) with "ESC"
     This will convert escape sequences like "\x1b[31m" (red text) to "ESC[31m"
-    making them visible instead of changing the terminal colors
+    making them visible instead of changing the terminal colors.
+
+    Args:
+    ----
+        content: String or content object to process
+
+    Returns:
+    -------
+        Same type as input with ANSI escape codes made visible in text content
+
     """
-    return re.sub(r"\x1b", "ESC", text)
+    if isinstance(content, str):
+        return _make_ansi_escape_codes_visible_str(content)
+    elif isinstance(content, types.TextContent):
+        processed_text = _make_ansi_escape_codes_visible_str(content.text)
+        return types.TextContent(type="text", text=processed_text, annotations=content.annotations)
+    else:
+        # For ImageContent and EmbeddedResource, return unchanged
+        return content

@@ -108,7 +108,7 @@ class ToolResponseQuarantine:
 
         """
         self.db_path = db_path or self.get_default_db_path()
-        self.quarantined_responses = {}  # dict[str, QuarantinedToolResponse]
+        self.quarantined_responses: dict[str, QuarantinedToolResponse] = {}
         self._load()
 
     @staticmethod
