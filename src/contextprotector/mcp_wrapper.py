@@ -614,7 +614,7 @@ Note: This tool is only available when tools are blocked due to security restric
         return [types.TextContent(type="text", text=error)]
 
     def _quarantine_and_log(
-        self, name: str, arguments: dict, response_text: str, guardrail_alert
+        self, name: str, arguments: dict, response_text: str, guardrail_alert: GuardrailAlert
     ) -> str | None:
         """Log guardrail alert and quarantine response if quarantine is enabled."""
         logger.exception(
