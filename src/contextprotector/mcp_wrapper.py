@@ -402,7 +402,6 @@ class MCPWrapperServer:
                     "reason": "Server approval status not initialized. Try reconnecting.",
                 }
                 error_json = json.dumps(blocked_response)
-                error_json = json.dumps(blocked_response)
                 raise ValueError(error_json)
 
             # Check if server is completely new or instructions changed
@@ -415,7 +414,6 @@ class MCPWrapperServer:
                         "'context-protector-block' tool for approval instructions."
                     ),
                 }
-                error_json = json.dumps(blocked_response)
                 error_json = json.dumps(blocked_response)
                 raise ValueError(error_json)
 
@@ -460,7 +458,6 @@ class MCPWrapperServer:
                     ),
                 }
                 error_json = json.dumps(blocked_response)
-                error_json = json.dumps(blocked_response)
                 raise ValueError(error_json)
 
             # Tool is approved, proxy the call
@@ -494,7 +491,6 @@ class MCPWrapperServer:
                     # a CallToolResult
                     return content if isinstance(content, list) else [content]
                 # Legacy text-only response (backward compatibility)
-                # TODO: do we need this?
                 wrapped_response = {"status": "completed", "response": tool_result}
                 json_response = json.dumps(wrapped_response)
                 return [types.TextContent(type="text", text=json_response)]
@@ -583,7 +579,7 @@ Note: This tool is only available when tools are blocked due to security restric
 
         if self.quarantine is None:
             msg = "Quarantine not initialized"
-            raise ValueError(msg)  # TODO: better exception
+            raise ValueError(msg)
 
         response_id = arguments["uuid"]
         logger.info("Processing quarantine_release request for UUID: %s", response_id)
@@ -652,8 +648,6 @@ Note: This tool is only available when tools are blocked due to security restric
                 if text_parts:
                     response_text = " ".join(text_parts)
             else:
-                # No content from downstream, use default text
-                response_text = f"Tool call to '{name}' succeeded but returned no content"
                 processed_content = [types.TextContent(type="text", text=response_text)]
 
             # Extract structured content if present
@@ -701,7 +695,7 @@ Note: This tool is only available when tools are blocked due to security restric
         self,
         response_text: str,
         structured_content: dict[str, Any | None],
-        content_list: list[Any],  # TODO: figure out mypy's inability to find ContentBlock
+        content_list: list[Any],
     ) -> dict[str, Any]:
         """Create a tool response dict with text, structured content, and all content types."""
         return {

@@ -418,10 +418,6 @@ class MCPServerConfig:
 
         return config
 
-    '''def __hash__(self) -> int:
-        """Compute hash based on server name."""
-        return hash(self.server_name) if self.server_name else hash(id(self))'''
-
     def __eq__(self, other: object) -> bool:
         """Compare two server configurations semantically."""
         if not isinstance(other, MCPServerConfig):
