@@ -53,7 +53,7 @@ Alternatively, use `--command-args` to have `mcp-context-protector` concatenate 
 }
 ```
 
-TL;DR: use `--command-args` if your MCP client mangles your stdio server command.
+TL;DR: use `--command-args` if your MCP client mangles your stdio server command, but be careful with escaping of shell metacharacters.
 
 Longer explanation: Some clients (including, as of this writing, Cursor) will construct their MCP server commands by concatenating the arguments together into a space-delimited string. That is, `mcp-context-protector.sh --command "cmd arg1 arg2 --arg3"` will become `mcp-context-protector.sh --command cmd arg1 arg2 --arg3`, and `mcp-context-protector` will think `arg1` through `--arg3` are meant as arguments to the wrapper, not to the child command. The `--command-args` option addresses this issue.
 
