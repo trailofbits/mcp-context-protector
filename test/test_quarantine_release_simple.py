@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
 from contextprotector.guardrail_providers.mock_provider import MockGuardrailProvider
 from contextprotector.mcp_wrapper import MCPWrapperServer
 from contextprotector.quarantine import ToolResponseQuarantine
