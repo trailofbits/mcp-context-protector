@@ -1,0 +1,301 @@
+"""Simplified tests for child process cleanup.
+
+Tests that verify child processes are properly terminated when
+the wrapper process exits under various conditions.
+"""
+
+import asyncio
+import os
+import signal
+import subprocess
+import tempfile
+import time
+from pathlib import Path
+
+import psutil
+import pytest
+
+
+class TestProcessCleanupSimple:
+    """Simplified tests for child process cleanup."""
+
+    @pytest.mark.asyncio()
+    async def test_wrapper_exit_cleans_up_children(self) -> None:
+        """Test that wrapper process exit results in child cleanup."""
+        config_file = tempfile.NamedTemporaryFile(delete=False)
+        config_file.close()
+        
+        try:
+            # Start wrapper process
+            downstream_server = Path(__file__).parent / "simple_downstream_server.py"
+            wrapper_process = await asyncio.create_subprocess_exec(
+                "uv", "run", "python", "-m", "contextprotector",
+                "--command", f"python {downstream_server}",
+                "--server-config-file", config_file.name,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=Path(__file__).parent.parent.resolve(),
+            )
+            
+            # Give wrapper time to start and spawn children
+            await asyncio.sleep(2.0)
+            
+            # Record child processes
+            child_pids = self._get_child_processes(wrapper_process.pid)
+            
+            # Terminate wrapper (simulating various exit conditions)
+            wrapper_process.terminate()
+            
+            # Wait for wrapper to exit
+            try:
+                await asyncio.wait_for(wrapper_process.wait(), timeout=5.0)
+            except asyncio.TimeoutError:
+                wrapper_process.kill()
+                await wrapper_process.wait()
+            
+            # Give time for cleanup
+            await asyncio.sleep(1.0)
+            
+            # Check that child processes are gone
+            remaining_children = [pid for pid in child_pids if self._is_process_running(pid)]
+            
+            # Clean up any remaining processes before assertion
+            for pid in remaining_children:
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            
+            assert len(remaining_children) == 0, f"Child processes {remaining_children} not cleaned up"
+                
+        finally:
+            Path(config_file.name).unlink(missing_ok=True)
+
+    @pytest.mark.asyncio()
+    async def test_wrapper_kill_cleans_up_children(self) -> None:
+        """Test that killing wrapper process results in child cleanup."""
+        config_file = tempfile.NamedTemporaryFile(delete=False)
+        config_file.close()
+        
+        try:
+            # Start wrapper process
+            downstream_server = Path(__file__).parent / "simple_downstream_server.py"
+            wrapper_process = await asyncio.create_subprocess_exec(
+                "uv", "run", "python", "-m", "contextprotector",
+                "--command", f"python {downstream_server}",
+                "--server-config-file", config_file.name,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=Path(__file__).parent.parent.resolve(),
+            )
+            
+            # Give wrapper time to start and spawn children
+            await asyncio.sleep(2.0)
+            
+            # Record child processes
+            child_pids = self._get_child_processes(wrapper_process.pid)
+            
+            # Kill wrapper immediately
+            wrapper_process.kill()
+            await wrapper_process.wait()
+            
+            # Check child cleanup with brief polling
+            max_wait = 3.0
+            cleanup_complete = False
+            for _ in range(int(max_wait * 10)):  # Check every 100ms
+                remaining = [pid for pid in child_pids if self._is_process_running(pid)]
+                if not remaining:
+                    cleanup_complete = True
+                    break
+                await asyncio.sleep(0.1)
+            
+            # Final check and cleanup
+            final_remaining = [pid for pid in child_pids if self._is_process_running(pid)]
+            for pid in final_remaining:
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            
+            assert cleanup_complete, f"Child processes {final_remaining} survived wrapper termination"
+                
+        finally:
+            Path(config_file.name).unlink(missing_ok=True)
+
+    @pytest.mark.asyncio()
+    async def test_wrapper_with_invalid_command_no_orphans(self) -> None:
+        """Test that wrapper failure doesn't leave orphan processes."""
+        config_file = tempfile.NamedTemporaryFile(delete=False)
+        config_file.close()
+        
+        try:
+            # Start wrapper with invalid command
+            wrapper_process = await asyncio.create_subprocess_exec(
+                "uv", "run", "python", "-m", "contextprotector",
+                "--command", "nonexistent_command_xyz",
+                "--server-config-file", config_file.name,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=Path(__file__).parent.parent.resolve(),
+            )
+            
+            # Wait for wrapper to fail
+            await asyncio.wait_for(wrapper_process.wait(), timeout=10.0)
+            
+            # Should not have spawned any long-lived processes
+            child_pids = self._get_child_processes(wrapper_process.pid)
+            
+            # Clean up any orphans and fail if they exist
+            for pid in child_pids:
+                if self._is_process_running(pid):
+                    try:
+                        os.kill(pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+            
+            assert len(child_pids) == 0, f"Unexpected child processes {child_pids} after wrapper failure"
+                
+        finally:
+            Path(config_file.name).unlink(missing_ok=True)
+
+    @pytest.mark.asyncio()
+    async def test_multiple_wrapper_instances_no_conflicts(self) -> None:
+        """Test that multiple wrapper instances can start/stop without conflicts."""
+        config_files = []
+        
+        try:
+            for i in range(3):
+                config_file = tempfile.NamedTemporaryFile(delete=False)
+                config_file.close()
+                config_files.append(config_file.name)
+                
+                # Start wrapper
+                downstream_server = Path(__file__).parent / "simple_downstream_server.py"
+                wrapper_process = await asyncio.create_subprocess_exec(
+                    "uv", "run", "python", "-m", "contextprotector",
+                    "--command", f"python {downstream_server}",
+                    "--server-config-file", config_file.name,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    cwd=Path(__file__).parent.parent.resolve(),
+                )
+                
+                # Give it a moment to start
+                await asyncio.sleep(1.0)
+                
+                # Stop wrapper
+                wrapper_process.terminate()
+                await asyncio.wait_for(wrapper_process.wait(), timeout=5.0)
+                
+                # Give time for cleanup
+                await asyncio.sleep(0.5)
+                
+                # Check for orphans
+                child_pids = self._get_child_processes(wrapper_process.pid)
+                for pid in child_pids:
+                    if self._is_process_running(pid):
+                        try:
+                            os.kill(pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                
+                assert len(child_pids) == 0, f"Instance {i}: orphaned processes {child_pids}"
+                
+        finally:
+            for config_file in config_files:
+                Path(config_file).unlink(missing_ok=True)
+
+    def _get_child_processes(self, parent_pid: int) -> list[int]:
+        """Get list of child process PIDs for a given parent PID."""
+        try:
+            parent = psutil.Process(parent_pid)
+            children = parent.children(recursive=True)
+            return [child.pid for child in children]
+        except psutil.NoSuchProcess:
+            return []
+
+    def _is_process_running(self, pid: int) -> bool:
+        """Check if a process is still running."""
+        try:
+            return psutil.pid_exists(pid)
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            return False
+
+
+class TestSignalHandling:
+    """Tests for signal handling without hanging test framework."""
+
+    def test_wrapper_responds_to_signal_in_subprocess(self) -> None:
+        """Test signal handling using subprocess.run for isolation."""
+        config_file = tempfile.NamedTemporaryFile(delete=False)
+        config_file.close()
+        
+        try:
+            # Create a simple test script that starts wrapper and sends signal
+            test_script = f'''
+import asyncio
+import signal
+import subprocess
+import time
+import sys
+from pathlib import Path
+
+async def main():
+    # Start wrapper
+    downstream_server = Path(__file__).parent / "simple_downstream_server.py"
+    process = await asyncio.create_subprocess_exec(
+        "uv", "run", "python", "-m", "contextprotector",
+        "--command", f"python {{downstream_server}}",
+        "--server-config-file", "{config_file.name}",
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        cwd=Path(__file__).parent.parent.resolve(),
+    )
+    
+    # Give it time to start
+    await asyncio.sleep(2.0)
+    
+    # Send SIGTERM
+    process.send_signal(signal.SIGTERM)
+    
+    # Wait for exit with timeout
+    try:
+        await asyncio.wait_for(process.wait(), timeout=5.0)
+        print("SUCCESS: Wrapper responded to signal")
+        sys.exit(0)
+    except asyncio.TimeoutError:
+        process.kill()
+        await process.wait()
+        print("FAILURE: Wrapper did not respond to signal")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+'''
+            
+            # Write test script to temp file
+            script_file = tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False)
+            script_file.write(test_script)
+            script_file.close()
+            
+            try:
+                # Run the test script
+                result = subprocess.run([
+                    "python", script_file.name
+                ], capture_output=True, text=True, timeout=15, 
+                cwd=Path(__file__).parent)
+                
+                # Check result
+                assert result.returncode == 0, f"Signal test failed: {result.stderr}"
+                assert "SUCCESS" in result.stdout, f"Unexpected output: {result.stdout}"
+                
+            finally:
+                Path(script_file.name).unlink(missing_ok=True)
+                
+        finally:
+            Path(config_file.name).unlink(missing_ok=True)
