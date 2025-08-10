@@ -374,6 +374,92 @@ class TestClientDisconnection:
         finally:
             Path(config_file.name).unlink(missing_ok=True)
 
+    def test_wrapper_handles_stdout_write_failure_gracefully(self) -> None:
+        """Test that wrapper handles stdout write failures gracefully when client disconnects abruptly."""
+        config_file = tempfile.NamedTemporaryFile(delete=False)
+        config_file.close()
+
+        try:
+            # Start wrapper
+            downstream_server = Path(__file__).parent / "simple_downstream_server.py"
+            wrapper_process = subprocess.Popen([
+                "uv", "run", "python", "-m", "contextprotector",
+                "--command", f"python {downstream_server}",
+                "--server-config-file", config_file.name,
+            ], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+               cwd=Path(__file__).parent.parent.resolve(), text=True, bufsize=0)
+
+            # Wait for startup
+            time.sleep(2.0)
+            assert wrapper_process.poll() is None, "Wrapper exited during startup"
+
+            # Get child processes before disconnection
+            child_pids = self._get_child_processes(wrapper_process.pid)
+            assert len(child_pids) > 0, "No child processes found"
+
+            # Send initialize message to establish connection
+            init_msg = {
+                "jsonrpc": "2.0",
+                "method": "initialize",
+                "id": 1,
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test-client", "version": "1.0.0"}
+                }
+            }
+            
+            wrapper_process.stdin.write(json.dumps(init_msg) + '\n')
+            wrapper_process.stdin.flush()
+
+            # Give time for initialization
+            time.sleep(1.0)
+
+            # Send a tools/list request that will generate a response
+            tools_msg = {
+                "jsonrpc": "2.0",
+                "method": "tools/list",
+                "id": 2,
+                "params": {}
+            }
+            
+            wrapper_process.stdin.write(json.dumps(tools_msg) + '\n')
+            wrapper_process.stdin.flush()
+
+            # Immediately close stdout pipe to simulate client disconnection
+            # This should cause the wrapper's write to fail
+            wrapper_process.stdout.close()
+            
+            # Also close stdin to signal disconnection
+            wrapper_process.stdin.close()
+
+            # Wrapper should exit within reasonable time despite the stdout write failure
+            return_code = wrapper_process.wait(timeout=10.0)
+            
+            # Currently, the wrapper exits with error code when stdout write fails
+            # This is expected behavior - writing to closed pipe causes I/O error
+            # The important thing is that it exits promptly and cleans up children
+            assert return_code != 0, f"Expected non-zero exit (I/O error), got {return_code}"
+
+            # Child processes should be cleaned up
+            time.sleep(1.0)  # Brief delay for cleanup
+            remaining_children = [pid for pid in child_pids if self._is_process_running(pid)]
+            
+            if remaining_children:
+                # Clean up any remaining processes
+                for pid in remaining_children:
+                    try:
+                        import os
+                        import signal
+                        os.kill(pid, signal.SIGKILL)
+                    except (ProcessLookupError, OSError):
+                        pass
+                
+                pytest.fail(f"Child processes not cleaned up: {remaining_children}")
+
+        finally:
+            Path(config_file.name).unlink(missing_ok=True)
+
 
 class TestSignalDelivery:
     """Test signal delivery without asyncio complications."""
