@@ -4,6 +4,7 @@ This module tests that child processes are properly managed
 when the wrapper process is terminated.
 """
 
+import json
 import subprocess
 import tempfile
 import time
@@ -229,6 +230,151 @@ class TestBasicProcessControl:
             return False
 
 
+class TestClientDisconnection:
+    """Test client disconnection scenarios."""
+
+    def _get_child_processes(self, parent_pid: int) -> list[int]:
+        """Get list of child process PIDs."""
+        try:
+            import psutil
+            parent = psutil.Process(parent_pid)
+            children = parent.children(recursive=True)
+            return [child.pid for child in children]
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            return []
+
+    def _is_process_running(self, pid: int) -> bool:
+        """Check if process is still running."""
+        try:
+            import psutil
+            return psutil.pid_exists(pid)
+        except ImportError:
+            try:
+                import os
+                os.kill(pid, 0)
+                return True
+            except (ProcessLookupError, OSError):
+                return False
+
+    def test_wrapper_shuts_down_on_stdin_eof(self) -> None:
+        """Test that wrapper shuts down gracefully when stdin receives EOF."""
+        config_file = tempfile.NamedTemporaryFile(delete=False)
+        config_file.close()
+
+        try:
+            # Start wrapper
+            downstream_server = Path(__file__).parent / "simple_downstream_server.py"
+            wrapper_process = subprocess.Popen([
+                "uv", "run", "python", "-m", "contextprotector",
+                "--command", f"python {downstream_server}",
+                "--server-config-file", config_file.name,
+            ], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+               cwd=Path(__file__).parent.parent.resolve())
+
+            # Wait for startup
+            time.sleep(2.0)
+            assert wrapper_process.poll() is None, "Wrapper exited during startup"
+
+            # Get child processes before disconnection
+            child_pids = self._get_child_processes(wrapper_process.pid)
+            assert len(child_pids) > 0, "No child processes found"
+
+            # Send EOF by closing stdin
+            wrapper_process.stdin.close()
+
+            # Wrapper should exit gracefully within reasonable time
+            return_code = wrapper_process.wait(timeout=10.0)
+            
+            # Should exit cleanly (not from signal)
+            assert return_code == 0, f"Expected clean exit, got {return_code}"
+
+            # Child processes should be cleaned up
+            time.sleep(1.0)  # Brief delay for cleanup
+            remaining_children = [pid for pid in child_pids if self._is_process_running(pid)]
+            
+            if remaining_children:
+                # Clean up any remaining processes
+                for pid in remaining_children:
+                    try:
+                        import os
+                        import signal
+                        os.kill(pid, signal.SIGKILL)
+                    except (ProcessLookupError, OSError):
+                        pass
+                
+                pytest.fail(f"Child processes not cleaned up: {remaining_children}")
+
+        finally:
+            Path(config_file.name).unlink(missing_ok=True)
+
+    def test_wrapper_shuts_down_on_client_disconnect_with_messages(self) -> None:
+        """Test wrapper shutdown when client disconnects after sending messages."""
+        config_file = tempfile.NamedTemporaryFile(delete=False)
+        config_file.close()
+
+        try:
+            # Start wrapper
+            downstream_server = Path(__file__).parent / "simple_downstream_server.py"
+            wrapper_process = subprocess.Popen([
+                "uv", "run", "python", "-m", "contextprotector",
+                "--command", f"python {downstream_server}",
+                "--server-config-file", config_file.name,
+            ], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+               cwd=Path(__file__).parent.parent.resolve(), text=True, bufsize=0)
+
+            # Wait for startup
+            time.sleep(2.0)
+            assert wrapper_process.poll() is None, "Wrapper exited during startup"
+
+            # Get child processes before disconnection
+            child_pids = self._get_child_processes(wrapper_process.pid)
+            assert len(child_pids) > 0, "No child processes found"
+
+            # Send initialize message to establish connection
+            init_msg = {
+                "jsonrpc": "2.0",
+                "method": "initialize",
+                "id": 1,
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test-client", "version": "1.0.0"}
+                }
+            }
+            
+            wrapper_process.stdin.write(json.dumps(init_msg) + '\n')
+            wrapper_process.stdin.flush()
+
+            # Brief delay to let initialization complete
+            time.sleep(1.0)
+
+            # Now close stdin to simulate client disconnection
+            wrapper_process.stdin.close()
+
+            # Wrapper should exit gracefully
+            return_code = wrapper_process.wait(timeout=10.0)
+            assert return_code == 0, f"Expected clean exit, got {return_code}"
+
+            # Child processes should be cleaned up
+            time.sleep(1.0)
+            remaining_children = [pid for pid in child_pids if self._is_process_running(pid)]
+            
+            if remaining_children:
+                # Clean up any remaining processes
+                for pid in remaining_children:
+                    try:
+                        import os
+                        import signal
+                        os.kill(pid, signal.SIGKILL)
+                    except (ProcessLookupError, OSError):
+                        pass
+                
+                pytest.fail(f"Child processes not cleaned up: {remaining_children}")
+
+        finally:
+            Path(config_file.name).unlink(missing_ok=True)
+
+
 class TestSignalDelivery:
     """Test signal delivery without asyncio complications."""
 
@@ -269,39 +415,3 @@ class TestSignalDelivery:
         finally:
             Path(config_file.name).unlink(missing_ok=True)
 
-    def test_sigint_delivered_to_wrapper(self) -> None:
-        """Test that SIGINT (Ctrl+C) is properly delivered to wrapper process."""
-        config_file = tempfile.NamedTemporaryFile(delete=False)
-        config_file.close()
-
-        try:
-            # Start wrapper
-            downstream_server = Path(__file__).parent / "simple_downstream_server.py"
-            wrapper_process = subprocess.Popen([
-                "uv", "run", "python", "-m", "contextprotector",
-                "--command", f"python {downstream_server}",
-                "--server-config-file", config_file.name,
-            ], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-               cwd=Path(__file__).parent.parent.resolve())
-
-            # Wait for startup
-            time.sleep(2.0)
-            assert wrapper_process.poll() is None, "Wrapper exited during startup"
-
-            # Send SIGINT
-            import os
-            import signal
-            os.kill(wrapper_process.pid, signal.SIGINT)
-
-            # Wrapper should exit within reasonable time
-            try:
-                wrapper_process.wait(timeout=5.0)
-                # Any return code is fine as long as it exits
-            except subprocess.TimeoutExpired:
-                # If it doesn't respond to SIGINT, kill it
-                wrapper_process.kill()
-                wrapper_process.wait()
-                pytest.fail("Wrapper did not respond to SIGINT within timeout")
-
-        finally:
-            Path(config_file.name).unlink(missing_ok=True)
