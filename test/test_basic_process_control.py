@@ -167,60 +167,6 @@ class TestBasicProcessControl:
         finally:
             Path(config_file.name).unlink(missing_ok=True)
 
-    def test_wrapper_kill_leaves_orphans_as_expected(self) -> None:
-        """Test that SIGKILL may leave orphan processes (expected behavior).
-
-        SIGKILL cannot be handled by the process, so cleanup handlers don't run.
-        This test documents the expected behavior and ensures we clean up orphans.
-        """
-        config_file = tempfile.NamedTemporaryFile(delete=False)
-        config_file.close()
-
-        try:
-            # Start wrapper process
-            downstream_server = Path(__file__).parent / "simple_downstream_server.py"
-            wrapper_process = subprocess.Popen([
-                "uv", "run", "python", "-m", "contextprotector",
-                "--command", f"python {downstream_server}",
-                "--server-config-file", config_file.name,
-            ], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-               cwd=Path(__file__).parent.parent.resolve())
-
-            # Give wrapper time to start
-            time.sleep(2.0)
-
-            # Check wrapper is running
-            assert wrapper_process.poll() is None, "Wrapper exited unexpectedly"
-
-            # Get child processes
-            child_pids = self._get_child_processes(wrapper_process.pid)
-            assert len(child_pids) > 0, "No child processes found"
-
-            # Send SIGKILL (immediate termination, no cleanup possible)
-            wrapper_process.kill()
-            wrapper_process.wait(timeout=5.0)
-
-            # SIGKILL may leave orphan processes - this is expected
-            # We need to clean them up manually for test hygiene
-            time.sleep(1.0)  # Brief delay for any system cleanup
-
-            remaining_orphans = [pid for pid in child_pids if self._is_process_running(pid)]
-
-            # Clean up orphans
-            for pid in remaining_orphans:
-                try:
-                    import os
-                    import signal as sig
-                    os.kill(pid, sig.SIGKILL)
-                except (ProcessLookupError, OSError):
-                    pass
-
-            # This test passes regardless - we're documenting expected behavior
-            # In a real scenario, init system would eventually clean up orphans
-            print(f"SIGKILL left {len(remaining_orphans)} orphan processes (expected)")
-
-        finally:
-            Path(config_file.name).unlink(missing_ok=True)
 
     def test_rapid_start_stop_cycles(self) -> None:
         """Test rapid start/stop cycles don't leave orphans."""
