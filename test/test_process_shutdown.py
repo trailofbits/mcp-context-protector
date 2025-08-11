@@ -29,8 +29,8 @@ class TestProcessShutdown:
             # Start wrapper process
             wrapper_process = await self._start_wrapper_process(config_file.name)
 
-            # Give wrapper time to start child
-            await asyncio.sleep(1.0)
+            # Give wrapper time to start child (longer when coverage is running)
+            await asyncio.sleep(3.0)
 
             # Find child processes
             child_pids = self._get_child_processes(wrapper_process.pid)
@@ -97,8 +97,8 @@ class TestProcessShutdown:
             # Start wrapper process
             wrapper_process = await self._start_wrapper_process(config_file.name)
 
-            # Give wrapper time to start child
-            await asyncio.sleep(1.0)
+            # Give wrapper time to start child (longer when coverage is running)
+            await asyncio.sleep(3.0)
 
             # Find child processes
             child_pids = self._get_child_processes(wrapper_process.pid)
