@@ -11,6 +11,7 @@ import sys
 
 from .approval_cli import list_unapproved_configs, review_server_config
 from .guardrails import GuardrailProvider, get_provider, get_provider_names
+from .mcp_config import wrap_mcp_config_file
 from .mcp_wrapper import MCPWrapperServer
 from .quarantine_cli import review_quarantine
 from .wrapper_config import MCPWrapperConfig
@@ -106,6 +107,10 @@ async def main_async() -> None:
         await list_unapproved_configs(args.server_config_file)
         return
 
+    if args.wrap_mcp_config:
+        wrap_mcp_config_file(args.wrap_mcp_config)
+        return
+
     # Check if we're in server review mode
     if args.review_server:
         await _launch_review(args, guardrail_provider)
@@ -176,6 +181,11 @@ def _parse_args() -> argparse.Namespace:
         "--review-all-servers",
         action="store_true",
         help="Review all unapproved server configurations",
+    )
+    source_group.add_argument(
+        "--wrap-mcp-config",
+        metavar="CONFIG_FILE",
+        help="Wrap all MCP servers in the specified mcp.json config file with context-protector",
     )
 
     # Add config file argument with new name

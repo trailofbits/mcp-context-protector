@@ -2,11 +2,17 @@
 
 import hashlib
 import json
+import logging
+import os
 import pathlib
+import shutil
+import sys
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Literal, TextIO
+
+logger = logging.getLogger("mcp_config")
 
 
 class ParameterType(str, Enum):
@@ -1050,3 +1056,142 @@ class MCPConfigDatabase:
             result["tools"][tool.name] = entry.is_tool_approved(tool.name, tool)
 
         return result
+
+
+def wrap_mcp_config_file(config_file_path: str) -> None:
+    """Wrap all MCP servers in the specified config file with context-protector.
+
+    This function reads an MCP config file (typically mcp.json) and modifies it to wrap
+    all servers with the context-protector wrapper. It supports both command-based servers
+    (stdio) and HTTP/SSE servers.
+
+    Args:
+    ----
+        config_file_path: Path to the MCP config file to modify
+
+    """
+    # Check if config file exists
+    if not os.path.exists(config_file_path):
+        logger.error("Error: Config file %s not found", config_file_path)
+        sys.exit(1)
+
+    script_dir = pathlib.Path(__file__).parent.parent.parent
+    protector_script = script_dir / "mcp-context-protector.sh"
+
+    if not protector_script.exists():
+        logger.error("Error: Context protector script not found at %s", protector_script)
+        sys.exit(1)
+
+    protector_script_path = str(protector_script.resolve())
+
+    # Backup of original config, in case things go wrong
+    backup_path = f"{config_file_path}.backup"
+    try:
+        shutil.copy2(config_file_path, backup_path)
+        logger.info("Created backup: %s", backup_path)
+    except Exception as e:
+        logger.error("Error creating backup: %s", e)
+        sys.exit(1)
+
+    config_data = None
+    try:
+        with open(config_file_path) as f:
+            config_data = json.load(f)
+    except json.JSONDecodeError as e:
+        logger.error("Error parsing JSON config file: %s", e)
+        sys.exit(1)
+    except Exception as e:
+        logger.error("Error reading config file: %s", e)
+        sys.exit(1)
+
+    if config_data is None:
+        logger.error("Failed to load config data")
+        sys.exit(1)
+
+    if "mcpServers" not in config_data:
+        logger.error("No 'mcpServers' section found in config file")
+        sys.exit(1)
+
+    mcp_servers = config_data["mcpServers"]
+    if not isinstance(mcp_servers, dict):
+        logger.error("'mcpServers' must be a dictionary")
+        sys.exit(1)
+
+    modified_servers = 0
+
+    # Process each server, wrapping it with context-protector if it wasn't already
+    for server_name, server_config in mcp_servers.items():
+        if not isinstance(server_config, dict):
+            logger.warning("Skipping server '%s' - invalid configuration", server_name)
+            continue
+
+        # Check if server is already wrapped
+        command = server_config.get("command")
+        if command and protector_script_path in str(command):
+            logger.info("Server '%s' is already wrapped, skipping", server_name)
+            continue
+
+        # (stdio) servers
+        if "command" in server_config:
+            original_command = server_config["command"]
+            original_args = server_config.get("args", [])
+
+            # Build the original command string
+            if original_args:
+                if isinstance(original_args, list):
+                    original_command_full = (
+                        f"{original_command} {' '.join(str(arg) for arg in original_args)}"
+                    )
+                else:
+                    original_command_full = f"{original_command} {original_args}"
+            else:
+                original_command_full = original_command
+
+            # Wrap with context protector
+            server_config["command"] = protector_script_path
+            server_config["args"] = ["--command", original_command_full]
+
+            logger.info("Wrapped command-based server '%s'", server_name)
+            modified_servers += 1
+
+        # HTTP/SSE servers
+        elif "url" in server_config:
+            original_url = server_config["url"]
+
+            # Determine if it's SSE or regular HTTP based on URL patterns
+            # This is a heuristic - SSE servers often have /sse or /events in the path
+            if "/sse" in original_url.lower() or "/events" in original_url.lower():
+                # Treat as SSE server
+                server_config["command"] = protector_script_path
+                server_config["args"] = ["--sse-url", original_url]
+            else:
+                server_config["command"] = protector_script_path
+                server_config["args"] = ["--url", original_url]
+
+            # Remove the original url field
+            del server_config["url"]
+
+            logger.info("Wrapped HTTP/SSE server '%s'", server_name)
+            modified_servers += 1
+
+        else:
+            logger.warning("Server '%s' has no recognized transport method, skipping", server_name)
+
+    if modified_servers == 0:
+        logger.info("No servers were modified")
+        return
+
+    try:
+        with open(config_file_path, "w") as f:
+            json.dump(config_data, f, indent=2)
+        logger.info("Successfully wrapped %d server(s) in %s", modified_servers, config_file_path)
+        logger.info("Original config backed up to: %s", backup_path)
+    except Exception as e:
+        logger.error("Error writing modified config: %s", e)
+        # things went wrong, try to restore backup
+        try:
+            shutil.copy2(backup_path, config_file_path)
+            logger.info("Restored original config from backup")
+        except Exception as restore_e:
+            logger.error("Error restoring backup: %s", restore_e)
+        sys.exit(1)
