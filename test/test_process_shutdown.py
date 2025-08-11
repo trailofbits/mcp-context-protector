@@ -80,9 +80,9 @@ class TestProcessShutdown:
             await asyncio.sleep(0.5)
             child_pids = self._get_child_processes(wrapper_process.pid)
             for pid in child_pids:
-                assert not self._is_process_running(
-                    pid
-                ), f"Child process {pid} still running after wrapper exit"
+                assert not self._is_process_running(pid), (
+                    f"Child process {pid} still running after wrapper exit"
+                )
 
         finally:
             Path(config_file.name).unlink(missing_ok=True)
@@ -243,9 +243,9 @@ class TestProcessCleanupIntegration:
                 # Verify cleanup before next iteration
                 await asyncio.sleep(0.5)
                 for pid in child_pids:
-                    assert not self._is_process_running(
-                        pid
-                    ), f"Iteration {i}: Child {pid} not cleaned up"
+                    assert not self._is_process_running(pid), (
+                        f"Iteration {i}: Child {pid} not cleaned up"
+                    )
 
         finally:
             Path(config_file.name).unlink(missing_ok=True)

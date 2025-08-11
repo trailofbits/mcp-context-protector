@@ -80,9 +80,9 @@ class TestBasicProcessControl:
                     except (ProcessLookupError, OSError):
                         pass
 
-            assert (
-                len(remaining_children) == 0
-            ), f"Child processes not cleaned up: {remaining_children}"
+            assert len(remaining_children) == 0, (
+                f"Child processes not cleaned up: {remaining_children}"
+            )
 
         finally:
             Path(config_file.name).unlink(missing_ok=True)

@@ -70,9 +70,9 @@ class TestProcessCleanupSimple:
                 with contextlib.suppress(ProcessLookupError):
                     os.kill(pid, signal.SIGKILL)
 
-            assert (
-                len(remaining_children) == 0
-            ), f"Child processes {remaining_children} not cleaned up"
+            assert len(remaining_children) == 0, (
+                f"Child processes {remaining_children} not cleaned up"
+            )
 
         finally:
             Path(config_file.name).unlink(missing_ok=True)
@@ -111,9 +111,9 @@ class TestProcessCleanupSimple:
                     with contextlib.suppress(ProcessLookupError):
                         os.kill(pid, signal.SIGKILL)
 
-            assert (
-                len(child_pids) == 0
-            ), f"Unexpected child processes {child_pids} after wrapper failure"
+            assert len(child_pids) == 0, (
+                f"Unexpected child processes {child_pids} after wrapper failure"
+            )
 
         finally:
             Path(config_file.name).unlink(missing_ok=True)

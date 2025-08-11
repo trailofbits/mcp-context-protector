@@ -4,6 +4,7 @@ import sys
 from unittest.mock import patch
 
 import pytest
+
 from contextprotector.__main__ import _parse_args
 from contextprotector.wrapper_config import MCPWrapperConfig
 

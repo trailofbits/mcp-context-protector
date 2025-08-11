@@ -6,8 +6,8 @@ import sys
 from pathlib import Path
 
 import pytest
-from contextprotector.guardrails import get_provider, get_provider_names
 
+from contextprotector.guardrails import get_provider, get_provider_names
 from test.logging_config import configure_logging
 
 # Add the project root to the path if not already there

@@ -9,10 +9,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from mcp import types
+
 from contextprotector.guardrail_providers.mock_provider import MockGuardrailProvider
 from contextprotector.mcp_wrapper import MCPWrapperServer
 from contextprotector.quarantine import ToolResponseQuarantine
-from mcp import types
 
 
 @pytest.fixture()

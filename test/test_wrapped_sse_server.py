@@ -43,9 +43,9 @@ async def _run_with_sse_server(
     from .test_utils import run_with_sse_downstream_server
 
     # Make sure we have a valid port
-    assert (
-        sse_server_utils.SERVER_PORT is not None
-    ), "Server port must be detected before connecting"
+    assert sse_server_utils.SERVER_PORT is not None, (
+        "Server port must be detected before connecting"
+    )
 
     logging.warning("Connecting wrapper to SSE server at port: %s", sse_server_utils.SERVER_PORT)
 
