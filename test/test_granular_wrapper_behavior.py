@@ -142,9 +142,9 @@ async def test_granular_tool_filtering_in_list_tools() -> None:
         assert "echo" in tool_names, f"Echo tool should be available, got: {tool_names}"
 
         # Should NOT have the unapproved greet tool
-        assert "greet" not in tool_names, (
-            f"Unapproved greet tool should not be visible, got: {tool_names}"
-        )
+        assert (
+            "greet" not in tool_names
+        ), f"Unapproved greet tool should not be visible, got: {tool_names}"
 
         # Test that approved tool works (skip detailed validation due to schema issues)
         # The key success is that the tool is available and can be called
@@ -162,9 +162,9 @@ async def test_granular_tool_filtering_in_list_tools() -> None:
             result = await session.call_tool(name="greet", arguments={"name": "test"})
             response_json = json.loads(result.content[0].text)
             assert response_json["status"] == "blocked", "Unapproved tool should be blocked"
-            assert "not approved" in response_json["reason"].lower(), (
-                "Should indicate tool not approved"
-            )
+            assert (
+                "not approved" in response_json["reason"].lower()
+            ), "Should indicate tool not approved"
         except ValueError as e:
             # The wrapper should raise a ValueError with JSON error details for blocked tools
             error_message = str(e)
@@ -408,9 +408,9 @@ async def test_new_server_complete_blocking() -> None:
 
         # Should ONLY have context-protector-block tool
         assert "context-protector-block" in tool_names
-        assert len([t for t in tool_names if t != "context-protector-block"]) == 0, (
-            f"New server should only show context-protector-block, got: {tool_names}"
-        )
+        assert (
+            len([t for t in tool_names if t != "context-protector-block"]) == 0
+        ), f"New server should only show context-protector-block, got: {tool_names}"
 
         # All downstream tools should be blocked
         result = await session.call_tool(name="echo", arguments={"message": "test"})
