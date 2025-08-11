@@ -122,7 +122,7 @@ async def main_async() -> None:
 
     try:
         await wrapper.run()
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, asyncio.CancelledError):
         logger.info("Shutting down")
     finally:
         await wrapper.stop_child_process()
