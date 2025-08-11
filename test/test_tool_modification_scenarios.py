@@ -10,9 +10,8 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from mcp import ClientSession
-
 from contextprotector.mcp_config import ApprovalStatus
+from mcp import ClientSession
 
 from .test_utils import approve_server_config_using_review, run_with_wrapper_session
 

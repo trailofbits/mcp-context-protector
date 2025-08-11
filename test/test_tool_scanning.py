@@ -8,14 +8,13 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-from mcp.types import CallToolResult as ToolCallResult
-from mcp.types import TextContent
-
 from contextprotector.guardrail_providers.mock_provider import (
     AlwaysAlertGuardrailProvider,
     MockGuardrailProvider,
 )
 from contextprotector.mcp_wrapper import MCPWrapperServer
+from mcp.types import CallToolResult as ToolCallResult
+from mcp.types import TextContent
 
 logging.basicConfig(level=logging.INFO)
 
