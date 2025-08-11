@@ -150,7 +150,7 @@ async def list_unapproved_configs(config_path: str | None = None) -> None:
                 await review_server_config(server["type"], server["identifier"], config_path)
 
                 # Refresh the database from disk and then refresh the list
-                config_db._load()
+                config_db.load()
                 unapproved_servers = config_db.list_unapproved_servers()
                 if not unapproved_servers:
                     print("\n✓ All server configurations have been reviewed!")
