@@ -91,19 +91,19 @@ async def list_unapproved_configs(config_path: str | None = None) -> None:
         print("No unapproved server configurations found.")
         return
 
-    print(f"\nFound {len(unapproved_servers)} unapproved server configuration(s):\n")
-
-    for i, server in enumerate(unapproved_servers, 1):
-        print(f"{i}. [{server['type'].upper()}] {server['identifier']}")
-        if server["has_config"]:
-            print("   Status: Configuration available for review")
-        else:
-            print("   Status: No configuration data available")
-        print()
-
     # Interactive menu
     while True:
         try:
+            print(f"\nFound {len(unapproved_servers)} unapproved server configuration(s):\n")
+
+            for i, server in enumerate(unapproved_servers, 1):
+                print(f"{i}. [{server['type'].upper()}] {server['identifier']}")
+                if server["has_config"]:
+                    print("   Status: Configuration available for review")
+                else:
+                    print("   Status: No configuration data available")
+                print()
+
             print("Options:")
             print(f"  [1-{len(unapproved_servers)}] Review and approve a specific server")
             print("  [a] Approve all servers")
@@ -149,7 +149,8 @@ async def list_unapproved_configs(config_path: str | None = None) -> None:
                 # Call the existing review function
                 await review_server_config(server["type"], server["identifier"], config_path)
 
-                # Refresh the list and continue
+                # Refresh the database from disk and then refresh the list
+                config_db.load()
                 unapproved_servers = config_db.list_unapproved_servers()
                 if not unapproved_servers:
                     print("\n✓ All server configurations have been reviewed!")

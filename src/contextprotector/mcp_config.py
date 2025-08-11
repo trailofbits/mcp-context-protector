@@ -654,7 +654,7 @@ class MCPConfigDatabase:
         self.config_path = config_path or self.get_default_config_path()
         self.servers: dict[str, MCPServerEntry] = {}
         self._file_lock = threading.RLock()  # Instance-level lock for file operations
-        self._load()
+        self.load()
 
     @staticmethod
     def get_default_config_path() -> str:
@@ -672,7 +672,7 @@ class MCPConfigDatabase:
 
         return str(data_dir / "servers.json")
 
-    def _load(self) -> None:
+    def load(self) -> None:
         """Load server configurations from the config file."""
         with self._file_lock:
             try:
@@ -769,7 +769,7 @@ class MCPConfigDatabase:
 
         """
         # Reload the database first to avoid overwriting other changes
-        self._load()
+        self.load()
 
         key = MCPServerEntry.create_key(server_type, identifier)
 
@@ -808,7 +808,7 @@ class MCPConfigDatabase:
 
         """
         # Reload the database first to avoid overwriting other changes
-        self._load()
+        self.load()
 
         key = MCPServerEntry.create_key(server_type, identifier)
         if key in self.servers:
@@ -867,7 +867,7 @@ class MCPConfigDatabase:
 
         """
         # Reload the database first to avoid overwriting other changes
-        self._load()
+        self.load()
 
         key = MCPServerEntry.create_key(server_type, identifier)
         if key in self.servers:
@@ -931,7 +931,7 @@ class MCPConfigDatabase:
             True if the tool was approved, False if server not found
 
         """
-        self._load()
+        self.load()
 
         key = MCPServerEntry.create_key(server_type, identifier)
         if key in self.servers:
@@ -954,7 +954,7 @@ class MCPConfigDatabase:
             True if the instructions were approved, False if server not found
 
         """
-        self._load()
+        self.load()
 
         key = MCPServerEntry.create_key(server_type, identifier)
         if key in self.servers:
