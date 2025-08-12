@@ -3,10 +3,8 @@
 import hashlib
 import json
 import logging
-import os
 import pathlib
 import shutil
-import sys
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
@@ -1071,16 +1069,16 @@ def wrap_mcp_config_file(config_file_path: str) -> None:
 
     """
     # Check if config file exists
-    if not os.path.exists(config_file_path):
+    if not pathlib.Path(config_file_path).exists():
         logger.error("Error: Config file %s not found", config_file_path)
-        sys.exit(1)
+        return
 
     script_dir = pathlib.Path(__file__).parent.parent.parent
     protector_script = script_dir / "mcp-context-protector.sh"
 
     if not protector_script.exists():
         logger.error("Error: Context protector script not found at %s", protector_script)
-        sys.exit(1)
+        return
 
     protector_script_path = str(protector_script.resolve())
 
@@ -1091,7 +1089,7 @@ def wrap_mcp_config_file(config_file_path: str) -> None:
         logger.info("Created backup: %s", backup_path)
     except Exception as e:
         logger.error("Error creating backup: %s", e)
-        sys.exit(1)
+        return
 
     config_data = None
     try:
@@ -1099,23 +1097,21 @@ def wrap_mcp_config_file(config_file_path: str) -> None:
             config_data = json.load(f)
     except json.JSONDecodeError as e:
         logger.error("Error parsing JSON config file: %s", e)
-        sys.exit(1)
     except Exception as e:
         logger.error("Error reading config file: %s", e)
-        sys.exit(1)
 
     if config_data is None:
         logger.error("Failed to load config data")
-        sys.exit(1)
+        return
 
     if "mcpServers" not in config_data:
         logger.error("No 'mcpServers' section found in config file")
-        sys.exit(1)
+        return
 
     mcp_servers = config_data["mcpServers"]
     if not isinstance(mcp_servers, dict):
         logger.error("'mcpServers' must be a dictionary")
-        sys.exit(1)
+        return
 
     modified_servers = 0
 
@@ -1179,19 +1175,19 @@ def wrap_mcp_config_file(config_file_path: str) -> None:
 
     if modified_servers == 0:
         logger.info("No servers were modified")
-        return
-
-    try:
-        with open(config_file_path, "w") as f:
-            json.dump(config_data, f, indent=2)
-        logger.info("Successfully wrapped %d server(s) in %s", modified_servers, config_file_path)
-        logger.info("Original config backed up to: %s", backup_path)
-    except Exception as e:
-        logger.error("Error writing modified config: %s", e)
-        # things went wrong, try to restore backup
+    else:
         try:
-            shutil.copy2(backup_path, config_file_path)
-            logger.info("Restored original config from backup")
-        except Exception as restore_e:
-            logger.error("Error restoring backup: %s", restore_e)
-        sys.exit(1)
+            with open(config_file_path, "w") as f:
+                json.dump(config_data, f, indent=2)
+            logger.info(
+                "Successfully wrapped %d server(s) in %s", modified_servers, config_file_path
+            )
+            logger.info("Original config backed up to: %s", backup_path)
+        except Exception as e:
+            logger.error("Error writing modified config: %s", e)
+            # things went wrong, try to restore backup
+            try:
+                shutil.copy2(backup_path, config_file_path)
+                logger.info("Restored original config from backup")
+            except Exception as restore_e:
+                logger.error("Error restoring backup: %s", restore_e)

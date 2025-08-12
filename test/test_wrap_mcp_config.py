@@ -275,10 +275,10 @@ def test_invalid_server_configs(temp_config_file, mock_protector_script):
 
 def test_file_not_found():
     """Test error handling when config file doesn't exist."""
-    with pytest.raises(SystemExit) as exc_info:
+    with patch("contextprotector.mcp_config.logger") as mock_logger:
         wrap_mcp_config_file("nonexistent.json")
 
-    assert exc_info.value.code == 1
+        mock_logger.error.assert_called_with("Error: Config file %s not found", "nonexistent.json")
 
 
 def test_protector_script_not_found(temp_config_file):
@@ -289,11 +289,13 @@ def test_protector_script_not_found(temp_config_file):
         json.dump(config, f)
 
     # Mock script doesn't exist
-    with patch("pathlib.Path.exists", return_value=False):
-        with pytest.raises(SystemExit) as exc_info:
-            wrap_mcp_config_file(temp_config_file)
+    with (
+        patch("pathlib.Path.exists", return_value=False),
+        patch("contextprotector.mcp_config.logger") as mock_logger,
+    ):
+        wrap_mcp_config_file(temp_config_file)
 
-        assert exc_info.value.code == 1
+        mock_logger.error.assert_called()
 
 
 def test_invalid_json(temp_config_file):
@@ -302,10 +304,11 @@ def test_invalid_json(temp_config_file):
     with open(temp_config_file, "w") as f:
         f.write("{ invalid json }")
 
-    with pytest.raises(SystemExit) as exc_info:
+    with patch("contextprotector.mcp_config.logger") as mock_logger:
         wrap_mcp_config_file(temp_config_file)
 
-    assert exc_info.value.code == 1
+        # Check that an error was logged about parsing JSON
+        mock_logger.error.assert_called()
 
 
 def test_no_mcp_servers_section(temp_config_file):
@@ -315,10 +318,10 @@ def test_no_mcp_servers_section(temp_config_file):
     with open(temp_config_file, "w") as f:
         json.dump(config, f)
 
-    with pytest.raises(SystemExit) as exc_info:
+    with patch("contextprotector.mcp_config.logger") as mock_logger:
         wrap_mcp_config_file(temp_config_file)
 
-    assert exc_info.value.code == 1
+        mock_logger.error.assert_called_with("No 'mcpServers' section found in config file")
 
 
 def test_invalid_mcp_servers_section(temp_config_file):
@@ -328,10 +331,10 @@ def test_invalid_mcp_servers_section(temp_config_file):
     with open(temp_config_file, "w") as f:
         json.dump(config, f)
 
-    with pytest.raises(SystemExit) as exc_info:
+    with patch("contextprotector.mcp_config.logger") as mock_logger:
         wrap_mcp_config_file(temp_config_file)
 
-    assert exc_info.value.code == 1
+        mock_logger.error.assert_called_with("'mcpServers' must be a dictionary")
 
 
 def test_backup_creation_failure(temp_config_file):
@@ -343,11 +346,13 @@ def test_backup_creation_failure(temp_config_file):
 
     # Mock backup creation failure
     backup_exception = Exception("Backup failed")
-    with patch("shutil.copy2", side_effect=backup_exception):
-        with pytest.raises(SystemExit) as exc_info:
-            wrap_mcp_config_file(temp_config_file)
+    with (
+        patch("shutil.copy2", side_effect=backup_exception),
+        patch("contextprotector.mcp_config.logger") as mock_logger,
+    ):
+        wrap_mcp_config_file(temp_config_file)
 
-        assert exc_info.value.code == 1
+        mock_logger.error.assert_called_with("Error creating backup: %s", backup_exception)
 
 
 def test_write_failure_with_recovery(temp_config_file, mock_protector_script):
@@ -379,12 +384,10 @@ def test_write_failure_with_recovery(temp_config_file, mock_protector_script):
         patch("pathlib.Path.resolve", return_value=Path(mock_protector_script)),
         patch("contextprotector.mcp_config.__file__", "/mock/src/contextprotector/mcp_config.py"),
         patch("json.dump", side_effect=write_exception),
-        patch("sys.exit") as mock_exit,
         patch("contextprotector.mcp_config.logger") as mock_logger,
     ):
         wrap_mcp_config_file(temp_config_file)
 
-        mock_exit.assert_called_once_with(1)
         mock_logger.error.assert_called()
         mock_logger.info.assert_called_with("Restored original config from backup")
 
