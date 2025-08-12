@@ -51,10 +51,12 @@ def test_wrap_command_based_servers(temp_config_file, mock_protector_script):
     with (
         patch("pathlib.Path.exists", return_value=True),
         patch("pathlib.Path.resolve", return_value=Path(mock_protector_script)),
-        patch("contextprotector.mcp_config.pathlib.Path") as mock_path,
+        patch("contextprotector.mcp_config.pathlib.Path") as mock_path_cls,
     ):
-        mock_path.return_value.parent.parent.parent = Path("/mock")
-        mock_path.return_value.__truediv__ = lambda _, other: Path("/mock") / other
+        mock_path_instance = Mock()
+        mock_path_instance.parent.parent.parent = Path("/mock")
+        mock_path_instance.__truediv__ = lambda other: Path("/mock") / other
+        mock_path_cls.return_value = mock_path_instance
 
         # Mock sys.exit to capture exit calls
         with patch("sys.exit") as mock_exit:
@@ -109,10 +111,12 @@ def test_wrap_http_sse_servers(temp_config_file, mock_protector_script):
     with (
         patch("pathlib.Path.exists", return_value=True),
         patch("pathlib.Path.resolve", return_value=Path(mock_protector_script)),
-        patch("contextprotector.mcp_config.pathlib.Path") as mock_path,
+        patch("contextprotector.mcp_config.pathlib.Path") as mock_path_cls,
     ):
-        mock_path.return_value.parent.parent.parent = Path("/mock")
-        mock_path.return_value.__truediv__ = lambda _, other: Path("/mock") / other
+        mock_path_instance = Mock()
+        mock_path_instance.parent.parent.parent = Path("/mock")
+        mock_path_instance.__truediv__ = lambda other: Path("/mock") / other
+        mock_path_cls.return_value = mock_path_instance
 
         # Mock sys.exit to capture exit calls
         with patch("sys.exit") as mock_exit:
@@ -161,10 +165,12 @@ def test_mixed_servers(temp_config_file, mock_protector_script):
     with (
         patch("pathlib.Path.exists", return_value=True),
         patch("pathlib.Path.resolve", return_value=Path(mock_protector_script)),
-        patch("contextprotector.mcp_config.pathlib.Path") as mock_path,
+        patch("contextprotector.mcp_config.pathlib.Path") as mock_path_cls,
     ):
-        mock_path.return_value.parent.parent.parent = Path("/mock")
-        mock_path.return_value.__truediv__ = lambda _, other: Path("/mock") / other
+        mock_path_instance = Mock()
+        mock_path_instance.parent.parent.parent = Path("/mock")
+        mock_path_instance.__truediv__ = lambda other: Path("/mock") / other
+        mock_path_cls.return_value = mock_path_instance
 
         # Mock sys.exit to capture exit calls
         with patch("sys.exit") as mock_exit:
@@ -209,11 +215,13 @@ def test_already_wrapped_servers(temp_config_file, mock_protector_script):
     with (
         patch("pathlib.Path.exists", return_value=True),
         patch("pathlib.Path.resolve", return_value=Path(mock_protector_script)),
-        patch("contextprotector.mcp_config.pathlib.Path") as mock_path,
+        patch("contextprotector.mcp_config.pathlib.Path") as mock_path_cls,
         patch("contextprotector.mcp_config.logger") as mock_logger,
     ):
-        mock_path.return_value.parent.parent.parent = Path("/mock")
-        mock_path.return_value.__truediv__ = lambda _, other: Path("/mock") / other
+        mock_path_instance = Mock()
+        mock_path_instance.parent.parent.parent = Path("/mock")
+        mock_path_instance.__truediv__ = lambda other: Path("/mock") / other
+        mock_path_cls.return_value = mock_path_instance
 
         # Mock sys.exit to capture exit calls
         with patch("sys.exit") as mock_exit:
@@ -259,11 +267,13 @@ def test_invalid_server_configs(temp_config_file, mock_protector_script):
     with (
         patch("pathlib.Path.exists", return_value=True),
         patch("pathlib.Path.resolve", return_value=Path(mock_protector_script)),
-        patch("contextprotector.mcp_config.pathlib.Path") as mock_path,
+        patch("contextprotector.mcp_config.pathlib.Path") as mock_path_cls,
         patch("contextprotector.mcp_config.logger") as mock_logger,
     ):
-        mock_path.return_value.parent.parent.parent = Path("/mock")
-        mock_path.return_value.__truediv__ = lambda _, other: Path("/mock") / other
+        mock_path_instance = Mock()
+        mock_path_instance.parent.parent.parent = Path("/mock")
+        mock_path_instance.__truediv__ = lambda other: Path("/mock") / other
+        mock_path_cls.return_value = mock_path_instance
 
         # Mock sys.exit to capture exit calls
         with patch("sys.exit") as mock_exit:
@@ -397,13 +407,15 @@ def test_write_failure_with_recovery(temp_config_file, mock_protector_script):
     with (
         patch("pathlib.Path.exists", return_value=True),
         patch("pathlib.Path.resolve", return_value=Path(mock_protector_script)),
-        patch("contextprotector.mcp_config.pathlib.Path") as mock_path,
+        patch("contextprotector.mcp_config.pathlib.Path") as mock_path_cls,
         patch("json.dump", side_effect=write_exception),
         patch("sys.exit") as mock_exit,
         patch("contextprotector.mcp_config.logger") as mock_logger,
     ):
-        mock_path.return_value.parent.parent.parent = Path("/mock")
-        mock_path.return_value.__truediv__ = lambda _, other: Path("/mock") / other
+        mock_path_instance = Mock()
+        mock_path_instance.parent.parent.parent = Path("/mock")
+        mock_path_instance.__truediv__ = lambda other: Path("/mock") / other
+        mock_path_cls.return_value = mock_path_instance
 
         wrap_mcp_config_file(temp_config_file)
 
@@ -430,11 +442,13 @@ def test_no_servers_modified(temp_config_file, mock_protector_script):
     with (
         patch("pathlib.Path.exists", return_value=True),
         patch("pathlib.Path.resolve", return_value=Path(mock_protector_script)),
-        patch("contextprotector.mcp_config.pathlib.Path") as mock_path,
+        patch("contextprotector.mcp_config.pathlib.Path") as mock_path_cls,
         patch("contextprotector.mcp_config.logger") as mock_logger,
     ):
-        mock_path.return_value.parent.parent.parent = Path("/mock")
-        mock_path.return_value.__truediv__ = lambda _, other: Path("/mock") / other
+        mock_path_instance = Mock()
+        mock_path_instance.parent.parent.parent = Path("/mock")
+        mock_path_instance.__truediv__ = lambda other: Path("/mock") / other
+        mock_path_cls.return_value = mock_path_instance
 
         wrap_mcp_config_file(temp_config_file)
 
@@ -457,10 +471,12 @@ def test_non_list_args_handling(temp_config_file, mock_protector_script):
     with (
         patch("pathlib.Path.exists", return_value=True),
         patch("pathlib.Path.resolve", return_value=Path(mock_protector_script)),
-        patch("contextprotector.mcp_config.pathlib.Path") as mock_path,
+        patch("contextprotector.mcp_config.pathlib.Path") as mock_path_cls,
     ):
-        mock_path.return_value.parent.parent.parent = Path("/mock")
-        mock_path.return_value.__truediv__ = lambda _, other: Path("/mock") / other
+        mock_path_instance = Mock()
+        mock_path_instance.parent.parent.parent = Path("/mock")
+        mock_path_instance.__truediv__ = lambda other: Path("/mock") / other
+        mock_path_cls.return_value = mock_path_instance
 
         with patch("sys.exit") as mock_exit:
             wrap_mcp_config_file(temp_config_file)
