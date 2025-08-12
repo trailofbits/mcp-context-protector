@@ -54,7 +54,7 @@ def test_wrap_command_based_servers(temp_config_file, mock_protector_script):
         patch("contextprotector.mcp_config.pathlib.Path") as mock_path,
     ):
         mock_path.return_value.parent.parent.parent = Path("/mock")
-        mock_path.return_value.__truediv__ = lambda self, other: Path("/mock") / other
+        mock_path.return_value.__truediv__ = lambda _, other: Path("/mock") / other
 
         # Mock sys.exit to capture exit calls
         with patch("sys.exit") as mock_exit:
@@ -112,7 +112,7 @@ def test_wrap_http_sse_servers(temp_config_file, mock_protector_script):
         patch("contextprotector.mcp_config.pathlib.Path") as mock_path,
     ):
         mock_path.return_value.parent.parent.parent = Path("/mock")
-        mock_path.return_value.__truediv__ = lambda self, other: Path("/mock") / other
+        mock_path.return_value.__truediv__ = lambda _, other: Path("/mock") / other
 
         # Mock sys.exit to capture exit calls
         with patch("sys.exit") as mock_exit:
@@ -164,7 +164,7 @@ def test_mixed_servers(temp_config_file, mock_protector_script):
         patch("contextprotector.mcp_config.pathlib.Path") as mock_path,
     ):
         mock_path.return_value.parent.parent.parent = Path("/mock")
-        mock_path.return_value.__truediv__ = lambda self, other: Path("/mock") / other
+        mock_path.return_value.__truediv__ = lambda _, other: Path("/mock") / other
 
         # Mock sys.exit to capture exit calls
         with patch("sys.exit") as mock_exit:
@@ -213,7 +213,7 @@ def test_already_wrapped_servers(temp_config_file, mock_protector_script):
         patch("contextprotector.mcp_config.logger") as mock_logger,
     ):
         mock_path.return_value.parent.parent.parent = Path("/mock")
-        mock_path.return_value.__truediv__ = lambda self, other: Path("/mock") / other
+        mock_path.return_value.__truediv__ = lambda _, other: Path("/mock") / other
 
         # Mock sys.exit to capture exit calls
         with patch("sys.exit") as mock_exit:
@@ -263,7 +263,7 @@ def test_invalid_server_configs(temp_config_file, mock_protector_script):
         patch("contextprotector.mcp_config.logger") as mock_logger,
     ):
         mock_path.return_value.parent.parent.parent = Path("/mock")
-        mock_path.return_value.__truediv__ = lambda self, other: Path("/mock") / other
+        mock_path.return_value.__truediv__ = lambda _, other: Path("/mock") / other
 
         # Mock sys.exit to capture exit calls
         with patch("sys.exit") as mock_exit:
@@ -403,7 +403,7 @@ def test_write_failure_with_recovery(temp_config_file, mock_protector_script):
         patch("contextprotector.mcp_config.logger") as mock_logger,
     ):
         mock_path.return_value.parent.parent.parent = Path("/mock")
-        mock_path.return_value.__truediv__ = lambda self, other: Path("/mock") / other
+        mock_path.return_value.__truediv__ = lambda _, other: Path("/mock") / other
 
         wrap_mcp_config_file(temp_config_file)
 
@@ -434,7 +434,7 @@ def test_no_servers_modified(temp_config_file, mock_protector_script):
         patch("contextprotector.mcp_config.logger") as mock_logger,
     ):
         mock_path.return_value.parent.parent.parent = Path("/mock")
-        mock_path.return_value.__truediv__ = lambda self, other: Path("/mock") / other
+        mock_path.return_value.__truediv__ = lambda _, other: Path("/mock") / other
 
         wrap_mcp_config_file(temp_config_file)
 
@@ -460,7 +460,7 @@ def test_non_list_args_handling(temp_config_file, mock_protector_script):
         patch("contextprotector.mcp_config.pathlib.Path") as mock_path,
     ):
         mock_path.return_value.parent.parent.parent = Path("/mock")
-        mock_path.return_value.__truediv__ = lambda self, other: Path("/mock") / other
+        mock_path.return_value.__truediv__ = lambda _, other: Path("/mock") / other
 
         with patch("sys.exit") as mock_exit:
             wrap_mcp_config_file(temp_config_file)
