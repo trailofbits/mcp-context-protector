@@ -11,7 +11,7 @@ import sys
 
 from .approval_cli import list_unapproved_configs, review_server_config
 from .guardrails import GuardrailProvider, get_provider, get_provider_names
-from .mcp_json_cli import manage_all_mcp_json_files, manage_mcp_json_file
+from .mcp_json_cli import manage_all_mcp_json_files, manage_mcp_json_file, wrap_mcp_json_file
 from .mcp_wrapper import MCPWrapperServer
 from .quarantine_cli import review_quarantine
 from .wrapper_config import MCPWrapperConfig
@@ -117,6 +117,11 @@ async def main_async() -> None:
         manage_all_mcp_json_files()
         return
 
+    # Check if we're in wrap MCP JSON file mode
+    if args.wrap_mcp_json:
+        wrap_mcp_json_file(args.wrap_mcp_json)
+        return
+
     # Check if we're in server review mode
     if args.review_server:
         await _launch_review(args, guardrail_provider)
@@ -196,6 +201,11 @@ def _parse_args() -> argparse.Namespace:
         "--manage-all-mcp-json",
         action="store_true",
         help="Find and manage all MCP JSON configuration files from known locations",
+    )
+    source_group.add_argument(
+        "--wrap-mcp-json",
+        metavar="CONFIG_FILE",
+        help="Wrap all MCP servers in the specified JSON config file with context-protector",
     )
 
     # Add config file argument with new name

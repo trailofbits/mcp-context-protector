@@ -4,7 +4,7 @@ import pathlib
 import tempfile
 from unittest.mock import Mock, patch
 
-from contextprotector.mcp_json_cli import AllMCPJsonManager, MCPJsonManager
+from contextprotector.mcp_json_cli import AllMCPJsonManager, MCPJsonManager, WrapMCPJsonManager
 from contextprotector.mcp_json_config import MCPJsonConfig, MCPServerSpec
 
 
@@ -644,6 +644,309 @@ class TestAllMCPJsonManager:
             mock_manager.run.assert_called_once()
 
 
+class TestWrapMCPJsonManager:
+    """Tests for WrapMCPJsonManager class."""
+
+    def test_init(self):
+        """Test initializing WrapMCPJsonManager."""
+        with tempfile.NamedTemporaryFile(suffix=".json") as f:
+            manager = WrapMCPJsonManager(f.name)
+            assert manager.file_path == pathlib.Path(f.name)
+            assert manager.config is None
+            assert manager.original_json == ""
+            assert manager.servers_to_wrap == []
+            assert manager.servers_already_wrapped == []
+
+    def test_load_config(self):
+        """Test loading configuration."""
+        import json
+
+        config_data = {
+            "mcpServers": {
+                "test-server": {"command": "python", "args": ["-m", "test_module"]}
+            }
+        }
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump(config_data, f, indent=2)
+            f.flush()
+
+            manager = WrapMCPJsonManager(f.name)
+            with patch("builtins.print"):
+                manager._load_config()
+
+            assert manager.config is not None
+            assert len(manager.config.mcp_servers) == 1
+            assert "test-server" in manager.config.mcp_servers
+            assert manager.original_json != ""
+
+            # Clean up
+            pathlib.Path(f.name).unlink()
+
+    def test_analyze_servers_none_wrapped(self):
+        """Test analyzing servers when none are wrapped."""
+        import json
+
+        config_data = {
+            "mcpServers": {
+                "server1": {"command": "python", "args": ["-m", "test1"]},
+                "server2": {"command": "echo", "args": ["hello"]},
+            }
+        }
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump(config_data, f, indent=2)
+            f.flush()
+
+            manager = WrapMCPJsonManager(f.name)
+            with patch("builtins.print"):
+                manager._load_config()
+            manager._analyze_servers()
+
+            assert len(manager.servers_to_wrap) == 2
+            assert "server1" in manager.servers_to_wrap
+            assert "server2" in manager.servers_to_wrap
+            assert len(manager.servers_already_wrapped) == 0
+
+            # Clean up
+            pathlib.Path(f.name).unlink()
+
+    def test_analyze_servers_some_wrapped(self):
+        """Test analyzing servers when some are already wrapped."""
+        import json
+
+        config_data = {
+            "mcpServers": {
+                "unwrapped": {"command": "python", "args": ["-m", "test"]},
+                "wrapped": {
+                    "command": "mcp-context-protector",
+                    "args": ["--command-args", "python", "-m", "test"],
+                },
+            }
+        }
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump(config_data, f, indent=2)
+            f.flush()
+
+            manager = WrapMCPJsonManager(f.name)
+            with patch("builtins.print"):
+                manager._load_config()
+            manager._analyze_servers()
+
+            assert len(manager.servers_to_wrap) == 1
+            assert "unwrapped" in manager.servers_to_wrap
+            assert len(manager.servers_already_wrapped) == 1
+            assert "wrapped" in manager.servers_already_wrapped
+
+            # Clean up
+            pathlib.Path(f.name).unlink()
+
+    @patch("builtins.print")
+    def test_display_analysis(self, mock_print):
+        """Test displaying analysis results."""
+        with tempfile.NamedTemporaryFile(suffix=".json") as f:
+            manager = WrapMCPJsonManager(f.name)
+            manager.config = MCPJsonConfig()
+            manager.config.add_server("unwrapped", MCPServerSpec(command="python", args=["-m", "test"]))
+            manager.config.add_server(
+                "wrapped", MCPServerSpec(command="mcp-context-protector", args=["--command-args", "echo"])
+            )
+            manager.servers_to_wrap = ["unwrapped"]
+            manager.servers_already_wrapped = ["wrapped"]
+
+            manager._display_analysis()
+
+            # Check that print was called with appropriate messages
+            printed_output = [str(call.args[0]) for call in mock_print.call_args_list if call.args]
+            output_text = "\n".join(printed_output)
+
+            assert "MCP Server Wrapping Analysis" in output_text
+            assert "Already Protected" in output_text
+            assert "wrapped" in output_text
+            assert "Servers to Wrap" in output_text
+            assert "unwrapped" in output_text
+
+    @patch("builtins.input", return_value="y")
+    def test_confirm_wrapping_yes(self, mock_input):  # noqa: ARG002
+        """Test confirming wrapping with yes."""
+        with tempfile.NamedTemporaryFile(suffix=".json") as f:
+            manager = WrapMCPJsonManager(f.name)
+            manager.servers_to_wrap = ["test-server"]
+
+            with patch("builtins.print"):
+                result = manager._confirm_wrapping()
+
+            assert result is True
+
+    @patch("builtins.input", return_value="n")
+    def test_confirm_wrapping_no(self, mock_input):  # noqa: ARG002
+        """Test confirming wrapping with no."""
+        with tempfile.NamedTemporaryFile(suffix=".json") as f:
+            manager = WrapMCPJsonManager(f.name)
+            manager.servers_to_wrap = ["test-server"]
+
+            with patch("builtins.print"):
+                result = manager._confirm_wrapping()
+
+            assert result is False
+
+    @patch("builtins.print")
+    def test_wrap_servers(self, mock_print):
+        """Test wrapping servers."""
+        with tempfile.NamedTemporaryFile(suffix=".json") as f:
+            manager = WrapMCPJsonManager(f.name)
+            manager.config = MCPJsonConfig()
+            
+            # Add an unwrapped server
+            original_spec = MCPServerSpec(command="python", args=["-m", "test_module"])
+            manager.config.add_server("test-server", original_spec)
+            manager.servers_to_wrap = ["test-server"]
+
+            manager._wrap_servers()
+
+            # Verify the server was wrapped
+            wrapped_spec = manager.config.get_server("test-server")
+            assert wrapped_spec is not None
+            
+            # Should have been wrapped (exact wrapping logic depends on with_context_protector implementation)
+            from contextprotector.mcp_json_config import MCPContextProtectorDetector
+            assert MCPContextProtectorDetector.is_context_protector_configured(wrapped_spec)
+
+            # Check that success message was printed
+            printed_output = [str(call.args[0]) for call in mock_print.call_args_list if call.args]
+            success_messages = [msg for msg in printed_output if "Successfully wrapped" in msg]
+            assert len(success_messages) > 0
+
+    @patch("builtins.input", side_effect=["y"])
+    def test_save_with_confirmation_yes(self, mock_input):  # noqa: ARG002
+        """Test saving with confirmation (yes)."""
+        import json
+
+        config_data = {"mcpServers": {"test": {"command": "echo"}}}
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump(config_data, f)
+            f.flush()
+
+            manager = WrapMCPJsonManager(f.name)
+            manager.config = MCPJsonConfig(filename=f.name)
+            # Modify the config to create a difference
+            manager.config.add_server("new-server", MCPServerSpec(command="python"))
+            manager.original_json = json.dumps(config_data, indent=2)
+
+            with patch("builtins.print"):
+                result = manager._save_with_confirmation()
+
+            assert result is True
+
+            # Verify backup was created
+            backup_path = pathlib.Path(f.name + ".backup")
+            assert backup_path.exists()
+
+            # Clean up
+            pathlib.Path(f.name).unlink()
+            if backup_path.exists():
+                backup_path.unlink()
+
+    @patch("builtins.input", side_effect=["n"])
+    def test_save_with_confirmation_no(self, mock_input):  # noqa: ARG002
+        """Test saving with confirmation (no)."""
+        with tempfile.NamedTemporaryFile(suffix=".json") as f:
+            manager = WrapMCPJsonManager(f.name)
+            manager.config = MCPJsonConfig()
+            manager.config.add_server("test", MCPServerSpec(command="echo"))
+            manager.original_json = '{"mcpServers": {}}'
+
+            with patch("builtins.print"):
+                result = manager._save_with_confirmation()
+
+            assert result is False
+
+    @patch("sys.exit")
+    def test_run_nonexistent_file(self, mock_exit):
+        """Test running with a non-existent file."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            nonexistent_path = pathlib.Path(temp_dir) / "nonexistent.json"
+            
+            manager = WrapMCPJsonManager(str(nonexistent_path))
+            
+            with patch("builtins.print"):
+                manager.run()
+
+            # Should have been called with exit code 1
+            mock_exit.assert_called_with(1)
+            # Allow for the possibility it's called more than once due to nested exceptions
+            assert mock_exit.call_count >= 1
+
+    def test_run_no_servers_to_wrap_already_wrapped(self):
+        """Test running when all servers are already wrapped."""
+        import json
+
+        config_data = {
+            "mcpServers": {
+                "wrapped": {
+                    "command": "mcp-context-protector",
+                    "args": ["--command-args", "python", "-m", "test"],
+                }
+            }
+        }
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump(config_data, f, indent=2)
+            f.flush()
+
+            manager = WrapMCPJsonManager(f.name)
+
+            with patch("builtins.print") as mock_print:
+                manager.run()
+
+            # Should print message about all servers being wrapped
+            printed_output = [str(call.args[0]) for call in mock_print.call_args_list if call.args]
+            success_messages = [msg for msg in printed_output if "already wrapped" in msg]
+            assert len(success_messages) > 0
+
+            # Clean up
+            pathlib.Path(f.name).unlink()
+
+    def test_run_no_servers_in_config(self):
+        """Test running with a config that has no servers."""
+        import json
+
+        config_data = {"mcpServers": {}}
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump(config_data, f, indent=2)
+            f.flush()
+
+            manager = WrapMCPJsonManager(f.name)
+
+            with patch("builtins.print") as mock_print:
+                manager.run()
+
+            # Should print message about no servers found
+            printed_output = [str(call.args[0]) for call in mock_print.call_args_list if call.args]
+            no_servers_messages = [msg for msg in printed_output if "No MCP servers found" in msg]
+            assert len(no_servers_messages) > 0
+
+            # Clean up
+            pathlib.Path(f.name).unlink()
+
+    def test_wrap_mcp_json_file_function(self):
+        """Test the main entry point function."""
+        with patch("contextprotector.mcp_json_cli.WrapMCPJsonManager") as mock_manager_class:
+            mock_manager = Mock()
+            mock_manager_class.return_value = mock_manager
+
+            from contextprotector.mcp_json_cli import wrap_mcp_json_file
+
+            with tempfile.NamedTemporaryFile(suffix=".json") as f:
+                wrap_mcp_json_file(f.name)
+
+                mock_manager_class.assert_called_once_with(f.name)
+                mock_manager.run.assert_called_once()
+
+
 class TestCLIIntegration:
     """Tests for CLI integration."""
 
@@ -680,3 +983,22 @@ class TestCLIIntegration:
         assert not args.review_server
         assert not args.review_quarantine
         assert not args.list_guardrail_providers
+
+    @patch("contextprotector.mcp_json_cli.wrap_mcp_json_file")
+    def test_main_with_wrap_mcp_json(self, mock_wrap):  # noqa: ARG002
+        """Test main function with --wrap-mcp-json option."""
+        from contextprotector.__main__ import _parse_args
+
+        with tempfile.NamedTemporaryFile(suffix=".json") as f:
+            # Mock sys.argv to test argument parsing
+            test_args = ["mcp-context-protector", "--wrap-mcp-json", f.name]
+
+            with patch("sys.argv", test_args):
+                args = _parse_args()
+
+            assert args.wrap_mcp_json == f.name
+            assert not args.manage_mcp_json_file
+            assert not args.manage_all_mcp_json
+            assert not args.review_server
+            assert not args.review_quarantine
+            assert not args.list_guardrail_providers
