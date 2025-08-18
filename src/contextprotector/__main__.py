@@ -119,7 +119,7 @@ async def main_async() -> None:
 
     # Check if we're in wrap MCP JSON file mode
     if args.wrap_mcp_json:
-        wrap_mcp_json_file(args.wrap_mcp_json)
+        wrap_mcp_json_file(args.wrap_mcp_json, args.environment)
         return
 
     # Check if we're in server review mode
@@ -206,6 +206,12 @@ def _parse_args() -> argparse.Namespace:
         "--wrap-mcp-json",
         metavar="CONFIG_FILE",
         help="Wrap all MCP servers in the specified JSON config file with context-protector",
+    )
+    source_group.add_argument(
+        "--environment",
+        "-e",
+        metavar="ENV",
+        help="Select specific environment/profile for multi-environment configs",
     )
 
     # Add config file argument with new name

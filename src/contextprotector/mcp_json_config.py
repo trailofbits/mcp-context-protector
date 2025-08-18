@@ -5,6 +5,7 @@ import pathlib
 import platform
 import shlex
 import shutil
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, TextIO
 
@@ -196,6 +197,11 @@ class MCPJsonLocator:
             return str(home_dir / ".config" / "Code" / "User" / "mcp.json")
 
     @staticmethod
+    def get_claude_settings_config_path() -> str:
+        """Get the Claude Code settings config path (~/.claude.json)."""
+        return str(pathlib.Path.home() / ".claude.json")
+
+    @staticmethod
     def get_all_mcp_config_paths() -> dict[str, str]:
         """Get all known MCP configuration file paths for different clients.
 
@@ -213,6 +219,7 @@ class MCPJsonLocator:
             "continue": MCPJsonLocator.get_continue_config_path(),
             "continue-yaml": MCPJsonLocator.get_continue_yaml_config_path(),
             "vscode": MCPJsonLocator.get_vscode_user_mcp_config_path(),
+            "claude-settings": MCPJsonLocator.get_claude_settings_config_path(),
         }
 
 
@@ -856,3 +863,424 @@ class MCPJsonConfig:
         This method is deprecated. Use MCPJsonLocator.get_claude_desktop_config_path() instead.
         """
         return MCPJsonLocator.get_claude_desktop_config_path()
+
+
+class MCPConfigSchema(ABC):
+    """Abstract base class for different MCP configuration file schemas."""
+
+    @abstractmethod
+    def detect_schema(self, data: dict[str, Any]) -> bool:
+        """Detect if this schema applies to the configuration data.
+        
+        Args:
+        ----
+            data: Raw configuration dictionary
+            
+        Returns:
+        -------
+            True if this schema can handle the data structure
+        """
+
+    @abstractmethod
+    def list_environments(self, data: dict[str, Any]) -> list[str]:
+        """List available environments/projects in this configuration.
+        
+        Args:
+        ----
+            data: Raw configuration dictionary
+            
+        Returns:
+        -------
+            List of environment names (empty list for single-environment schemas)
+        """
+
+    @abstractmethod
+    def get_default_environment(self, data: dict[str, Any]) -> str | None:
+        """Get the default environment name if specified.
+        
+        Args:
+        ----
+            data: Raw configuration dictionary
+            
+        Returns:
+        -------
+            Default environment name, or None if not specified
+        """
+
+    @abstractmethod
+    def get_servers(self, data: dict[str, Any], environment: str | None = None) -> dict[str, MCPServerSpec]:
+        """Extract MCP servers for a specific environment.
+        
+        Args:
+        ----
+            data: Raw configuration dictionary
+            environment: Environment name (None for single-environment schemas)
+            
+        Returns:
+        -------
+            Dictionary mapping server names to MCPServerSpec objects
+        """
+
+    @abstractmethod
+    def set_servers(
+        self, 
+        data: dict[str, Any], 
+        servers: dict[str, MCPServerSpec], 
+        environment: str | None = None
+    ) -> dict[str, Any]:
+        """Update MCP servers in the configuration data.
+        
+        Args:
+        ----
+            data: Raw configuration dictionary
+            servers: Updated servers dictionary
+            environment: Environment name (None for single-environment schemas)
+            
+        Returns:
+        -------
+            Updated configuration dictionary
+        """
+
+    @abstractmethod
+    def get_other_config(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Extract non-MCP configuration from the data.
+        
+        Args:
+        ----
+            data: Raw configuration dictionary
+            
+        Returns:
+        -------
+            Dictionary of non-MCP configuration keys
+        """
+
+
+class StandardMCPSchema(MCPConfigSchema):
+    """Schema handler for standard MCP configuration format."""
+
+    def detect_schema(self, data: dict[str, Any]) -> bool:
+        """Detect standard schema by presence of direct mcpServers key."""
+        return "mcpServers" in data and isinstance(data["mcpServers"], dict)
+
+    def list_environments(self, data: dict[str, Any]) -> list[str]:
+        """Standard schema has no environments."""
+        return []
+
+    def get_default_environment(self, data: dict[str, Any]) -> str | None:
+        """Standard schema has no default environment."""
+        return None
+
+    def get_servers(self, data: dict[str, Any], environment: str | None = None) -> dict[str, MCPServerSpec]:
+        """Extract servers from standard mcpServers structure."""
+        if environment is not None:
+            raise ValueError("Standard schema does not support environments")
+            
+        servers = {}
+        mcp_servers = data.get("mcpServers", {})
+        
+        for name, server_data in mcp_servers.items():
+            servers[name] = MCPServerSpec.from_dict(server_data)
+            
+        return servers
+
+    def set_servers(
+        self, 
+        data: dict[str, Any], 
+        servers: dict[str, MCPServerSpec], 
+        environment: str | None = None
+    ) -> dict[str, Any]:
+        """Update servers in standard mcpServers structure."""
+        if environment is not None:
+            raise ValueError("Standard schema does not support environments")
+            
+        updated_data = data.copy()
+        updated_data["mcpServers"] = {name: server.to_dict() for name, server in servers.items()}
+        return updated_data
+
+    def get_other_config(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Extract non-MCP configuration."""
+        return {k: v for k, v in data.items() if k != "mcpServers"}
+
+
+class ProjectMCPSchema(MCPConfigSchema):
+    """Schema handler for project-based MCP configuration format used by ~/.claude.json."""
+
+    def detect_schema(self, data: dict[str, Any]) -> bool:
+        """Detect project schema by presence of projects key with nested mcpServers."""
+        if "projects" not in data or not isinstance(data["projects"], dict):
+            return False
+            
+        # Verify each project has mcpServers
+        return all(
+            isinstance(project, dict) and "mcpServers" in project and isinstance(project["mcpServers"], dict)
+            for project in data["projects"].values()
+        )
+
+    def list_environments(self, data: dict[str, Any]) -> list[str]:
+        """List all project paths."""
+        return list(data.get("projects", {}).keys())
+
+    def get_default_environment(self, data: dict[str, Any]) -> str | None:
+        """Get first project as default (no explicit default in this schema)."""
+        projects = list(data.get("projects", {}).keys())
+        return projects[0] if projects else None
+
+    def get_servers(self, data: dict[str, Any], environment: str | None = None) -> dict[str, MCPServerSpec]:
+        """Extract servers from specified project."""
+        projects = data.get("projects", {})
+        
+        if environment is None:
+            environment = self.get_default_environment(data)
+            if environment is None:
+                return {}
+                
+        if environment not in projects:
+            raise ValueError(f"Project '{environment}' not found")
+            
+        servers = {}
+        project_data = projects[environment]
+        mcp_servers = project_data.get("mcpServers", {})
+        
+        for name, server_data in mcp_servers.items():
+            servers[name] = MCPServerSpec.from_dict(server_data)
+            
+        return servers
+
+    def set_servers(
+        self, 
+        data: dict[str, Any], 
+        servers: dict[str, MCPServerSpec], 
+        environment: str | None = None
+    ) -> dict[str, Any]:
+        """Update servers in specified project."""
+        if environment is None:
+            environment = self.get_default_environment(data)
+            if environment is None:
+                raise ValueError("No project specified and no default found")
+                
+        projects = data.get("projects", {})
+        if environment not in projects:
+            raise ValueError(f"Project '{environment}' not found")
+            
+        updated_data = data.copy()
+        updated_data["projects"] = projects.copy()
+        updated_data["projects"][environment] = projects[environment].copy()
+        updated_data["projects"][environment]["mcpServers"] = {
+            name: server.to_dict() for name, server in servers.items()
+        }
+        
+        return updated_data
+
+    def get_other_config(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Extract non-project configuration."""
+        return {k: v for k, v in data.items() if k != "projects"}
+
+
+
+
+class SchemaDetector:
+    """Detects MCP configuration file schema type automatically."""
+    
+    # Order matters - more specific schemas first
+    SCHEMAS = [
+        ProjectMCPSchema(),
+        StandardMCPSchema(),  # Fallback
+    ]
+    
+    @classmethod
+    def detect_schema(cls, data: dict[str, Any]) -> MCPConfigSchema:
+        """Automatically detect configuration schema type.
+        
+        Args:
+        ----
+            data: Raw configuration dictionary
+            
+        Returns:
+        -------
+            Appropriate schema handler instance
+            
+        Raises:
+        ------
+            ValueError: If no schema can handle the data
+        """
+        for schema in cls.SCHEMAS:
+            if schema.detect_schema(data):
+                return schema
+                
+        raise ValueError("Unknown or invalid MCP configuration schema")
+
+
+class MCPUnifiedConfig:
+    """Unified configuration manager that handles any schema type automatically."""
+    
+    def __init__(self, file_path: str, environment: str | None = None) -> None:
+        """Initialize unified config manager.
+        
+        Args:
+        ----
+            file_path: Path to the MCP configuration file
+            environment: Specific environment to target (auto-detected if None)
+        """
+        self.file_path = pathlib.Path(file_path)
+        self.environment = environment
+        self.schema: MCPConfigSchema | None = None
+        self.raw_data: dict[str, Any] = {}
+        
+    def load(self) -> None:
+        """Load and detect schema from configuration file."""
+        if not self.file_path.exists():
+            # Create empty standard schema config
+            self.raw_data = {}
+            self.schema = StandardMCPSchema()
+            return
+            
+        with self.file_path.open("r") as f:
+            self.raw_data = json.load(f)
+            
+        self.schema = SchemaDetector.detect_schema(self.raw_data)
+        
+        # Auto-select environment if not specified
+        if self.environment is None and self.schema.list_environments(self.raw_data):
+            self.environment = self.schema.get_default_environment(self.raw_data)
+    
+    def list_environments(self) -> list[str]:
+        """List available environments in this configuration."""
+        if not self.schema:
+            return []
+        return self.schema.list_environments(self.raw_data)
+    
+    def get_current_environment(self) -> str | None:
+        """Get the currently selected environment."""
+        return self.environment
+        
+    def set_environment(self, environment: str) -> None:
+        """Set the current environment."""
+        if not self.schema:
+            raise ValueError("Configuration not loaded")
+            
+        environments = self.schema.list_environments(self.raw_data)
+        if environments and environment not in environments:
+            raise ValueError(f"Environment '{environment}' not found. Available: {environments}")
+            
+        self.environment = environment
+    
+    def get_servers(self) -> dict[str, MCPServerSpec]:
+        """Get MCP servers for the current environment."""
+        if not self.schema:
+            raise ValueError("Configuration not loaded")
+        return self.schema.get_servers(self.raw_data, self.environment)
+    
+    def set_servers(self, servers: dict[str, MCPServerSpec]) -> None:
+        """Update MCP servers for the current environment."""
+        if not self.schema:
+            raise ValueError("Configuration not loaded")
+        self.raw_data = self.schema.set_servers(self.raw_data, servers, self.environment)
+    
+    def save(self, indent: int = 2) -> None:
+        """Save the configuration to file."""
+        with self.file_path.open("w") as f:
+            json.dump(self.raw_data, f, indent=indent)
+    
+    def get_schema_type(self) -> str:
+        """Get a human-readable schema type name."""
+        if not self.schema:
+            return "Unknown"
+        return type(self.schema).__name__.replace("MCPSchema", "").replace("MCP", "")
+
+
+class EnvironmentSelector:
+    """Handles environment selection for multi-environment configurations."""
+    
+    @staticmethod
+    def select_environment(
+        schema: MCPConfigSchema, 
+        data: dict[str, Any], 
+        cli_environment: str | None = None,
+        interactive: bool = True
+    ) -> str | None:
+        """Select environment with CLI override or interactive prompt.
+        
+        Args:
+        ----
+            schema: The configuration schema handler
+            data: Raw configuration data
+            cli_environment: Environment specified via CLI (takes precedence)
+            interactive: Whether to prompt user for selection
+            
+        Returns:
+        -------
+            Selected environment name, or None for single-environment schemas
+            
+        Raises:
+        ------
+            ValueError: If specified environment doesn't exist
+        """
+        environments = schema.list_environments(data)
+        
+        # Single-environment or standard schema - no selection needed
+        if len(environments) <= 1:
+            return environments[0] if environments else None
+            
+        # CLI argument takes precedence
+        if cli_environment:
+            if cli_environment in environments:
+                return cli_environment
+            else:
+                available = ", ".join(environments)
+                raise ValueError(f"Environment '{cli_environment}' not found. Available: {available}")
+                
+        # Non-interactive mode - use default
+        if not interactive:
+            return schema.get_default_environment(data)
+            
+        # Interactive selection
+        return EnvironmentSelector._interactive_selection(environments, schema.get_default_environment(data))
+        
+    @staticmethod
+    def _interactive_selection(environments: list[str], default: str | None = None) -> str:
+        """Interactive environment selection prompt."""
+        print(f"\n{len(environments)} environments detected:")
+        for i, env in enumerate(environments, 1):
+            marker = " (default)" if env == default else ""
+            print(f"  {i}. {env}{marker}")
+            
+        while True:
+            prompt = f"Select environment [1-{len(environments)}]"
+            if default:
+                prompt += f" (default: {default})"
+            prompt += ": "
+            
+            choice = input(prompt).strip()
+            
+            # Empty input uses default
+            if not choice and default:
+                return default
+                
+            # Numeric selection
+            if choice.isdigit():
+                idx = int(choice)
+                if 1 <= idx <= len(environments):
+                    return environments[idx - 1]
+                    
+            print(f"Invalid selection. Please enter 1-{len(environments)}")
+
+
+class MCPConfigManagerFactory:
+    """Factory for creating unified configuration managers."""
+    
+    @staticmethod
+    def create_manager(file_path: str, environment: str | None = None) -> MCPUnifiedConfig:
+        """Create a unified configuration manager.
+        
+        Args:
+        ----
+            file_path: Path to the MCP configuration file
+            environment: Specific environment to target
+            
+        Returns:
+        -------
+            Configured MCPUnifiedConfig instance
+        """
+        manager = MCPUnifiedConfig(file_path, environment)
+        manager.load()
+        return manager

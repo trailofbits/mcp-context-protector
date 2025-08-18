@@ -444,6 +444,7 @@ class TestMCPJsonLocator:
             "continue",
             "continue-yaml",
             "vscode",
+            "claude-settings",
         }
         assert set(all_paths.keys()) == expected_clients
 
