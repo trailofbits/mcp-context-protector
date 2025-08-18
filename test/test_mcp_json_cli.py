@@ -742,6 +742,67 @@ class TestWrapMCPJsonManager:
             # Clean up
             pathlib.Path(f.name).unlink()
 
+    def test_analyze_servers_comprehensive_wrapped_patterns(self):
+        """Test analyzing servers with comprehensive wrapped patterns including uv and arbitrary paths."""
+        import json
+
+        config_data = {
+            "mcpServers": {
+                "unwrapped-python": {"command": "python", "args": ["-m", "myserver"]},
+                "unwrapped-node": {"command": "node", "args": ["server.js"]},
+                "wrapped-direct": {
+                    "command": "mcp-context-protector",
+                    "args": ["--command-args", "python", "-m", "server1"],
+                },
+                "wrapped-script": {
+                    "command": "mcp-context-protector.sh",
+                    "args": ["--command-args", "node", "app.js"],
+                },
+                "wrapped-absolute-path": {
+                    "command": "/usr/local/bin/mcp-context-protector",
+                    "args": ["--command-args", "rust-analyzer", "--stdio"],
+                },
+                "wrapped-uv-run": {
+                    "command": "uv",
+                    "args": ["run", "mcp-context-protector", "--command-args", "go", "run", "main.go"],
+                },
+                "wrapped-python-module": {
+                    "command": "python3",
+                    "args": ["-m", "contextprotector", "--command-args", "java", "-jar", "server.jar"],
+                },
+                "wrapped-venv-python": {
+                    "command": "/path/to/venv/bin/python",
+                    "args": ["-m", "contextprotector", "--command-args", "docker", "run", "myimage"],
+                },
+            }
+        }
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump(config_data, f, indent=2)
+            f.flush()
+
+            manager = WrapMCPJsonManager(f.name)
+            with patch("builtins.print"):
+                manager._load_config()
+            manager._analyze_servers()
+
+            # Should identify exactly 2 servers to wrap
+            assert len(manager.servers_to_wrap) == 2
+            assert "unwrapped-python" in manager.servers_to_wrap
+            assert "unwrapped-node" in manager.servers_to_wrap
+
+            # Should identify 6 already wrapped servers
+            assert len(manager.servers_already_wrapped) == 6
+            assert "wrapped-direct" in manager.servers_already_wrapped
+            assert "wrapped-script" in manager.servers_already_wrapped
+            assert "wrapped-absolute-path" in manager.servers_already_wrapped
+            assert "wrapped-uv-run" in manager.servers_already_wrapped
+            assert "wrapped-python-module" in manager.servers_already_wrapped
+            assert "wrapped-venv-python" in manager.servers_already_wrapped
+
+            # Clean up
+            pathlib.Path(f.name).unlink()
+
     @patch("builtins.print")
     def test_display_analysis(self, mock_print):
         """Test displaying analysis results."""

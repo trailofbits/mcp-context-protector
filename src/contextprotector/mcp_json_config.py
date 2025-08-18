@@ -246,35 +246,49 @@ class MCPContextProtectorDetector:
         command = server_spec.command.strip()
 
         # Direct invocations
-        if command in ("mcp-context-protector", "mcp-context-protector.sh"):
+        if command in ("mcp-context-protector", "mcp-context-protector.sh", "mcp-context-protector.bat"):
             return True
 
-        # Check if command ends with the script name
-        if command.endswith("/mcp-context-protector.sh") or command.endswith(
-            "\\mcp-context-protector.sh"
-        ):
-            return True
-        if command.endswith("/mcp-context-protector") or command.endswith(
-            "\\mcp-context-protector"
-        ):
+        # Check if command ends with the script name or installed entry point
+        if (command.endswith("/mcp-context-protector.sh") or 
+            command.endswith("\\mcp-context-protector.sh") or
+            command.endswith("/mcp-context-protector.bat") or 
+            command.endswith("\\mcp-context-protector.bat") or
+            command.endswith("/mcp-context-protector") or
+            command.endswith("\\mcp-context-protector")):
             return True
 
         # Check arguments for context protector patterns
         if server_spec.args:
             args = server_spec.args
 
-            # uv run mcp-context-protector
-            if (
-                command == "uv"
-                and len(args) >= MIN_ARGS_FOR_COMMAND_PATTERN
-                and args[0] == "run"
-                and args[1] == "mcp-context-protector"
-            ):
-                return True
+            # uv run mcp-context-protector (with optional flags)
+            if command == "uv" and len(args) >= MIN_ARGS_FOR_COMMAND_PATTERN:
+                # Find the "run" subcommand, which may not be at index 0 due to global flags
+                run_index = None
+                for i, arg in enumerate(args):
+                    if arg == "run":
+                        run_index = i
+                        break
+                
+                # Check if we have "mcp-context-protector" after "run"
+                if (run_index is not None and 
+                    run_index + 1 < len(args) and 
+                    args[run_index + 1] == "mcp-context-protector"):
+                    return True
 
-            # python -m contextprotector
+            # python -m contextprotector (including absolute paths and python variants)
+            is_python_command = (
+                command in ("python", "python3") or
+                command.endswith("/python") or
+                command.endswith("/python3") or
+                command.endswith("\\python.exe") or
+                command.endswith("\\python3.exe") or
+                command.endswith("/python3.11") or
+                (command.startswith("/") and command.split("/")[-1].startswith("python"))
+            )
             if (
-                command in ("python", "python3")
+                is_python_command
                 and len(args) >= MIN_ARGS_FOR_COMMAND_PATTERN
                 and args[0] == "-m"
                 and args[1] == "contextprotector"
@@ -284,7 +298,11 @@ class MCPContextProtectorDetector:
             # Check if any arg contains context protector references
             for arg in args:
                 if isinstance(arg, str) and (
-                    "mcp-context-protector" in arg or "contextprotector" in arg
+                    "mcp-context-protector" in arg or 
+                    # Only detect contextprotector if it's not part of a pip install command
+                    ("contextprotector" in arg and not (
+                        len(args) >= 3 and args[0] == "-m" and args[1] == "pip" and args[2] == "install"
+                    ))
                 ):
                     return True
 
@@ -297,14 +315,28 @@ class MCPContextProtectorDetector:
 
             for i, part in enumerate(parsed):
                 # Check each part for context protector patterns
-                if "mcp-context-protector" in part:
+                # Be more specific about mcp-context-protector matching
+                if (part == "mcp-context-protector" or 
+                    part == "mcp-context-protector.sh" or
+                    part == "mcp-context-protector.bat" or
+                    part.endswith("/mcp-context-protector") or
+                    part.endswith("\\mcp-context-protector") or
+                    part.endswith("/mcp-context-protector.sh") or
+                    part.endswith("\\mcp-context-protector.sh") or
+                    part.endswith("/mcp-context-protector.bat") or
+                    part.endswith("\\mcp-context-protector.bat")):
                     return True
                 if part == "contextprotector" and i > 0 and parsed[i - 1] == "-m":
                     return True
 
         except ValueError:
             # If shlex parsing fails, fall back to simple string search
-            if "mcp-context-protector" in full_command or "contextprotector" in full_command:
+            # Only match if it appears to be the actual command, not just a substring
+            if (" mcp-context-protector " in full_command or 
+                full_command.startswith("mcp-context-protector ") or
+                full_command.endswith(" mcp-context-protector") or
+                full_command == "mcp-context-protector" or
+                " -m contextprotector " in full_command):
                 return True
 
         return False
@@ -478,22 +510,28 @@ class MCPServerSpec:
 
         # Pattern 1: Direct mcp-context-protector with --command-args
         if (
-            self.command in ("mcp-context-protector", "mcp-context-protector.sh")
+            self.command in ("mcp-context-protector", "mcp-context-protector.sh", "mcp-context-protector.bat")
             or self.command.endswith("/mcp-context-protector.sh")
             or self.command.endswith("\\mcp-context-protector.sh")
-            or self.command.endswith("/mcp-context-protector")
-            or self.command.endswith("\\mcp-context-protector")
+            or self.command.endswith("/mcp-context-protector.bat")
+            or self.command.endswith("\\mcp-context-protector.bat")
         ):
             return self._extract_from_command_args()
 
-        # Pattern 2: uv run mcp-context-protector
-        if (
-            self.command == "uv"
-            and len(self.args) >= MIN_ARGS_FOR_COMMAND_PATTERN
-            and self.args[0] == "run"
-            and self.args[1] == "mcp-context-protector"
-        ):
-            return self._extract_from_uv_run()
+        # Pattern 2: uv run mcp-context-protector (with optional flags)
+        if self.command == "uv" and len(self.args) >= MIN_ARGS_FOR_COMMAND_PATTERN:
+            # Find the "run" subcommand, which may not be at index 0 due to global flags
+            run_index = None
+            for i, arg in enumerate(self.args):
+                if arg == "run":
+                    run_index = i
+                    break
+            
+            # Check if we have "mcp-context-protector" after "run"
+            if (run_index is not None and 
+                run_index + 1 < len(self.args) and 
+                self.args[run_index + 1] == "mcp-context-protector"):
+                return self._extract_from_uv_run(run_index)
 
         # Pattern 3: python -m contextprotector
         if (
@@ -539,10 +577,15 @@ class MCPServerSpec:
         except (ValueError, IndexError) as e:
             raise ValueError(f"Could not parse --command-args pattern: {e}") from e
 
-    def _extract_from_uv_run(self) -> "MCPServerSpec":
-        """Extract original command from uv run pattern."""
-        # Skip "run", "mcp-context-protector", then look for --command-args
-        remaining_args = self.args[2:]  # Skip "run" and "mcp-context-protector"
+    def _extract_from_uv_run(self, run_index: int = 0) -> "MCPServerSpec":
+        """Extract original command from uv run pattern.
+        
+        Args:
+        ----
+            run_index: Index of the "run" argument in self.args
+        """
+        # Skip to after "run" and "mcp-context-protector"
+        remaining_args = self.args[run_index + 2:]  # Skip "run" and "mcp-context-protector"
 
         if not remaining_args or "--command-args" not in remaining_args:
             raise ValueError("Expected --command-args in uv run pattern")
