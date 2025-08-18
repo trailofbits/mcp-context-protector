@@ -86,7 +86,7 @@ async def _launch_review(
         )
 
 
-async def main_async() -> None:
+async def main_async() -> None:  # noqa: PLR0911
     """Launch the wrapped server or review process specified in arguments."""
     args = _parse_args()
 

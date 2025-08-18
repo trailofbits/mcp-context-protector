@@ -6,8 +6,8 @@ import pathlib
 import sys
 
 from .mcp_json_config import (
-    EnvironmentSelector,
     MCPConfigManagerFactory,
+    MCPConfigSchema,
     MCPContextProtectorDetector,
     MCPJsonConfig,
     MCPJsonLocator,
@@ -19,6 +19,89 @@ from .mcp_json_config import (
 MAX_ARGS_DISPLAY_LENGTH = 60
 MAX_ENV_KEYS_PREVIEW = 3
 MAX_ARGS_PREVIEW_LENGTH = 60
+MAX_PATH_DISPLAY_LENGTH = 50
+
+
+class EnvironmentSelector:
+    """Handles environment selection for multi-environment configurations."""
+
+    @staticmethod
+    def select_environment(
+        schema: MCPConfigSchema,
+        data: dict,
+        cli_environment: str | None = None,
+        interactive: bool = True,
+    ) -> str | None:
+        """Select environment with CLI override or interactive prompt.
+
+        Args:
+        ----
+            schema: The configuration schema handler
+            data: Raw configuration data
+            cli_environment: Environment specified via CLI (takes precedence)
+            interactive: Whether to prompt user for selection
+
+        Returns:
+        -------
+            Selected environment name, or None for single-environment schemas
+
+        Raises:
+        ------
+            ValueError: If specified environment doesn't exist
+
+        """
+        environments = schema.list_environments(data)
+
+        # Single-environment or standard schema - no selection needed
+        if len(environments) <= 1:
+            return environments[0] if environments else None
+
+        # CLI argument takes precedence
+        if cli_environment:
+            if cli_environment in environments:
+                return cli_environment
+            else:
+                available = ", ".join(environments)
+                raise ValueError(
+                    f"Environment '{cli_environment}' not found. Available: {available}"
+                )
+
+        # Non-interactive mode - use default
+        if not interactive:
+            default_env = schema.get_default_environment(data)
+            return default_env
+
+        # Interactive selection
+        default_env = schema.get_default_environment(data)
+        return EnvironmentSelector._interactive_selection(environments, default_env)
+
+    @staticmethod
+    def _interactive_selection(environments: list[str], default: str | None = None) -> str:
+        """Interactive environment selection prompt."""
+        print(f"\n{len(environments)} environments detected:")
+        for i, env in enumerate(environments, 1):
+            marker = " (default)" if env == default else ""
+            print(f"  {i}. {env}{marker}")
+
+        while True:
+            prompt = f"Select environment [1-{len(environments)}]"
+            if default:
+                prompt += f" (default: {default})"
+            prompt += ": "
+
+            choice = input(prompt).strip()
+
+            # Empty input uses default
+            if not choice and default:
+                return default
+
+            # Numeric selection
+            if choice.isdigit():
+                idx = int(choice)
+                if 1 <= idx <= len(environments):
+                    return environments[idx - 1]
+
+            print(f"Invalid selection. Please enter 1-{len(environments)}")
 
 
 class MCPJsonManager:
@@ -58,12 +141,14 @@ class MCPJsonManager:
             self.original_json = "{}"
         else:
             print(f"Loading MCP configuration from: {self.file_path}")
-            
+
             # Try unified config first to handle multi-project configs
             try:
-                unified_config = MCPConfigManagerFactory.create_manager(str(self.file_path), self.environment)
+                unified_config = MCPConfigManagerFactory.create_manager(
+                    str(self.file_path), self.environment
+                )
                 environments = unified_config.list_environments()
-                
+
                 if environments:
                     # Multi-project config
                     if self.environment:
@@ -71,36 +156,42 @@ class MCPJsonManager:
                         print(f"Managing project: {self.environment}")
                     else:
                         # Select first project as default
-                        first_env = environments[0] 
+                        first_env = environments[0]
                         unified_config.set_environment(first_env)
                         print(f"Managing project: {first_env}")
-                    
+
                     self.config = unified_config
                 else:
                     # Single-project config - fall back to legacy for compatibility
                     self.config = MCPJsonConfig.from_json(path=str(self.file_path))
-                    
+
             except Exception:
                 # Fallback to legacy config
                 self.config = MCPJsonConfig.from_json(path=str(self.file_path))
-            
+
             self.original_json = self.file_path.read_text()
 
         # Get server count for display
-        if hasattr(self.config, 'get_servers'):
+        if self.config and hasattr(self.config, "get_servers"):
             servers = self.config.get_servers()
             server_count = len(servers)
-        else:
+        elif self.config and hasattr(self.config, "mcp_servers"):
             server_count = len(self.config.mcp_servers)
-            
+        else:
+            server_count = 0
+
         print(f"Loaded {server_count} MCP server(s)\n")
 
     def _get_servers(self) -> dict[str, MCPServerSpec]:
         """Get servers from either config type."""
-        if hasattr(self.config, 'get_servers'):
+        if not self.config:
+            return {}
+        if hasattr(self.config, "get_servers"):
             return self.config.get_servers()
-        else:
+        elif hasattr(self.config, "mcp_servers"):
             return self.config.mcp_servers
+        else:
+            return {}
 
     def _display_config(self) -> None:
         """Display the current configuration in a human-readable format."""
@@ -113,14 +204,14 @@ class MCPJsonManager:
 
         # Get servers and show current project if applicable
         servers = self._get_servers()
-        
-        if hasattr(self.config, 'get_current_environment'):
+
+        if hasattr(self.config, "get_current_environment"):
             current_env = self.config.get_current_environment()
             if current_env:
                 print(f"Current Project: {current_env}")
-        
+
         # Show global shortcut for legacy configs
-        global_shortcut = getattr(self.config, 'global_shortcut', None)
+        global_shortcut = getattr(self.config, "global_shortcut", None)
         if global_shortcut:
             print(f"Global Shortcut: {global_shortcut}")
 
@@ -238,12 +329,12 @@ class MCPJsonManager:
                 print(f"\n🛡️  Adding protection to '{server_name}'...")
 
             # Update the configuration
-            if hasattr(self.config, 'get_servers'):
+            if self.config and hasattr(self.config, "set_servers"):
                 # Unified config - update servers
                 updated_servers = servers.copy()
                 updated_servers[server_name] = new_spec
                 self.config.set_servers(updated_servers)
-            else:
+            elif self.config and hasattr(self.config, "mcp_servers"):
                 # Legacy config - direct update
                 self.config.mcp_servers[server_name] = new_spec
 
@@ -267,7 +358,7 @@ class MCPJsonManager:
             return False
 
         # Generate new JSON without saving
-        if hasattr(self.config, 'raw_data'):
+        if hasattr(self.config, "raw_data"):
             # Unified config - use raw_data
             new_json = json.dumps(self.config.raw_data, indent=2)
         else:
@@ -328,7 +419,7 @@ class MCPJsonManager:
 
         # Save the file
         try:
-            if hasattr(self.config, 'raw_data'):
+            if hasattr(self.config, "raw_data"):
                 # Unified config - has save() method
                 self.config.save()
             else:
@@ -391,26 +482,34 @@ class AllMCPJsonManager:
                     # Use unified config to handle all schema types
                     config = MCPConfigManagerFactory.create_manager(config_path)
                     environments = config.list_environments()
-                    
+
                     if environments:
                         # Multi-project/environment config - add each project separately
                         for env in environments:
                             config.set_environment(env)
                             servers = config.get_servers()
                             server_count = len(servers)
-                            
+
                             # Only add projects/environments that have MCP servers configured
                             if server_count > 0:
                                 # Format: (client_name, config_path, server_count, environment)
-                                env_display = env if len(env) <= 50 else "..." + env[-47:]
+                                env_display = (
+                                    env
+                                    if len(env) <= MAX_PATH_DISPLAY_LENGTH
+                                    else "..." + env[-47:]
+                                )
                                 display_name = f"{client_name} ({env_display})"
-                                self.discovered_configs.append((display_name, config_path, server_count, env))
+                                self.discovered_configs.append(
+                                    (display_name, config_path, server_count, env)
+                                )
                     else:
                         # Single-project config - show as before
                         servers = config.get_servers()
                         server_count = len(servers)
-                        self.discovered_configs.append((client_name, config_path, server_count, None))
-                        
+                        self.discovered_configs.append(
+                            (client_name, config_path, server_count, None)
+                        )
+
                 except Exception:
                     # If we can't parse it, still show it but with unknown server count
                     self.discovered_configs.append((client_name, config_path, -1, None))
@@ -424,7 +523,9 @@ class AllMCPJsonManager:
         print("Discovered MCP Configuration Files")
         print("=" * 80)
 
-        for i, (client_name, config_path, server_count, environment) in enumerate(self.discovered_configs, 1):
+        for i, (client_name, config_path, server_count, environment) in enumerate(
+            self.discovered_configs, 1
+        ):
             if server_count == -1:
                 server_info = "(unable to parse)"
             elif server_count == 0:
@@ -480,9 +581,12 @@ class AllMCPJsonManager:
                 elif choice.isdigit():
                     config_num = int(choice)
                     if 1 <= config_num <= len(self.discovered_configs):
-                        client_name, config_path, server_count, environment = self.discovered_configs[
-                            config_num - 1
-                        ]
+                        (
+                            client_name,
+                            config_path,
+                            server_count,
+                            environment,
+                        ) = self.discovered_configs[config_num - 1]
 
                         if server_count == -1:
                             warning_msg = (
@@ -504,7 +608,7 @@ class AllMCPJsonManager:
                             display_name = f"{base_name.upper()} ({path_part}"
                         else:
                             display_name = client_name.upper()
-                            
+
                         if environment:
                             print(f"\nOpening {display_name} configuration: {config_path}")
                             print(f"Project: {environment}")
@@ -602,11 +706,13 @@ class WrapMCPJsonManager:
     def _load_config(self) -> None:
         """Load the MCP JSON configuration file."""
         print(f"Loading MCP configuration from: {self.file_path}")
-        
+
         # Create unified config manager
-        self.config = MCPConfigManagerFactory.create_manager(str(self.file_path), self.cli_environment)
+        self.config = MCPConfigManagerFactory.create_manager(
+            str(self.file_path), self.cli_environment
+        )
         self.original_json = self.file_path.read_text() if self.file_path.exists() else "{}"
-        
+
         # Handle environment selection for multi-environment configs
         environments = self.config.list_environments()
         if environments:
@@ -617,24 +723,25 @@ class WrapMCPJsonManager:
                 print(f"Using environment: {self.current_environment}")
             else:
                 # Interactive selection
-                self.current_environment = EnvironmentSelector.select_environment(
-                    self.config.schema, self.config.raw_data, interactive=True
-                )
+                if self.config.schema:
+                    self.current_environment = EnvironmentSelector.select_environment(
+                        self.config.schema,
+                        self.config.raw_data,
+                        cli_environment=None,
+                        interactive=True,
+                    )
                 if self.current_environment:
                     self.config.set_environment(self.current_environment)
                     print(f"Selected environment: {self.current_environment}")
         else:
             # Single-environment config
             self.current_environment = None
-            
+
         # Display schema info
         schema_type = self.config.get_schema_type()
-        if environments:
-            env_info = f" (environment: {self.current_environment})"
-        else:
-            env_info = ""
+        env_info = f" (environment: {self.current_environment})" if environments else ""
         print(f"Detected schema: {schema_type}{env_info}")
-        
+
         servers = self.config.get_servers()
         print(f"Loaded {len(servers)} MCP server(s)")
 
@@ -643,13 +750,15 @@ class WrapMCPJsonManager:
         if not self.config:
             return
 
-        if hasattr(self.config, 'get_servers'):
+        if hasattr(self.config, "get_servers"):
             # New unified config system
             servers = self.config.get_servers()
-        else:
+        elif hasattr(self.config, "mcp_servers"):
             # Legacy MCPJsonConfig
             servers = self.config.mcp_servers
-            
+        else:
+            servers = {}
+
         for server_name, server_spec in servers.items():
             if MCPContextProtectorDetector.is_context_protector_configured(server_spec):
                 self.servers_already_wrapped.append(server_name)
@@ -661,18 +770,17 @@ class WrapMCPJsonManager:
         print("\n" + "=" * 70)
         print("MCP Server Wrapping Analysis")
         print("=" * 70)
-        
+
         # Show schema and environment info
-        if self.config:
-            if hasattr(self.config, 'get_schema_type'):
-                # New unified config system
-                schema_type = self.config.get_schema_type()
-                if self.current_environment:
-                    print(f"Schema: {schema_type} (Environment: {self.current_environment})")
-                else:
-                    print(f"Schema: {schema_type}")
-                print()
-            # Legacy system doesn't show schema info
+        if self.config and hasattr(self.config, "get_schema_type"):
+            # New unified config system
+            schema_type = self.config.get_schema_type()
+            if self.current_environment:
+                print(f"Schema: {schema_type} (Environment: {self.current_environment})")
+            else:
+                print(f"Schema: {schema_type}")
+            print()
+        # Legacy system doesn't show schema info
 
         if self.servers_already_wrapped:
             print(f"\n🛡️  Already Protected ({len(self.servers_already_wrapped)} servers):")
@@ -681,14 +789,16 @@ class WrapMCPJsonManager:
 
         if self.servers_to_wrap:
             print(f"\n⚠️  Servers to Wrap ({len(self.servers_to_wrap)} servers):")
-            
-            if hasattr(self.config, 'get_servers'):
+
+            if self.config and hasattr(self.config, "get_servers"):
                 # New unified config system
                 servers = self.config.get_servers()
-            else:
+            elif self.config and hasattr(self.config, "mcp_servers"):
                 # Legacy MCPJsonConfig
                 servers = self.config.mcp_servers
-                
+            else:
+                servers = {}
+
             for server_name in self.servers_to_wrap:
                 server_spec = servers[server_name]
                 print(f"  • {server_name}")
@@ -730,13 +840,16 @@ class WrapMCPJsonManager:
 
         print(f"\nWrapping {len(self.servers_to_wrap)} server(s)...")
 
-        if hasattr(self.config, 'get_servers'):
+        if hasattr(self.config, "get_servers"):
             # New unified config system
             servers = self.config.get_servers()
             updated_servers = servers.copy()
-        else:
+        elif hasattr(self.config, "mcp_servers"):
             # Legacy MCPJsonConfig
             servers = self.config.mcp_servers
+            updated_servers = None
+        else:
+            servers = {}
             updated_servers = None
 
         for server_name in self.servers_to_wrap:
@@ -745,11 +858,11 @@ class WrapMCPJsonManager:
             try:
                 current_spec = servers[server_name]
                 wrapped_spec = current_spec.with_context_protector()
-                
+
                 if updated_servers is not None:
                     # New system
                     updated_servers[server_name] = wrapped_spec
-                else:
+                elif self.config and hasattr(self.config, "mcp_servers"):
                     # Legacy system
                     self.config.mcp_servers[server_name] = wrapped_spec
 
@@ -763,23 +876,25 @@ class WrapMCPJsonManager:
 
             except ValueError as e:
                 print(f"    ❌ Failed to wrap {server_name}: {e}")
-                
+
         # Update the configuration with wrapped servers (new system only)
         if updated_servers is not None:
             self.config.set_servers(updated_servers)
 
-    def _save_with_confirmation(self) -> bool:
+    def _save_with_confirmation(self) -> bool:  # noqa: PLR0911
         """Show diff and ask for confirmation before saving."""
         if not self.config:
             return False
 
         # Generate new JSON
-        if hasattr(self.config, 'raw_data'):
+        if hasattr(self.config, "raw_data"):
             # New unified config system
             new_json = json.dumps(self.config.raw_data, indent=2)
-        else:
+        elif hasattr(self.config, "to_dict"):
             # Legacy MCPJsonConfig for backward compatibility
             new_json = json.dumps(self.config.to_dict(), indent=2)
+        else:
+            return False
 
         # Check if there are any changes (there should be since we wrapped servers)
         if new_json.strip() == self.original_json.strip():
@@ -834,11 +949,14 @@ class WrapMCPJsonManager:
 
         # Save the file
         try:
-            if hasattr(self.config, 'save') and callable(getattr(self.config, 'save')):
-                self.config.save()
+            if hasattr(self.config, "raw_data"):
+                # MCPUnifiedConfig - save() takes indent parameter
+                self.config.save(indent=2)
+            elif hasattr(self.config, "to_dict"):
+                # MCPJsonConfig - save() takes path parameter
+                self.config.save(str(self.file_path))  # type: ignore[arg-type]
             else:
-                # Legacy MCPJsonConfig 
-                self.config.save(str(self.file_path))
+                return False
             print(f"Configuration saved to: {self.file_path}")
             return True
         except Exception as e:

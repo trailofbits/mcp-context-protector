@@ -662,9 +662,7 @@ class TestWrapMCPJsonManager:
         import json
 
         config_data = {
-            "mcpServers": {
-                "test-server": {"command": "python", "args": ["-m", "test_module"]}
-            }
+            "mcpServers": {"test-server": {"command": "python", "args": ["-m", "test_module"]}}
         }
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
@@ -744,7 +742,8 @@ class TestWrapMCPJsonManager:
             pathlib.Path(f.name).unlink()
 
     def test_analyze_servers_comprehensive_wrapped_patterns(self):
-        """Test analyzing servers with comprehensive wrapped patterns including uv and arbitrary paths."""
+        """Test analyzing servers with comprehensive wrapped patterns including uv and arbitrary
+        paths."""
         import json
 
         config_data = {
@@ -765,15 +764,36 @@ class TestWrapMCPJsonManager:
                 },
                 "wrapped-uv-run": {
                     "command": "uv",
-                    "args": ["run", "mcp-context-protector", "--command-args", "go", "run", "main.go"],
+                    "args": [
+                        "run",
+                        "mcp-context-protector",
+                        "--command-args",
+                        "go",
+                        "run",
+                        "main.go",
+                    ],
                 },
                 "wrapped-python-module": {
                     "command": "python3",
-                    "args": ["-m", "contextprotector", "--command-args", "java", "-jar", "server.jar"],
+                    "args": [
+                        "-m",
+                        "contextprotector",
+                        "--command-args",
+                        "java",
+                        "-jar",
+                        "server.jar",
+                    ],
                 },
                 "wrapped-venv-python": {
                     "command": "/path/to/venv/bin/python",
-                    "args": ["-m", "contextprotector", "--command-args", "docker", "run", "myimage"],
+                    "args": [
+                        "-m",
+                        "contextprotector",
+                        "--command-args",
+                        "docker",
+                        "run",
+                        "myimage",
+                    ],
                 },
             }
         }
@@ -806,25 +826,25 @@ class TestWrapMCPJsonManager:
 
     @patch("builtins.print")
     def test_display_analysis(self, mock_print):
-        """Test displaying analysis results.""" 
+        """Test displaying analysis results."""
         import json
-        
+
         config_data = {
             "mcpServers": {
                 "unwrapped": {"command": "python", "args": ["-m", "test"]},
-                "wrapped": {"command": "mcp-context-protector", "args": ["--command-args", "echo"]}
+                "wrapped": {"command": "mcp-context-protector", "args": ["--command-args", "echo"]},
             }
         }
-        
+
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(config_data, f, indent=2)
             f.flush()
-            
+
             manager = WrapMCPJsonManager(f.name)
             manager._load_config()
             manager._analyze_servers()
             manager._display_analysis()
-            
+
             # Clean up
             pathlib.Path(f.name).unlink()
 
@@ -866,17 +886,15 @@ class TestWrapMCPJsonManager:
     def test_wrap_servers(self, mock_print):
         """Test wrapping servers."""
         import json
-        
+
         config_data = {
-            "mcpServers": {
-                "test-server": {"command": "python", "args": ["-m", "test_module"]}
-            }
+            "mcpServers": {"test-server": {"command": "python", "args": ["-m", "test_module"]}}
         }
-        
+
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(config_data, f, indent=2)
             f.flush()
-            
+
             manager = WrapMCPJsonManager(f.name)
             manager._load_config()
             manager._analyze_servers()
@@ -884,6 +902,7 @@ class TestWrapMCPJsonManager:
 
             # Verify the server was wrapped
             from contextprotector.mcp_json_config import MCPContextProtectorDetector
+
             servers = manager.config.get_servers()
             wrapped_spec = servers["test-server"]
             assert MCPContextProtectorDetector.is_context_protector_configured(wrapped_spec)
@@ -892,7 +911,7 @@ class TestWrapMCPJsonManager:
             printed_output = [str(call.args[0]) for call in mock_print.call_args_list if call.args]
             success_messages = [msg for msg in printed_output if "Successfully wrapped" in msg]
             assert len(success_messages) > 0
-            
+
             # Clean up
             pathlib.Path(f.name).unlink()
 
@@ -946,9 +965,9 @@ class TestWrapMCPJsonManager:
         """Test running with a non-existent file."""
         with tempfile.TemporaryDirectory() as temp_dir:
             nonexistent_path = pathlib.Path(temp_dir) / "nonexistent.json"
-            
+
             manager = WrapMCPJsonManager(str(nonexistent_path))
-            
+
             with patch("builtins.print"):
                 manager.run()
 

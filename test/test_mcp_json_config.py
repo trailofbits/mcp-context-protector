@@ -682,7 +682,7 @@ class TestMCPContextProtectorDetector:
         spec3 = MCPServerSpec(command="/path/to/mcp-context-protector.sh")
         assert MCPContextProtectorDetector.is_context_protector_configured(spec3)
 
-        spec4 = MCPServerSpec(command="C:\\path\\to\\mcp-context-protector.bat")
+        spec4 = MCPServerSpec(command="C:\\tools\\mcp-context-protector.bat")
         assert MCPContextProtectorDetector.is_context_protector_configured(spec4)
 
     def test_uv_run_detection(self):
@@ -762,19 +762,21 @@ class TestMCPContextProtectorDetector:
         # Unix-style absolute path
         spec1 = MCPServerSpec(command="/usr/local/bin/mcp-context-protector")
         assert MCPContextProtectorDetector.is_context_protector_configured(spec1)
-        
+
         # Relative path
         spec2 = MCPServerSpec(command="./scripts/mcp-context-protector")
         assert MCPContextProtectorDetector.is_context_protector_configured(spec2)
-        
+
         # Deep nested path
-        spec3 = MCPServerSpec(command="/home/user/.local/bin/tools/mcp-context-protector.sh")
+        spec3 = MCPServerSpec(command="/usr/local/bin/mcp-context-protector.sh")
         assert MCPContextProtectorDetector.is_context_protector_configured(spec3)
-        
+
         # Windows-style path
-        spec4 = MCPServerSpec(command=r"C:\Users\User\AppData\Local\mcp-context-protector\mcp-context-protector.bat")
+        spec4 = MCPServerSpec(
+            command=r"C:\Program Files\mcp-context-protector\mcp-context-protector.bat"
+        )
         assert MCPContextProtectorDetector.is_context_protector_configured(spec4)
-        
+
         # Path with spaces (quoted)
         spec5 = MCPServerSpec(command="/path with spaces/mcp-context-protector.sh")
         assert MCPContextProtectorDetector.is_context_protector_configured(spec5)
@@ -784,46 +786,63 @@ class TestMCPContextProtectorDetector:
         # Standard uv run pattern
         spec1 = MCPServerSpec(
             command="uv",
-            args=["run", "mcp-context-protector", "--command-args", "python", "server.py"]
+            args=["run", "mcp-context-protector", "--command-args", "python", "server.py"],
         )
         assert MCPContextProtectorDetector.is_context_protector_configured(spec1)
-        
+
         # uv run with additional uv flags after run
         spec2 = MCPServerSpec(
             command="uv",
-            args=["run", "--python", "3.11", "mcp-context-protector", "--command-args", "node", "server.js"]
+            args=[
+                "run",
+                "--python",
+                "3.11",
+                "mcp-context-protector",
+                "--command-args",
+                "node",
+                "server.js",
+            ],
         )
         assert MCPContextProtectorDetector.is_context_protector_configured(spec2)
-        
-        # uv with global flags before run  
+
+        # uv with global flags before run
         spec2b = MCPServerSpec(
             command="uv",
-            args=["--verbose", "--directory", "/path", "run", "mcp-context-protector", "--command-args", "python", "test.py"]
+            args=[
+                "--verbose",
+                "--directory",
+                "/path",
+                "run",
+                "mcp-context-protector",
+                "--command-args",
+                "python",
+                "test.py",
+            ],
         )
         assert MCPContextProtectorDetector.is_context_protector_configured(spec2b)
-        
+
         # uv run with env vars and complex command args
         spec3 = MCPServerSpec(
             command="uv",
             args=[
-                "run", 
-                "mcp-context-protector", 
-                "--command-args", 
-                "docker", 
-                "run", 
-                "--rm", 
-                "-v", 
+                "run",
+                "mcp-context-protector",
+                "--command-args",
+                "docker",
+                "run",
+                "--rm",
+                "-v",
                 "/data:/app/data",
-                "myimage:latest"
+                "myimage:latest",
             ],
-            env={"UV_CACHE_DIR": "/tmp/uv"}
+            env={"UV_CACHE_DIR": "./cache/uv"},
         )
         assert MCPContextProtectorDetector.is_context_protector_configured(spec3)
-        
+
         # Should NOT detect other uv run commands
         spec_false1 = MCPServerSpec(command="uv", args=["run", "pytest"])
         assert not MCPContextProtectorDetector.is_context_protector_configured(spec_false1)
-        
+
         spec_false2 = MCPServerSpec(command="uv", args=["run", "black", "."])
         assert not MCPContextProtectorDetector.is_context_protector_configured(spec_false2)
 
@@ -831,44 +850,46 @@ class TestMCPContextProtectorDetector:
         """Test comprehensive python -m contextprotector patterns."""
         # Standard python -m pattern
         spec1 = MCPServerSpec(
-            command="python", 
-            args=["-m", "contextprotector", "--command-args", "rust-analyzer", "--stdio"]
+            command="python",
+            args=["-m", "contextprotector", "--command-args", "rust-analyzer", "--stdio"],
         )
         assert MCPContextProtectorDetector.is_context_protector_configured(spec1)
-        
+
         # python3 variant
         spec2 = MCPServerSpec(
-            command="python3", 
-            args=["-m", "contextprotector", "--command-args", "go", "run", "server.go"]
+            command="python3",
+            args=["-m", "contextprotector", "--command-args", "go", "run", "server.go"],
         )
         assert MCPContextProtectorDetector.is_context_protector_configured(spec2)
-        
+
         # With python flags
         spec3 = MCPServerSpec(
             command="python",
-            args=["-O", "-m", "contextprotector", "--command-args", "java", "-jar", "server.jar"]
+            args=["-O", "-m", "contextprotector", "--command-args", "java", "-jar", "server.jar"],
         )
         assert MCPContextProtectorDetector.is_context_protector_configured(spec3)
-        
+
         # Absolute python path
         spec4 = MCPServerSpec(
             command="/usr/bin/python3.11",
-            args=["-m", "contextprotector", "--command-args", "npm", "start"]
+            args=["-m", "contextprotector", "--command-args", "npm", "start"],
         )
         assert MCPContextProtectorDetector.is_context_protector_configured(spec4)
-        
+
         # Virtual env python
         spec5 = MCPServerSpec(
             command="/path/to/venv/bin/python",
-            args=["-m", "contextprotector", "--command-args", "php", "server.php"]
+            args=["-m", "contextprotector", "--command-args", "php", "server.php"],
         )
         assert MCPContextProtectorDetector.is_context_protector_configured(spec5)
-        
+
         # Should NOT detect other python modules
         spec_false1 = MCPServerSpec(command="python", args=["-m", "http.server"])
         assert not MCPContextProtectorDetector.is_context_protector_configured(spec_false1)
-        
-        spec_false2 = MCPServerSpec(command="python3", args=["-m", "pip", "install", "contextprotector"])
+
+        spec_false2 = MCPServerSpec(
+            command="python3", args=["-m", "pip", "install", "contextprotector"]
+        )
         assert not MCPContextProtectorDetector.is_context_protector_configured(spec_false2)
 
     def test_complex_shell_invocation_patterns(self):
@@ -876,21 +897,30 @@ class TestMCPContextProtectorDetector:
         # Shell script that calls mcp-context-protector
         spec1 = MCPServerSpec(
             command="bash",
-            args=["/path/to/wrapper.sh", "/usr/local/bin/mcp-context-protector", "--command-args", "server"]
+            args=[
+                "/path/to/wrapper.sh",
+                "/usr/local/bin/mcp-context-protector",
+                "--command-args",
+                "server",
+            ],
         )
         assert MCPContextProtectorDetector.is_context_protector_configured(spec1)
-        
+
         # Environment variable expansion in shell
         spec2 = MCPServerSpec(
             command="sh",
-            args=["-c", "$HOME/bin/mcp-context-protector.sh --command-args python -m myserver"]
+            args=["-c", "$HOME/bin/mcp-context-protector.sh --command-args python -m myserver"],
         )
         assert MCPContextProtectorDetector.is_context_protector_configured(spec2)
-        
+
         # Complex shell pipeline
         spec3 = MCPServerSpec(
             command="bash",
-            args=["-c", "cd /app && /opt/mcp-context-protector/mcp-context-protector --command-args node index.js | tee server.log"]
+            args=[
+                "-c",
+                "cd /app && /opt/mcp-context-protector/mcp-context-protector "
+                "--command-args node index.js | tee server.log",
+            ],
         )
         assert MCPContextProtectorDetector.is_context_protector_configured(spec3)
 
@@ -903,15 +933,15 @@ class TestMCPContextProtectorDetector:
         # Malformed shell command (should fall back gracefully)
         spec2 = MCPServerSpec(command="bash", args=["-c", "unclosed quote 'mcp-context-protector"])
         assert MCPContextProtectorDetector.is_context_protector_configured(spec2)
-        
+
         # Case sensitivity test - should be case sensitive for security
         spec3 = MCPServerSpec(command="MCP-CONTEXT-PROTECTOR")  # uppercase
         assert not MCPContextProtectorDetector.is_context_protector_configured(spec3)
-        
+
         # Partial matches should not be detected
         spec4 = MCPServerSpec(command="my-mcp-context-protector-wrapper")
         assert not MCPContextProtectorDetector.is_context_protector_configured(spec4)
-        
+
         # Empty args list
         spec5 = MCPServerSpec(command="mcp-context-protector", args=[])
         assert MCPContextProtectorDetector.is_context_protector_configured(spec5)
@@ -1062,19 +1092,19 @@ class TestMCPServerSpecMutations:
         assert original.command == "npx"
         assert original.args == ["server", "--config", "prod.json"]
         assert original.env == {"DEBUG": "false"}
-        
+
         # Test UV with global flags before run
         protected_with_flags = MCPServerSpec(
             command="uv",
             args=[
                 "--verbose",
-                "--directory", 
+                "--directory",
                 "/project",
                 "run",
                 "mcp-context-protector",
                 "--command-args",
                 "python",
-                "server.py"
+                "server.py",
             ],
             env={"PYTHONPATH": "/app"},
         )
