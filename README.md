@@ -10,6 +10,7 @@ mcp-context-protector is a security wrapper for MCP servers that addresses risks
 - Automatic blocking of unapproved configuration changes
 - Guardrail scanning and quarantining of tool responses
 - ANSI control character sanitization
+- Assisted editing of `mcp.json` files
 
 ## Quickstart
 
@@ -116,13 +117,27 @@ mcp-context-protector.sh --review-all-servers
 mcp-context-protector.sh --review-quarantine --quarantine-id <ID>
 ```
 
+## Management of mcp.json files
+
+`mcp-context-protector` can also help add the wrapper server to any existing configuration files that follow the `mcp.json` standard. To edit a specific file, use the `--manage-all-mcp-json` flag. All configuration files found at known locations on the filesystem will automatically be detected. Use the CLI interface to add and remove the wrapper from MCP servers. Configuration files located in project directories or code repositories will not be detected automatically. To edit a project's MCP configuration file, or any other specified file, use `--manage-mcp-json-file FILENAME`.
+
+The following MCP clients' configuration files will automatically be detected:
+
+* Claude Code
+* Claude Desktop
+* Continue.dev
+* Cursor
+* Visual Studio Code
+* Windsurf
+
+
 ## Usage
 
 ```
-usage: mcp-context-protector [-h] [--command COMMAND] [--command-args COMMAND_ARGS [COMMAND_ARGS ...]] [--url URL] [--sse-url SSE_URL]
-                             [--list-guardrail-providers] [--review-server] [--review-quarantine] [--review-all-servers]
-                             [--server-config-file SERVER_CONFIG_FILE] [--guardrail-provider GUARDRAIL_PROVIDER] [--visualize-ansi-codes]
-                             [--quarantine-id QUARANTINE_ID] [--quarantine-path QUARANTINE_PATH]
+usage: mcp-context-protector [-h] [--command COMMAND] [--command-args COMMAND_ARGS [COMMAND_ARGS ...]] [--url URL] [--sse-url SSE_URL] [--list-guardrail-providers]
+                             [--review-server] [--review-quarantine] [--review-all-servers] [--manage-mcp-json-file MANAGE_MCP_JSON_FILE] [--manage-all-mcp-json]
+                             [--wrap-mcp-json CONFIG_FILE] [--environment ENV] [--server-config-file SERVER_CONFIG_FILE] [--guardrail-provider GUARDRAIL_PROVIDER]
+                             [--visualize-ansi-codes] [--quarantine-id QUARANTINE_ID] [--quarantine-path QUARANTINE_PATH]
 
 options:
   -h, --help            show this help message and exit
@@ -139,8 +154,8 @@ options:
 
   --command COMMAND     Start a wrapped server over the stdio transport using the specified command
   --command-args COMMAND_ARGS [COMMAND_ARGS ...]
-                        Start a wrapped server over the stdio transport using the specified command arguments (space-separated). Supports arguments with
-                        dashes (e.g. docker run --rm -i)
+                        Start a wrapped server over the stdio transport using the specified command arguments (space-separated). Supports arguments with dashes (e.g.
+                        docker run --rm -i)
   --url URL             Connect to a remote MCP server over streamable HTTP at the specified URL
   --sse-url SSE_URL     Connect to a remote MCP server over SSE at the specified URL
   --list-guardrail-providers
@@ -148,6 +163,14 @@ options:
   --review-server       Review and approve changes to a specific server configuration (must be used with --command, --command-args, --url or --sse-url)
   --review-quarantine   Review quarantined tool responses
   --review-all-servers  Review all unapproved server configurations
+  --manage-mcp-json-file MANAGE_MCP_JSON_FILE
+                        Interactively manage an MCP JSON configuration file
+  --manage-all-mcp-json
+                        Find and manage all MCP JSON configuration files from known locations
+  --wrap-mcp-json CONFIG_FILE
+                        Wrap all MCP servers in the specified JSON config file with context-protector
+  --environment ENV, -e ENV
+                        Select specific environment/profile for multi-environment config
 ```
 
 ## License
