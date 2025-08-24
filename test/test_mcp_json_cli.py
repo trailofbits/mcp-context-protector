@@ -4,7 +4,12 @@ import pathlib
 import tempfile
 from unittest.mock import Mock, patch
 
-from contextprotector.mcp_json_cli import AllMCPJsonManager, MCPJsonManager, WrapMCPJsonManager
+from contextprotector.mcp_json_cli import (
+    AllMCPJsonManager,
+    DiscoveredMCPConfig,
+    MCPJsonManager,
+    WrapMCPJsonManager,
+)
 from contextprotector.mcp_json_config import MCPJsonConfig, MCPServerSpec
 
 
@@ -441,11 +446,11 @@ class TestAllMCPJsonManager:
         assert len(manager.discovered_configs) == 2
 
         # Check that configs are sorted by client name
-        assert manager.discovered_configs[0][0] == "claude-desktop"
-        assert manager.discovered_configs[0][2] == 1  # 1 server
+        assert manager.discovered_configs[0].client_name == "claude-desktop"
+        assert manager.discovered_configs[0].server_count == 1  # 1 server
 
-        assert manager.discovered_configs[1][0] == "cursor"
-        assert manager.discovered_configs[1][2] == 2  # 2 servers
+        assert manager.discovered_configs[1].client_name == "cursor"
+        assert manager.discovered_configs[1].server_count == 2  # 2 servers
 
         # Clean up
         pathlib.Path(f1.name).unlink()
@@ -466,8 +471,8 @@ class TestAllMCPJsonManager:
 
         # Should still discover the file but with server_count = -1
         assert len(manager.discovered_configs) == 1
-        assert manager.discovered_configs[0][0] == "claude-desktop"
-        assert manager.discovered_configs[0][2] == -1  # Unable to parse
+        assert manager.discovered_configs[0].client_name == "claude-desktop"
+        assert manager.discovered_configs[0].server_count == -1  # Unable to parse
 
         # Clean up
         pathlib.Path(f.name).unlink()
@@ -477,10 +482,10 @@ class TestAllMCPJsonManager:
         """Test displaying configs with various server counts."""
         manager = AllMCPJsonManager()
         manager.discovered_configs = [
-            ("claude-desktop", "/path/to/claude.json", 0, None),
-            ("cursor", "/path/to/cursor.json", 1, None),
-            ("windsurf", "/path/to/windsurf.json", 3, None),
-            ("invalid-config", "/path/to/invalid.json", -1, None),
+            DiscoveredMCPConfig("claude-desktop", "/path/to/claude.json", 0, None),
+            DiscoveredMCPConfig("cursor", "/path/to/cursor.json", 1, None),
+            DiscoveredMCPConfig("windsurf", "/path/to/windsurf.json", 3, None),
+            DiscoveredMCPConfig("invalid-config", "/path/to/invalid.json", -1, None),
         ]
 
         manager._display_configs()
@@ -503,7 +508,9 @@ class TestAllMCPJsonManager:
     def test_run_selection_loop_quit(self, mock_print, mock_input):  # noqa: ARG002
         """Test selection loop with quit command."""
         manager = AllMCPJsonManager()
-        manager.discovered_configs = [("test-client", "/path/to/test.json", 1)]
+        manager.discovered_configs = [
+            DiscoveredMCPConfig("test-client", "/path/to/test.json", 1, None)
+        ]
 
         manager._run_selection_loop()
 
@@ -516,11 +523,15 @@ class TestAllMCPJsonManager:
     def test_run_selection_loop_refresh(self, mock_display, mock_discover, mock_input):  # noqa: ARG002
         """Test selection loop with refresh command."""
         manager = AllMCPJsonManager()
-        manager.discovered_configs = [("test-client", "/path/to/test.json", 1)]
+        manager.discovered_configs = [
+            DiscoveredMCPConfig("test-client", "/path/to/test.json", 1, None)
+        ]
 
         # Mock discover_configs to repopulate the configs after clearing
         def mock_discover_side_effect():
-            manager.discovered_configs = [("test-client", "/path/to/test.json", 1)]
+            manager.discovered_configs = [
+                DiscoveredMCPConfig("test-client", "/path/to/test.json", 1, None)
+            ]
 
         mock_discover.side_effect = mock_discover_side_effect
 
@@ -537,7 +548,9 @@ class TestAllMCPJsonManager:
     def test_run_selection_loop_refresh_no_configs(self, mock_print, mock_discover, mock_input):  # noqa: ARG002
         """Test selection loop with refresh command that finds no configs."""
         manager = AllMCPJsonManager()
-        manager.discovered_configs = [("test-client", "/path/to/test.json", 1)]
+        manager.discovered_configs = [
+            DiscoveredMCPConfig("test-client", "/path/to/test.json", 1, None)
+        ]
 
         # Mock discover_configs to clear configs (simulating no configs found)
         def mock_discover_side_effect():
@@ -559,7 +572,9 @@ class TestAllMCPJsonManager:
         mock_manager_class.return_value = mock_manager
 
         manager = AllMCPJsonManager()
-        manager.discovered_configs = [("test-client", "/path/to/test.json", 1, None)]
+        manager.discovered_configs = [
+            DiscoveredMCPConfig("test-client", "/path/to/test.json", 1, None)
+        ]
 
         # Mock the _discover_configs to prevent it from clearing discovered_configs
         with patch.object(manager, "_discover_configs"), patch("builtins.print"):
@@ -573,7 +588,9 @@ class TestAllMCPJsonManager:
     def test_run_selection_loop_unparseable_config_declined(self, mock_input):  # noqa: ARG002
         """Test selection loop with unparseable config that user declines to manage."""
         manager = AllMCPJsonManager()
-        manager.discovered_configs = [("test-client", "/path/to/test.json", -1, None)]
+        manager.discovered_configs = [
+            DiscoveredMCPConfig("test-client", "/path/to/test.json", -1, None)
+        ]
 
         with patch("builtins.print"):
             manager._run_selection_loop()
@@ -585,7 +602,9 @@ class TestAllMCPJsonManager:
     def test_run_selection_loop_invalid_input(self, mock_print, mock_input):  # noqa: ARG002
         """Test selection loop with invalid input."""
         manager = AllMCPJsonManager()
-        manager.discovered_configs = [("test-client", "/path/to/test.json", 1)]
+        manager.discovered_configs = [
+            DiscoveredMCPConfig("test-client", "/path/to/test.json", 1, None)
+        ]
 
         manager._run_selection_loop()
 
@@ -603,7 +622,9 @@ class TestAllMCPJsonManager:
 
         # Mock that we discovered some configs
         def mock_discover_side_effect():
-            manager.discovered_configs = [("test-client", "/path/to/test.json", 1)]
+            manager.discovered_configs = [
+                DiscoveredMCPConfig("test-client", "/path/to/test.json", 1, None)
+            ]
 
         mock_discover.side_effect = mock_discover_side_effect
 

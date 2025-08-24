@@ -4,6 +4,7 @@ import difflib
 import json
 import pathlib
 import sys
+from dataclasses import dataclass
 
 from .cli_utils import confirm_prompt, display_colored_diff, print_separator, truncate_text
 from .mcp_json_config import (
@@ -20,6 +21,43 @@ from .mcp_json_config import (
 MAX_ARGS_DISPLAY_LENGTH = 60  # Maximum length for args display
 MAX_ENV_KEYS_PREVIEW = 3
 MAX_PATH_DISPLAY_LENGTH = 50
+
+
+@dataclass
+class DiscoveredMCPConfig:
+    """Represents a discovered MCP configuration file."""
+
+    client_name: str
+    path: str
+    server_count: int
+    environment: str | None = None
+
+    @property
+    def is_parseable(self) -> bool:
+        """Check if the configuration was successfully parsed."""
+        return self.server_count >= 0
+
+    @property
+    def server_info_display(self) -> str:
+        """Get display string for server information."""
+        if self.server_count == -1:
+            return "(unable to parse)"
+        elif self.server_count == 0:
+            return "(no servers configured)"
+        elif self.server_count == 1:
+            return "(1 server)"
+        else:
+            return f"({self.server_count} servers)"
+
+    @property
+    def display_name(self) -> str:
+        """Get the display name with proper formatting."""
+        # Only uppercase the base client name, not paths in parens
+        if "(" in self.client_name and self.client_name.endswith(")"):
+            base_name, path_part = self.client_name.split(" (", 1)
+            return f"{base_name.upper()} ({path_part}"
+        else:
+            return self.client_name.upper()
 
 
 class EnvironmentSelector:
@@ -432,8 +470,7 @@ class AllMCPJsonManager:
 
     def __init__(self) -> None:
         """Initialize the all MCP JSON manager."""
-        # (client_name, path, server_count, environment)
-        self.discovered_configs: list[tuple[str, str, int, str | None]] = []
+        self.discovered_configs: list[DiscoveredMCPConfig] = []
 
     def run(self) -> None:
         """Run the discovery and selection interface."""
@@ -481,22 +518,39 @@ class AllMCPJsonManager:
                                 )
                                 display_name = f"{client_name} ({env_display})"
                                 self.discovered_configs.append(
-                                    (display_name, config_path, server_count, env)
+                                    DiscoveredMCPConfig(
+                                        client_name=display_name,
+                                        path=config_path,
+                                        server_count=server_count,
+                                        environment=env,
+                                    )
                                 )
                     else:
                         # Single-project config - show as before
                         servers = config.get_servers()
                         server_count = len(servers)
                         self.discovered_configs.append(
-                            (client_name, config_path, server_count, None)
+                            DiscoveredMCPConfig(
+                                client_name=client_name,
+                                path=config_path,
+                                server_count=server_count,
+                                environment=None,
+                            )
                         )
 
                 except Exception:
                     # If we can't parse it, still show it but with unknown server count
-                    self.discovered_configs.append((client_name, config_path, -1, None))
+                    self.discovered_configs.append(
+                        DiscoveredMCPConfig(
+                            client_name=client_name,
+                            path=config_path,
+                            server_count=-1,
+                            environment=None,
+                        )
+                    )
 
         # Sort by client name for consistent display
-        self.discovered_configs.sort(key=lambda x: x[0])
+        self.discovered_configs.sort(key=lambda x: x.client_name)
 
     def _display_configs(self) -> None:
         """Display the discovered configuration files."""
@@ -504,29 +558,12 @@ class AllMCPJsonManager:
         print("Discovered MCP Configuration Files")
         print_separator()
 
-        for i, (client_name, config_path, server_count, environment) in enumerate(
-            self.discovered_configs, 1
-        ):
-            if server_count == -1:
-                server_info = "(unable to parse)"
-            elif server_count == 0:
-                server_info = "(no servers configured)"
-            elif server_count == 1:
-                server_info = "(1 server)"
-            else:
-                server_info = f"({server_count} servers)"
-
-            # Only uppercase the base client name, not paths in parens
-            if "(" in client_name and client_name.endswith(")"):
-                base_name, path_part = client_name.split(" (", 1)
-                display_name = f"{base_name.upper()} ({path_part}"
-            else:
-                display_name = client_name.upper()
-            print(f"{i:2d}. {display_name}")
-            print(f"    Path: {config_path}")
-            if environment:
-                print(f"    Project: {environment}")
-            print(f"    Status: {server_info}")
+        for i, config in enumerate(self.discovered_configs, 1):
+            print(f"{i:2d}. {config.display_name}")
+            print(f"    Path: {config.path}")
+            if config.environment:
+                print(f"    Project: {config.environment}")
+            print(f"    Status: {config.server_info_display}")
             print()
 
     def _run_selection_loop(self) -> None:
@@ -562,38 +599,26 @@ class AllMCPJsonManager:
                 elif choice.isdigit():
                     config_num = int(choice)
                     if 1 <= config_num <= len(self.discovered_configs):
-                        (
-                            client_name,
-                            config_path,
-                            server_count,
-                            environment,
-                        ) = self.discovered_configs[config_num - 1]
+                        config = self.discovered_configs[config_num - 1]
 
-                        if server_count == -1:
+                        if not config.is_parseable:
                             warning_msg = (
-                                f"\nWarning: Configuration file at {config_path} "
+                                f"\nWarning: Configuration file at {config.path} "
                                 "could not be parsed."
                             )
                             print(warning_msg)
                             if not confirm_prompt("Do you want to try managing it anyway?"):
                                 continue
 
-                        # Only uppercase the base client name, not paths in parens
-                        if "(" in client_name and client_name.endswith(")"):
-                            base_name, path_part = client_name.split(" (", 1)
-                            display_name = f"{base_name.upper()} ({path_part}"
+                        if config.environment:
+                            print(f"\nOpening {config.display_name} configuration: {config.path}")
+                            print(f"Project: {config.environment}")
                         else:
-                            display_name = client_name.upper()
-
-                        if environment:
-                            print(f"\nOpening {display_name} configuration: {config_path}")
-                            print(f"Project: {environment}")
-                        else:
-                            print(f"\nOpening {display_name} configuration: {config_path}")
+                            print(f"\nOpening {config.display_name} configuration: {config.path}")
                         print_separator("-")
 
                         # Launch the individual file manager
-                        manager = MCPJsonManager(config_path, environment)
+                        manager = MCPJsonManager(config.path, config.environment)
                         manager.run()
 
                         # After returning from individual manager, refresh discovery
