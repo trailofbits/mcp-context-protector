@@ -208,7 +208,14 @@ class MCPJsonLocator:
             return str(appdata / "Code - Insiders" / "User" / "mcp.json")
         elif system == "Darwin":  # macOS
             # ~/Library/Application Support/Code - Insiders/User/mcp.json
-            return str(home_dir / "Library" / "Application Support" / "Code - Insiders" / "User" / "mcp.json")
+            return str(
+                home_dir
+                / "Library"
+                / "Application Support"
+                / "Code - Insiders"
+                / "User"
+                / "mcp.json"
+            )
         else:
             # Linux/Unix - ~/.config/Code - Insiders/User/mcp.json
             return str(home_dir / ".config" / "Code - Insiders" / "User" / "mcp.json")
