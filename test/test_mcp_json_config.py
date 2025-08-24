@@ -428,6 +428,14 @@ class TestMCPJsonLocator:
         # Should contain either "Code" (standard) or "Code/User"
         assert "Code" in path
 
+    def test_get_vscode_insiders_user_mcp_config_path(self):
+        """Test getting VS Code Insiders user MCP config path."""
+        path = MCPJsonLocator.get_vscode_insiders_user_mcp_config_path()
+        assert isinstance(path, str)
+        assert path.endswith("mcp.json")
+        # Should contain "Code - Insiders"
+        assert "Code - Insiders" in path or "Code%20-%20Insiders" in path
+
     def test_get_all_mcp_config_paths(self):
         """Test getting all MCP config paths."""
         all_paths = MCPJsonLocator.get_all_mcp_config_paths()
@@ -444,6 +452,7 @@ class TestMCPJsonLocator:
             "continue",
             "continue-yaml",
             "vscode",
+            "vscode-insiders",
             "claude-settings",
         }
         assert set(all_paths.keys()) == expected_clients

@@ -197,6 +197,23 @@ class MCPJsonLocator:
             return str(home_dir / ".config" / "Code" / "User" / "mcp.json")
 
     @staticmethod
+    def get_vscode_insiders_user_mcp_config_path() -> str:
+        """Get the VS Code Insiders user MCP config path based on the platform."""
+        system = platform.system()
+        home_dir = pathlib.Path.home()
+
+        if system == "Windows":
+            # %APPDATA%/Code - Insiders/User/mcp.json
+            appdata = home_dir / "AppData" / "Roaming"
+            return str(appdata / "Code - Insiders" / "User" / "mcp.json")
+        elif system == "Darwin":  # macOS
+            # ~/Library/Application Support/Code - Insiders/User/mcp.json
+            return str(home_dir / "Library" / "Application Support" / "Code - Insiders" / "User" / "mcp.json")
+        else:
+            # Linux/Unix - ~/.config/Code - Insiders/User/mcp.json
+            return str(home_dir / ".config" / "Code - Insiders" / "User" / "mcp.json")
+
+    @staticmethod
     def get_claude_settings_config_path() -> str:
         """Get the Claude Code settings config path (~/.claude.json)."""
         return str(pathlib.Path.home() / ".claude.json")
@@ -219,6 +236,7 @@ class MCPJsonLocator:
             "continue": MCPJsonLocator.get_continue_config_path(),
             "continue-yaml": MCPJsonLocator.get_continue_yaml_config_path(),
             "vscode": MCPJsonLocator.get_vscode_user_mcp_config_path(),
+            "vscode-insiders": MCPJsonLocator.get_vscode_insiders_user_mcp_config_path(),
             "claude-settings": MCPJsonLocator.get_claude_settings_config_path(),
         }
 
