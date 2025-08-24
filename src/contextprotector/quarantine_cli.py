@@ -5,11 +5,16 @@ import json
 import logging
 from typing import Any
 
+from .cli_utils import confirm_prompt, truncate_text
 from .mcp_wrapper import make_ansi_escape_codes_visible
 from .quarantine import QuarantinedToolResponse, ToolResponseQuarantine, _utc_to_local_display
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("quarantine_cli")
+
+# Display constants
+MAX_REASON_PREVIEW_LENGTH = 50
+TIMESTAMP_DATE_LENGTH = 10  # "YYYY-MM-DD" portion
 
 
 async def review_quarantine(
@@ -69,9 +74,9 @@ def review_response_list(
             local_display = _utc_to_local_display(utc_dt)
             timestamp = local_display.split()[0]  # Just the date part for list view
         else:
-            timestamp = str(utc_timestamp)[:10]  # Fallback
-        reason_preview = response_data["reason"][:50]
-        print(f"{i + 1}. [{timestamp}] {response_data['tool_name']} - {reason_preview}...")
+            timestamp = str(utc_timestamp)[:TIMESTAMP_DATE_LENGTH]  # Fallback
+        reason_preview = truncate_text(response_data["reason"], MAX_REASON_PREVIEW_LENGTH)
+        print(f"{i + 1}. [{timestamp}] {response_data['tool_name']} - {reason_preview}")
     print("========================================\n")
 
     # Prompt user to select a response to review
@@ -121,13 +126,8 @@ def review_response(quarantine: ToolResponseQuarantine, response: QuarantinedToo
     print(f"{make_ansi_escape_codes_visible(str(response.tool_output))}")
     print("=======================================\n")
 
-    while True:
-        choice = input("Do you want to release this response from quarantine? [y/n]: ").lower()
-        if choice in ("y", "yes"):
-            quarantine.release_response(response.id)
-            print(f"\nResponse {response.id} has been released from quarantine.")
-            break
-        if choice in ("n", "no"):
-            print("\nResponse remains in quarantine.")
-            break
-        print("\nInvalid choice. Please enter 'y' or 'n'.")
+    if confirm_prompt("Do you want to release this response from quarantine?"):
+        quarantine.release_response(response.id)
+        print(f"\nResponse {response.id} has been released from quarantine.")
+    else:
+        print("\nResponse remains in quarantine.")

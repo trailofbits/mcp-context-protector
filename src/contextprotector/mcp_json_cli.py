@@ -5,6 +5,7 @@ import json
 import pathlib
 import sys
 
+from .cli_utils import confirm_prompt, display_colored_diff, print_separator, truncate_text
 from .mcp_json_config import (
     MCPConfigManagerFactory,
     MCPConfigSchema,
@@ -16,9 +17,8 @@ from .mcp_json_config import (
 )
 
 # Constants for display formatting
-MAX_ARGS_DISPLAY_LENGTH = 60
+MAX_ARGS_DISPLAY_LENGTH = 60  # Maximum length for args display
 MAX_ENV_KEYS_PREVIEW = 3
-MAX_ARGS_PREVIEW_LENGTH = 60
 MAX_PATH_DISPLAY_LENGTH = 50
 
 
@@ -198,9 +198,9 @@ class MCPJsonManager:
         if not self.config:
             return
 
-        print("=" * 60)
+        print_separator()
         print("MCP JSON Configuration")
-        print("=" * 60)
+        print_separator()
 
         # Get servers and show current project if applicable
         servers = self._get_servers()
@@ -220,7 +220,7 @@ class MCPJsonManager:
             return
 
         print(f"\nConfigured Servers ({len(servers)}):")
-        print("-" * 40)
+        print_separator("-")
 
         for i, (name, server) in enumerate(servers.items(), 1):
             protected = MCPContextProtectorDetector.is_context_protector_configured(server)
@@ -231,8 +231,7 @@ class MCPJsonManager:
 
             if server.args:
                 args_str = " ".join(server.args)
-                if len(args_str) > MAX_ARGS_DISPLAY_LENGTH:
-                    args_str = args_str[:57] + "..."
+                args_str = truncate_text(args_str, MAX_ARGS_DISPLAY_LENGTH)
                 print(f"    Args: {args_str}")
 
             if server.env:
@@ -250,9 +249,9 @@ class MCPJsonManager:
             return
 
         while True:
-            print("=" * 60)
+            print_separator()
             print("MCP JSON Manager")
-            print("=" * 60)
+            print_separator()
             print("Commands:")
             servers = self._get_servers()
             server_count = len(servers)
@@ -371,9 +370,9 @@ class MCPJsonManager:
             return True
 
         # Show the diff
-        print("\n" + "=" * 60)
+        print_separator(newline_before=True)
         print("PROPOSED CHANGES")
-        print("=" * 60)
+        print_separator()
 
         original_lines = self.original_json.splitlines(keepends=True)
         new_lines = new_json.splitlines(keepends=True)
@@ -386,30 +385,14 @@ class MCPJsonManager:
             lineterm="",
         )
 
-        for line in diff:
-            if line.startswith("+++") or line.startswith("---"):
-                print(f"\033[1m{line}\033[0m", end="")  # Bold
-            elif line.startswith("@@"):
-                print(f"\033[36m{line}\033[0m", end="")  # Cyan
-            elif line.startswith("+"):
-                print(f"\033[32m{line}\033[0m", end="")  # Green
-            elif line.startswith("-"):
-                print(f"\033[31m{line}\033[0m", end="")  # Red
-            else:
-                print(line, end="")
+        display_colored_diff(diff)
 
-        print("\n" + "=" * 60)
+        print_separator(newline_before=True)
 
         # Ask for confirmation
-        while True:
-            confirm = input("Do you want to save these changes? [y/N]: ").strip().lower()
-            if confirm in ("", "n", "no"):
-                print("Changes not saved.")
-                return False
-            elif confirm in ("y", "yes"):
-                break
-            else:
-                print("Please enter 'y' for yes or 'n' for no.")
+        if not confirm_prompt("Do you want to save these changes?"):
+            print("Changes not saved.")
+            return False
 
         # Create backup if file exists
         if self.file_path.exists():
@@ -493,10 +476,8 @@ class AllMCPJsonManager:
                             # Only add projects/environments that have MCP servers configured
                             if server_count > 0:
                                 # Format: (client_name, config_path, server_count, environment)
-                                env_display = (
-                                    env
-                                    if len(env) <= MAX_PATH_DISPLAY_LENGTH
-                                    else "..." + env[-47:]
+                                env_display = truncate_text(
+                                    env, MAX_PATH_DISPLAY_LENGTH, from_start=False
                                 )
                                 display_name = f"{client_name} ({env_display})"
                                 self.discovered_configs.append(
@@ -519,9 +500,9 @@ class AllMCPJsonManager:
 
     def _display_configs(self) -> None:
         """Display the discovered configuration files."""
-        print("\n" + "=" * 80)
+        print_separator(newline_before=True)
         print("Discovered MCP Configuration Files")
-        print("=" * 80)
+        print_separator()
 
         for i, (client_name, config_path, server_count, environment) in enumerate(
             self.discovered_configs, 1
@@ -551,9 +532,9 @@ class AllMCPJsonManager:
     def _run_selection_loop(self) -> None:
         """Run the interactive selection loop."""
         while True:
-            print("=" * 80)
+            print_separator()
             print("Select a configuration file to manage:")
-            print("=" * 80)
+            print_separator()
 
             config_count = len(self.discovered_configs)
             if config_count == 1:
@@ -594,12 +575,7 @@ class AllMCPJsonManager:
                                 "could not be parsed."
                             )
                             print(warning_msg)
-                            confirm = (
-                                input("Do you want to try managing it anyway? [y/N]: ")
-                                .strip()
-                                .lower()
-                            )
-                            if confirm not in ("y", "yes"):
+                            if not confirm_prompt("Do you want to try managing it anyway?"):
                                 continue
 
                         # Only uppercase the base client name, not paths in parens
@@ -614,7 +590,7 @@ class AllMCPJsonManager:
                             print(f"Project: {environment}")
                         else:
                             print(f"\nOpening {display_name} configuration: {config_path}")
-                        print("-" * 80)
+                        print_separator("-")
 
                         # Launch the individual file manager
                         manager = MCPJsonManager(config_path, environment)
@@ -767,9 +743,9 @@ class WrapMCPJsonManager:
 
     def _display_analysis(self) -> None:
         """Display the analysis of servers to be wrapped."""
-        print("\n" + "=" * 70)
+        print_separator(newline_before=True)
         print("MCP Server Wrapping Analysis")
-        print("=" * 70)
+        print_separator()
 
         # Show schema and environment info
         if self.config and hasattr(self.config, "get_schema_type"):
@@ -805,13 +781,12 @@ class WrapMCPJsonManager:
                 print(f"    Current command: {server_spec.command}")
                 if server_spec.args:
                     args_preview = " ".join(server_spec.args)
-                    if len(args_preview) > MAX_ARGS_PREVIEW_LENGTH:
-                        args_preview = args_preview[:57] + "..."
+                    args_preview = truncate_text(args_preview, MAX_ARGS_DISPLAY_LENGTH)
                     print(f"    Current args: {args_preview}")
 
     def _confirm_wrapping(self) -> bool:
         """Ask user for confirmation to proceed with wrapping."""
-        print("\n" + "=" * 70)
+        print_separator(newline_before=True)
 
         if len(self.servers_to_wrap) == 1:
             message = f"This will wrap 1 server ({self.servers_to_wrap[0]}) with context protector."
@@ -824,14 +799,7 @@ class WrapMCPJsonManager:
         print("  • Preserve original server functionality")
         print("  • Create a backup of the original configuration")
 
-        while True:
-            confirm = input("\nDo you want to proceed with wrapping? [y/N]: ").strip().lower()
-            if confirm in ("", "n", "no"):
-                return False
-            elif confirm in ("y", "yes"):
-                return True
-            else:
-                print("Please enter 'y' for yes or 'n' for no.")
+        return confirm_prompt("\nDo you want to proceed with wrapping?")
 
     def _wrap_servers(self) -> None:
         """Wrap the identified servers with context protector."""
@@ -870,8 +838,7 @@ class WrapMCPJsonManager:
                 print(f"    New command: {wrapped_spec.command}")
                 if wrapped_spec.args:
                     args_preview = " ".join(wrapped_spec.args)
-                    if len(args_preview) > MAX_ARGS_PREVIEW_LENGTH:
-                        args_preview = args_preview[:57] + "..."
+                    args_preview = truncate_text(args_preview, MAX_ARGS_DISPLAY_LENGTH)
                     print(f"    New args: {args_preview}")
 
             except ValueError as e:
@@ -902,9 +869,9 @@ class WrapMCPJsonManager:
             return False
 
         # Show the diff
-        print("\n" + "=" * 70)
+        print_separator(newline_before=True)
         print("PROPOSED CHANGES")
-        print("=" * 70)
+        print_separator()
 
         original_lines = self.original_json.splitlines(keepends=True)
         new_lines = new_json.splitlines(keepends=True)
@@ -917,30 +884,14 @@ class WrapMCPJsonManager:
             lineterm="",
         )
 
-        for line in diff:
-            if line.startswith("+++") or line.startswith("---"):
-                print(f"\033[1m{line}\033[0m", end="")  # Bold
-            elif line.startswith("@@"):
-                print(f"\033[36m{line}\033[0m", end="")  # Cyan
-            elif line.startswith("+"):
-                print(f"\033[32m{line}\033[0m", end="")  # Green
-            elif line.startswith("-"):
-                print(f"\033[31m{line}\033[0m", end="")  # Red
-            else:
-                print(line, end="")
+        display_colored_diff(diff)
 
-        print("\n" + "=" * 70)
+        print_separator(newline_before=True)
 
         # Ask for confirmation
-        while True:
-            confirm = input("Do you want to save these changes? [Y/n]: ").strip().lower()
-            if confirm in ("", "y", "yes"):
-                break
-            elif confirm in ("n", "no"):
-                print("Changes not saved.")
-                return False
-            else:
-                print("Please enter 'y' for yes or 'n' for no.")
+        if not confirm_prompt("Do you want to save these changes?", default="y"):
+            print("Changes not saved.")
+            return False
 
         # Create backup
         backup_path = self.file_path.with_suffix(self.file_path.suffix + ".backup")
