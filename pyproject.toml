@@ -84,7 +84,7 @@ select = [
 ignore = ["D203", "D213", "C901", "PLR0912", "PLR0915"]
 
 [tool.ruff.lint.per-file-ignores]
-"**/*_cli.py" = [
+"**/*cli*.py" = [
     "T201", # allow `print` in cli module
 ]
 "test/**/*.py" = [

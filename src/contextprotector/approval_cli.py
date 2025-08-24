@@ -3,6 +3,7 @@
 import logging
 from typing import Literal
 
+from .cli_utils import confirm_prompt
 from .guardrails import GuardrailProvider
 from .mcp_config import ApprovalStatus, MCPConfigDatabase
 from .mcp_wrapper import MCPWrapperServer, make_ansi_escape_codes_visible
@@ -62,10 +63,7 @@ async def review_server_config(
 
         _display_server_config(wrapper)
 
-        response = (
-            input("Do you want to trust this server configuration? (yes/no): ").strip().lower()
-        )
-        if response in ("yes", "y"):
+        if confirm_prompt("Do you want to trust this server configuration?"):
             _approve_server_config(wrapper)
             print(f"\nThe server configuration for {identifier} has been trusted and saved.")
         else:
@@ -115,12 +113,7 @@ async def list_unapproved_configs(config_path: str | None = None) -> None:
                 break
             if choice == "a":
                 # Approve all servers
-                confirm = (
-                    input("Are you sure you want to approve ALL unapproved servers? (yes/no): ")
-                    .strip()
-                    .lower()
-                )
-                if confirm in ("yes", "y"):
+                if confirm_prompt("Are you sure you want to approve ALL unapproved servers?"):
                     approved_count = 0
                     for server in unapproved_servers:
                         success = config_db.approve_server_config(

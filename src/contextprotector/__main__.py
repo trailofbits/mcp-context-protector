@@ -11,6 +11,7 @@ import sys
 
 from .approval_cli import list_unapproved_configs, review_server_config
 from .guardrails import GuardrailProvider, get_provider, get_provider_names
+from .mcp_json_cli import manage_all_mcp_json_files, manage_mcp_json_file, wrap_mcp_json_file
 from .mcp_wrapper import MCPWrapperServer
 from .quarantine_cli import review_quarantine
 from .wrapper_config import MCPWrapperConfig
@@ -85,7 +86,7 @@ async def _launch_review(
         )
 
 
-async def main_async() -> None:
+async def main_async() -> None:  # noqa: PLR0911
     """Launch the wrapped server or review process specified in arguments."""
     args = _parse_args()
 
@@ -104,6 +105,21 @@ async def main_async() -> None:
 
     if args.review_all_servers:
         await list_unapproved_configs(args.server_config_file)
+        return
+
+    # Check if we're in MCP JSON file management mode
+    if args.manage_mcp_json_file:
+        manage_mcp_json_file(args.manage_mcp_json_file)
+        return
+
+    # Check if we're in manage all MCP JSON files mode
+    if args.manage_all_mcp_json:
+        manage_all_mcp_json_files()
+        return
+
+    # Check if we're in wrap MCP JSON file mode
+    if args.wrap_mcp_json:
+        wrap_mcp_json_file(args.wrap_mcp_json, args.environment)
         return
 
     # Check if we're in server review mode
@@ -176,6 +192,26 @@ def _parse_args() -> argparse.Namespace:
         "--review-all-servers",
         action="store_true",
         help="Review all unapproved server configurations",
+    )
+    source_group.add_argument(
+        "--manage-mcp-json-file",
+        help="Interactively manage an MCP JSON configuration file",
+    )
+    source_group.add_argument(
+        "--manage-all-mcp-json",
+        action="store_true",
+        help="Find and manage all MCP JSON configuration files from known locations",
+    )
+    source_group.add_argument(
+        "--wrap-mcp-json",
+        metavar="CONFIG_FILE",
+        help="Wrap all MCP servers in the specified JSON config file with context-protector",
+    )
+    source_group.add_argument(
+        "--environment",
+        "-e",
+        metavar="ENV",
+        help="Select specific environment/profile for multi-environment configs",
     )
 
     # Add config file argument with new name
