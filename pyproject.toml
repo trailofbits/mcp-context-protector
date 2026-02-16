@@ -13,7 +13,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
-    "mcp==1.9.4",
+    "mcp==1.26.0",
     "llamafirewall>=1.0.3",
     "aiofiles>=24.1.0",
 ]
