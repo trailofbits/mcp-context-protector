@@ -1186,7 +1186,7 @@ Note: This tool is only available when tools are blocked due to security restric
 
             # Add MCP-Protocol-Version header for streamable HTTP client
             headers = {"MCP-Protocol-Version": "2025-06-18"}
-            self.client_context = streamablehttp_client(self.server_url, headers=headers)
+            self.client_context = streamablehttp_client(str(self.server_url), headers=headers)
             streams_and_session_id = await self.client_context.__aenter__()
             self.streams = (streams_and_session_id[0], streams_and_session_id[1])
 
