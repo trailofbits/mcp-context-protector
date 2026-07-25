@@ -39,7 +39,8 @@ def test_get_nonexistent_provider() -> None:
     assert provider is None, "Should return None for non-existent provider"
 
 
-def test_provider_check_server_config() -> None:
+@pytest.mark.asyncio
+async def test_provider_check_server_config() -> None:
     """Test that a provider can check a server config and log the results."""
     from contextprotector.mcp_config import MCPServerConfig, MCPToolDefinition
 
@@ -55,7 +56,7 @@ def test_provider_check_server_config() -> None:
 
     # Check the config and log the result
     logger.info("Checking server config with provider...")
-    result = provider.check_server_config(config)
+    result = await provider.check_server_config(config)
 
     if result:
         logger.info("Provider returned alert: %s", result.explanation)

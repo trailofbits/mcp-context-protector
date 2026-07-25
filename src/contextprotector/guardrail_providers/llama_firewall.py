@@ -36,7 +36,7 @@ class LlamaFirewallProvider(GuardrailProvider):
         """Get the provider name."""
         return "LlamaFirewall"
 
-    def check_server_config(self, config: MCPServerConfig) -> GuardrailAlert | None:
+    async def check_server_config(self, config: MCPServerConfig) -> GuardrailAlert | None:
         """Check the provided server configuration against LlamaFirewall guardrails.
 
         Args:
@@ -65,7 +65,7 @@ class LlamaFirewallProvider(GuardrailProvider):
             logger.info("Created UserMessage for scanning")
 
             logger.info("Scanning config with LlamaFirewall...")
-            result = lf.scan(message)
+            result = await lf.scan_async(message)
 
             logger.info("Scan result decision: %s", result.decision)
             if hasattr(result, "reason") and result.reason:
@@ -99,7 +99,7 @@ class LlamaFirewallProvider(GuardrailProvider):
 
         return alert
 
-    def check_tool_response(self, tool_response: ToolResponse) -> GuardrailAlert | None:
+    async def check_tool_response(self, tool_response: ToolResponse) -> GuardrailAlert | None:
         """Check the provided tool response against LlamaFirewall guardrails.
 
         Args:
@@ -121,7 +121,7 @@ class LlamaFirewallProvider(GuardrailProvider):
             message = ToolMessage(content=tool_response.tool_output)
 
             logger.info("Scanning tool response with LlamaFirewall...")
-            result = lf.scan(message)
+            result = await lf.scan_async(message)
 
             logger.info("Scan result decision: %s", result.decision)
             if hasattr(result, "reason") and result.reason:

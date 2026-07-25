@@ -142,6 +142,7 @@ async def test_review_mode_modified_server_rejection() -> None:
 
     mock_wrapper.tool_specs = [AsyncMock(name="tool1", description="Tool 1 description")]
     mock_wrapper.guardrail_alert = None
+    mock_wrapper.guardrail_provider = None
     mock_wrapper.connect = AsyncMock(return_value=None)
     mock_wrapper.stop_child_process = AsyncMock(return_value=None)
     mock_wrapper.config_db.save_server_config = MagicMock()
@@ -198,6 +199,8 @@ async def test_review_mode_with_guardrail_alert() -> None:
     # Mock guardrail provider - use regular MagicMock
     mock_provider = MagicMock()
     mock_provider.name = "mock_provider"
+    mock_provider.check_server_config = AsyncMock(return_value=mock_wrapper.guardrail_alert)
+    mock_wrapper.guardrail_provider = mock_provider
 
     # Patch the MCPWrapperServer.from_config to return our mock
     with (

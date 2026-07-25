@@ -61,7 +61,7 @@ async def review_server_config(
 
         print(f"\nServer configuration for {identifier} is not trusted or has changed.")
 
-        _display_server_config(wrapper)
+        await _display_server_config(wrapper)
 
         if confirm_prompt("Do you want to trust this server configuration?"):
             _approve_server_config(wrapper)
@@ -156,13 +156,12 @@ async def list_unapproved_configs(config_path: str | None = None) -> None:
             break
 
 
-def _display_server_config(wrapper: MCPWrapperServer) -> None:
+async def _display_server_config(wrapper: MCPWrapperServer) -> None:
     """Display server configuration details for review.
 
     Args:
     ----
         wrapper: The wrapper server instance
-        guardrail_provider: Optional guardrail provider
 
     """
     print(
@@ -190,7 +189,9 @@ def _display_server_config(wrapper: MCPWrapperServer) -> None:
 
     guardrail_alert = None
     if wrapper.guardrail_provider is not None:
-        guardrail_alert = wrapper.guardrail_provider.check_server_config(wrapper.current_config)
+        guardrail_alert = await wrapper.guardrail_provider.check_server_config(
+            wrapper.current_config
+        )
 
         if guardrail_alert:
             print("\n==== GUARDRAIL CHECK: ALERT ====")
