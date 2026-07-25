@@ -677,7 +677,7 @@ Note: This tool is only available when tools are blocked due to security restric
 
             # Scan the tool response with guardrail provider if configured
             if self.use_guardrails and self.guardrail_provider is not None:
-                guardrail_alert = self._scan_tool_response(name, arguments, response_text)
+                guardrail_alert = await self._scan_tool_response(name, arguments, response_text)
                 if guardrail_alert:
                     quarantine_id = self._quarantine_and_log(
                         name, arguments, response_text, guardrail_alert
@@ -1345,7 +1345,7 @@ Note: This tool is only available when tools are blocked due to security restric
 
         return _make_ansi_escape_codes_visible_str(text)
 
-    def _scan_tool_response(
+    async def _scan_tool_response(
         self, tool_name: str, tool_input: dict[str, Any], tool_output: str
     ) -> GuardrailAlert | None:
         """Scan a tool response with the configured guardrail provider.
@@ -1376,7 +1376,7 @@ Note: This tool is only available when tools are blocked due to security restric
                 context={},  # Could be extended with additional context in the future
             )
 
-            alert = self.guardrail_provider.check_tool_response(tool_response)
+            alert = await self.guardrail_provider.check_tool_response(tool_response)
 
             if alert:
                 logger.warning(

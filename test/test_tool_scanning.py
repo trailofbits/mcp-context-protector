@@ -5,7 +5,7 @@ Tests for the tool response scanning feature.
 import logging
 from collections.abc import Generator
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from mcp.types import CallToolResult as ToolCallResult
@@ -110,7 +110,7 @@ async def test_tool_scanning_exception_handling() -> None:
     """Test that exceptions in the scanning process are properly handled."""
     # Create a guardrail provider that raises an exception during tool response checking
     provider = MockGuardrailProvider()
-    provider.check_tool_response = MagicMock(side_effect=Exception("Test exception"))
+    provider.check_tool_response = AsyncMock(side_effect=Exception("Test exception"))
 
     # Create a wrapper server with the provider
     wrapper = MCPWrapperServer(guardrail_provider=provider)
@@ -140,8 +140,8 @@ async def test_tool_vs_config_scanning_separation() -> None:
     provider = MockGuardrailProvider()
 
     # Mock both methods to track calls
-    provider.check_server_config = MagicMock(return_value=None)
-    provider.check_tool_response = MagicMock(return_value=None)
+    provider.check_server_config = AsyncMock(return_value=None)
+    provider.check_tool_response = AsyncMock(return_value=None)
 
     # Create a wrapper server with the provider
     wrapper = MCPWrapperServer(guardrail_provider=provider)

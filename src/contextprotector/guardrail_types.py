@@ -56,7 +56,7 @@ class GuardrailProvider:
         msg = "Guardrail providers must implement the name property"
         raise NotImplementedError(msg)
 
-    def check_server_config(self, _config: "MCPServerConfig") -> GuardrailAlert | None:
+    async def check_server_config(self, _config: "MCPServerConfig") -> GuardrailAlert | None:
         """Check a server configuration against the guardrail.
 
         Args:
@@ -70,7 +70,7 @@ class GuardrailProvider:
         """
         return None
 
-    def check_tool_response(self, _tool_response: ToolResponse) -> GuardrailAlert | None:
+    async def check_tool_response(self, _tool_response: ToolResponse) -> GuardrailAlert | None:
         """Check a tool response against the guardrail.
 
         Args:

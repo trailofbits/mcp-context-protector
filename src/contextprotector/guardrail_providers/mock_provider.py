@@ -47,7 +47,7 @@ class MockGuardrailProvider(GuardrailProvider):
         self._trigger_alert = False
         self._alert_text = ""
 
-    def check_server_config(self, config: MCPServerConfig) -> GuardrailAlert | None:
+    async def check_server_config(self, config: MCPServerConfig) -> GuardrailAlert | None:
         """Check the server configuration based on the current trigger setting.
 
         Args:
@@ -76,7 +76,7 @@ class MockGuardrailProvider(GuardrailProvider):
         logger.info("No alert triggered")
         return None
 
-    def check_tool_response(self, tool_response: ToolResponse) -> GuardrailAlert | None:
+    async def check_tool_response(self, tool_response: ToolResponse) -> GuardrailAlert | None:
         """Check the tool response based on the current trigger setting.
 
         Args:
@@ -131,7 +131,7 @@ class AlwaysAlertGuardrailProvider(GuardrailProvider):
         """Get the provider name."""
         return "Always Alert Provider"
 
-    def check_server_config(self, config: MCPServerConfig) -> GuardrailAlert:
+    async def check_server_config(self, config: MCPServerConfig) -> GuardrailAlert:
         """Return a pre-written guardrail alert regardless of the config.
 
         Args:
@@ -153,7 +153,7 @@ class AlwaysAlertGuardrailProvider(GuardrailProvider):
             },
         )
 
-    def check_tool_response(self, tool_response: ToolResponse) -> GuardrailAlert:
+    async def check_tool_response(self, tool_response: ToolResponse) -> GuardrailAlert:
         """Return a pre-written guardrail alert regardless of the tool response.
 
         Args:
@@ -194,7 +194,7 @@ class NeverAlertGuardrailProvider(GuardrailProvider):
         """Get the provider name."""
         return "Never Alert Provider"
 
-    def check_server_config(self, _config: MCPServerConfig) -> None:
+    async def check_server_config(self, _config: MCPServerConfig) -> None:
         """Return None, indicating no guardrail alert.
 
         Args:
