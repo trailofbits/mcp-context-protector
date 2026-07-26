@@ -9,6 +9,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, TextIO
 
+from .errors import ConfigValidationError
+
 # Constants for command pattern detection
 MIN_ARGS_FOR_COMMAND_PATTERN = 2
 
@@ -497,21 +499,21 @@ class MCPServerSpec:
     def from_dict(cls, data: dict[str, Any]) -> "MCPServerSpec":
         """Create from a dictionary representation."""
         if not isinstance(data, dict):
-            raise ValueError("Server specification must be a dictionary")
+            raise ConfigValidationError("Server specification must be a dictionary")
 
         command = data.get("command")
         if not command or not isinstance(command, str):
-            raise ValueError("Server specification must have a valid 'command' field")
+            raise ConfigValidationError("Server specification must have a valid 'command' field")
 
         args = data.get("args", [])
         if not isinstance(args, list) or not all(isinstance(arg, str) for arg in args):
-            raise ValueError("Server 'args' must be a list of strings")
+            raise ConfigValidationError("Server 'args' must be a list of strings")
 
         env = data.get("env", {})
         if not isinstance(env, dict) or not all(
             isinstance(k, str) and isinstance(v, str) for k, v in env.items()
         ):
-            raise ValueError("Server 'env' must be a dictionary of string key-value pairs")
+            raise ConfigValidationError("Server 'env' must be a dictionary of string key-value pairs")
 
         return cls(command=command, args=args, env=env)
 
@@ -533,7 +535,7 @@ class MCPServerSpec:
         """
         # Check if already using context protector
         if MCPContextProtectorDetector.is_context_protector_configured(self):
-            raise ValueError("Server is already configured to use MCP Context Protector")
+            raise ConfigValidationError("Server is already configured to use MCP Context Protector")
 
         return MCPContextProtectorDetector.suggest_context_protector_command(
             self, installation_path
@@ -556,7 +558,7 @@ class MCPServerSpec:
         """
         # Check if using context protector
         if not MCPContextProtectorDetector.is_context_protector_configured(self):
-            raise ValueError("Server is not configured to use MCP Context Protector")
+            raise ConfigValidationError("Server is not configured to use MCP Context Protector")
 
         # Try to extract the original command from different patterns
 
@@ -608,7 +610,7 @@ class MCPServerSpec:
                         continue
 
         # If we can't parse it, raise an error
-        raise ValueError(
+        raise ConfigValidationError(
             "Cannot automatically extract original server command from context protector "
             "configuration. The server appears to use context protector but in an "
             "unrecognized pattern."
@@ -617,12 +619,12 @@ class MCPServerSpec:
     def _extract_from_command_args(self) -> "MCPServerSpec":
         """Extract original command from --command-args pattern."""
         if not self.args or "--command-args" not in self.args:
-            raise ValueError("Expected --command-args in arguments")
+            raise ConfigValidationError("Expected --command-args in arguments")
 
         try:
             command_args_index = self.args.index("--command-args")
             if command_args_index + 1 >= len(self.args):
-                raise ValueError("No command found after --command-args")
+                raise ConfigValidationError("No command found after --command-args")
 
             # Extract original command and args
             original_command = self.args[command_args_index + 1]
@@ -630,7 +632,7 @@ class MCPServerSpec:
 
             return MCPServerSpec(command=original_command, args=original_args, env=self.env.copy())
         except (ValueError, IndexError) as e:
-            raise ValueError(f"Could not parse --command-args pattern: {e}") from e
+            raise ConfigValidationError(f"Could not parse --command-args pattern: {e}") from e
 
     def _extract_from_uv_run(self, run_index: int = 0) -> "MCPServerSpec":
         """Extract original command from uv run pattern.
@@ -644,19 +646,19 @@ class MCPServerSpec:
         remaining_args = self.args[run_index + 2 :]  # Skip "run" and "mcp-context-protector"
 
         if not remaining_args or "--command-args" not in remaining_args:
-            raise ValueError("Expected --command-args in uv run pattern")
+            raise ConfigValidationError("Expected --command-args in uv run pattern")
 
         try:
             command_args_index = remaining_args.index("--command-args")
             if command_args_index + 1 >= len(remaining_args):
-                raise ValueError("No command found after --command-args")
+                raise ConfigValidationError("No command found after --command-args")
 
             original_command = remaining_args[command_args_index + 1]
             original_args = remaining_args[command_args_index + 2 :]
 
             return MCPServerSpec(command=original_command, args=original_args, env=self.env.copy())
         except (ValueError, IndexError) as e:
-            raise ValueError(f"Could not parse uv run pattern: {e}") from e
+            raise ConfigValidationError(f"Could not parse uv run pattern: {e}") from e
 
     def _extract_from_python_module(self) -> "MCPServerSpec":
         """Extract original command from python -m contextprotector pattern."""
@@ -664,19 +666,19 @@ class MCPServerSpec:
         remaining_args = self.args[2:]  # Skip "-m" and "contextprotector"
 
         if not remaining_args or "--command-args" not in remaining_args:
-            raise ValueError("Expected --command-args in python -m pattern")
+            raise ConfigValidationError("Expected --command-args in python -m pattern")
 
         try:
             command_args_index = remaining_args.index("--command-args")
             if command_args_index + 1 >= len(remaining_args):
-                raise ValueError("No command found after --command-args")
+                raise ConfigValidationError("No command found after --command-args")
 
             original_command = remaining_args[command_args_index + 1]
             original_args = remaining_args[command_args_index + 2 :]
 
             return MCPServerSpec(command=original_command, args=original_args, env=self.env.copy())
         except (ValueError, IndexError) as e:
-            raise ValueError(f"Could not parse python -m pattern: {e}") from e
+            raise ConfigValidationError(f"Could not parse python -m pattern: {e}") from e
 
     def _extract_from_shell_pattern(self, start_index: int) -> "MCPServerSpec":
         """Extract original command from shell command pattern."""
@@ -694,7 +696,7 @@ class MCPServerSpec:
                     command=original_command, args=original_args, env=self.env.copy()
                 )
 
-        raise ValueError("Could not locate original command in shell pattern")
+        raise ConfigValidationError("Could not locate original command in shell pattern")
 
 
 @dataclass
@@ -720,14 +722,14 @@ class MCPJsonConfig:
 
         """
         if not name or not isinstance(name, str):
-            raise ValueError("Server name must be a non-empty string")
+            raise ConfigValidationError("Server name must be a non-empty string")
 
         if isinstance(server, dict):
             self.mcp_servers[name] = MCPServerSpec.from_dict(server)
         elif isinstance(server, MCPServerSpec):
             self.mcp_servers[name] = server
         else:
-            raise ValueError("Server must be either an MCPServerSpec object or a dictionary")
+            raise ConfigValidationError("Server must be either an MCPServerSpec object or a dictionary")
 
     def remove_server(self, name: str) -> None:
         """Remove an MCP server from the configuration by name."""
@@ -777,23 +779,23 @@ class MCPJsonConfig:
             return config
 
         if not isinstance(data, dict):
-            raise ValueError("Configuration data must be a dictionary")
+            raise ConfigValidationError("Configuration data must be a dictionary")
 
         # Parse mcpServers section
         mcp_servers_data = data.get("mcpServers", {})
         if not isinstance(mcp_servers_data, dict):
-            raise ValueError("'mcpServers' must be a dictionary")
+            raise ConfigValidationError("'mcpServers' must be a dictionary")
 
         for name, server_data in mcp_servers_data.items():
             try:
                 config.add_server(name, server_data)
             except ValueError as e:
-                raise ValueError(f"Invalid server configuration for '{name}': {e}") from e
+                raise ConfigValidationError(f"Invalid server configuration for '{name}': {e}") from e
 
         # Parse global shortcut
         global_shortcut = data.get("globalShortcut")
         if global_shortcut is not None and not isinstance(global_shortcut, str):
-            raise ValueError("'globalShortcut' must be a string")
+            raise ConfigValidationError("'globalShortcut' must be a string")
         config.global_shortcut = global_shortcut
 
         # Store other configuration keys
@@ -853,7 +855,7 @@ class MCPJsonConfig:
         write_path = path or self.filename
 
         if not write_path:
-            raise ValueError("No path provided and configuration has no filename")
+            raise ConfigValidationError("No path provided and configuration has no filename")
 
         self.to_json(path=write_path, indent=indent)
 
@@ -886,7 +888,7 @@ class MCPJsonConfig:
         """
         if sum(x is not None for x in (json_str, path, fp)) != 1:
             msg = "Exactly one of json_str, path, or fp must be provided"
-            raise ValueError(msg)
+            raise ConfigValidationError(msg)
 
         data = None
         source_filename = None
@@ -1032,7 +1034,7 @@ class StandardMCPSchema(MCPConfigSchema):
     ) -> dict[str, MCPServerSpec]:
         """Extract servers from standard mcpServers structure."""
         if environment is not None:
-            raise ValueError("Standard schema does not support environments")
+            raise ConfigValidationError("Standard schema does not support environments")
 
         servers = {}
         mcp_servers = data.get("mcpServers", {})
@@ -1050,7 +1052,7 @@ class StandardMCPSchema(MCPConfigSchema):
     ) -> dict[str, Any]:
         """Update servers in standard mcpServers structure."""
         if environment is not None:
-            raise ValueError("Standard schema does not support environments")
+            raise ConfigValidationError("Standard schema does not support environments")
 
         updated_data = data.copy()
         updated_data["mcpServers"] = {name: server.to_dict() for name, server in servers.items()}
@@ -1098,7 +1100,7 @@ class ProjectMCPSchema(MCPConfigSchema):
                 return {}
 
         if environment not in projects:
-            raise ValueError(f"Project '{environment}' not found")
+            raise ConfigValidationError(f"Project '{environment}' not found")
 
         servers = {}
         project_data = projects[environment]
@@ -1119,11 +1121,11 @@ class ProjectMCPSchema(MCPConfigSchema):
         if environment is None:
             environment = self.get_default_environment(data)
             if environment is None:
-                raise ValueError("No project specified and no default found")
+                raise ConfigValidationError("No project specified and no default found")
 
         projects = data.get("projects", {})
         if environment not in projects:
-            raise ValueError(f"Project '{environment}' not found")
+            raise ConfigValidationError(f"Project '{environment}' not found")
 
         updated_data = data.copy()
         updated_data["projects"] = projects.copy()
@@ -1169,7 +1171,7 @@ class SchemaDetector:
             if schema.detect_schema(data):
                 return schema
 
-        raise ValueError("Unknown or invalid MCP configuration schema")
+        raise ConfigValidationError("Unknown or invalid MCP configuration schema")
 
 
 class MCPUnifiedConfig:
@@ -1219,24 +1221,24 @@ class MCPUnifiedConfig:
     def set_environment(self, environment: str) -> None:
         """Set the current environment."""
         if not self.schema:
-            raise ValueError("Configuration not loaded")
+            raise ConfigValidationError("Configuration not loaded")
 
         environments = self.schema.list_environments(self.raw_data)
         if environments and environment not in environments:
-            raise ValueError(f"Environment '{environment}' not found. Available: {environments}")
+            raise ConfigValidationError(f"Environment '{environment}' not found. Available: {environments}")
 
         self.environment = environment
 
     def get_servers(self) -> dict[str, MCPServerSpec]:
         """Get MCP servers for the current environment."""
         if not self.schema:
-            raise ValueError("Configuration not loaded")
+            raise ConfigValidationError("Configuration not loaded")
         return self.schema.get_servers(self.raw_data, self.environment)
 
     def set_servers(self, servers: dict[str, MCPServerSpec]) -> None:
         """Update MCP servers for the current environment."""
         if not self.schema:
-            raise ValueError("Configuration not loaded")
+            raise ConfigValidationError("Configuration not loaded")
         self.raw_data = self.schema.set_servers(self.raw_data, servers, self.environment)
 
     def save(self, indent: int = 2) -> None:

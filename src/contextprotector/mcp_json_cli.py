@@ -7,6 +7,7 @@ import sys
 from dataclasses import dataclass
 
 from .cli_utils import confirm_prompt, display_colored_diff, print_separator, truncate_text
+from .errors import ConfigValidationError
 from .mcp_json_config import (
     MCPConfigManagerFactory,
     MCPConfigSchema,
@@ -100,7 +101,7 @@ class EnvironmentSelector:
                 return cli_environment
             else:
                 available = ", ".join(environments)
-                raise ValueError(
+                raise ConfigValidationError(
                     f"Environment '{cli_environment}' not found. Available: {available}"
                 )
 

@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from contextprotector.__main__ import _parse_args
+from contextprotector.errors import ConnectionConfigError
 from contextprotector.wrapper_config import MCPWrapperConfig
 
 
@@ -208,7 +209,7 @@ class TestArgumentParsingEdgeCases:
         with patch.object(sys, "argv", ["mcp-context-protector"]):
             args = _parse_args()
             # This should work (parsing), but config creation should fail
-            with pytest.raises(ValueError, match="No valid connection type found"):
+            with pytest.raises(ConnectionConfigError, match="No valid connection type found"):
                 MCPWrapperConfig.from_args(args)
 
     def test_url_and_command_args_both_provided(self):

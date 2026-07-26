@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from contextprotector.errors import ConfigValidationError
 from contextprotector.mcp_json_config import (
     MCPContextProtectorDetector,
     MCPJsonConfig,
@@ -78,7 +79,7 @@ class TestMCPServerSpec:
 
     def test_from_dict_invalid_data_type(self):
         """Test error handling for invalid data type."""
-        with pytest.raises(ValueError, match="Server specification must be a dictionary"):
+        with pytest.raises(ConfigValidationError, match="Server specification must be a dictionary"):
             MCPServerSpec.from_dict("not a dict")
 
     def test_from_dict_missing_command(self):
@@ -97,10 +98,10 @@ class TestMCPServerSpec:
 
     def test_from_dict_invalid_args(self):
         """Test error handling for invalid args."""
-        with pytest.raises(ValueError, match="Server 'args' must be a list of strings"):
+        with pytest.raises(ConfigValidationError, match="Server 'args' must be a list of strings"):
             MCPServerSpec.from_dict({"command": "node", "args": "not a list"})
 
-        with pytest.raises(ValueError, match="Server 'args' must be a list of strings"):
+        with pytest.raises(ConfigValidationError, match="Server 'args' must be a list of strings"):
             MCPServerSpec.from_dict({"command": "node", "args": [123, "valid"]})
 
     def test_from_dict_invalid_env(self):
@@ -154,10 +155,10 @@ class TestMCPJsonConfig:
         config = MCPJsonConfig()
         server = MCPServerSpec(command="node")
 
-        with pytest.raises(ValueError, match="Server name must be a non-empty string"):
+        with pytest.raises(ConfigValidationError, match="Server name must be a non-empty string"):
             config.add_server("", server)
 
-        with pytest.raises(ValueError, match="Server name must be a non-empty string"):
+        with pytest.raises(ConfigValidationError, match="Server name must be a non-empty string"):
             config.add_server(123, server)
 
     def test_add_server_invalid_type(self):
@@ -272,12 +273,12 @@ class TestMCPJsonConfig:
 
     def test_from_dict_invalid_type(self):
         """Test error handling for invalid data type."""
-        with pytest.raises(ValueError, match="Configuration data must be a dictionary"):
+        with pytest.raises(ConfigValidationError, match="Configuration data must be a dictionary"):
             MCPJsonConfig.from_dict("not a dict")
 
     def test_from_dict_invalid_mcp_servers(self):
         """Test error handling for invalid mcpServers."""
-        with pytest.raises(ValueError, match="'mcpServers' must be a dictionary"):
+        with pytest.raises(ConfigValidationError, match="'mcpServers' must be a dictionary"):
             MCPJsonConfig.from_dict({"mcpServers": "not a dict"})
 
     def test_from_dict_invalid_server_config(self):
@@ -288,12 +289,12 @@ class TestMCPJsonConfig:
             }
         }
 
-        with pytest.raises(ValueError, match="Invalid server configuration for 'bad-server'"):
+        with pytest.raises(ConfigValidationError, match="Invalid server configuration for 'bad-server'"):
             MCPJsonConfig.from_dict(data)
 
     def test_from_dict_invalid_global_shortcut(self):
         """Test error handling for invalid global shortcut."""
-        with pytest.raises(ValueError, match="'globalShortcut' must be a string"):
+        with pytest.raises(ConfigValidationError, match="'globalShortcut' must be a string"):
             MCPJsonConfig.from_dict({"globalShortcut": 123})
 
     def test_json_roundtrip(self):
@@ -627,7 +628,7 @@ class TestMCPJsonConfigFilename:
         config = MCPJsonConfig()  # No filename set
         config.add_server("test", {"command": "java", "args": ["-jar", "app.jar"]})
 
-        with pytest.raises(ValueError, match="No path provided and configuration has no filename"):
+        with pytest.raises(ConfigValidationError, match="No path provided and configuration has no filename"):
             config.save()
 
     def test_round_trip_with_filename_preservation(self):
@@ -1041,7 +1042,7 @@ class TestMCPServerSpecMutations:
         )
 
         # Should raise error when trying to add protection again
-        with pytest.raises(ValueError, match="already configured to use MCP Context Protector"):
+        with pytest.raises(ConfigValidationError, match="already configured to use MCP Context Protector"):
             protected.with_context_protector()
 
     def test_without_context_protector_direct_command(self):
@@ -1140,7 +1141,7 @@ class TestMCPServerSpecMutations:
         """Test error when trying to remove context protector from unprotected server."""
         original = MCPServerSpec(command="node", args=["server.js"])
 
-        with pytest.raises(ValueError, match="not configured to use MCP Context Protector"):
+        with pytest.raises(ConfigValidationError, match="not configured to use MCP Context Protector"):
             original.without_context_protector()
 
     def test_without_context_protector_malformed(self):
@@ -1151,7 +1152,7 @@ class TestMCPServerSpecMutations:
             args=["node", "server.js"],  # Missing --command-args
         )
 
-        with pytest.raises(ValueError, match="Expected --command-args"):
+        with pytest.raises(ConfigValidationError, match="Expected --command-args"):
             malformed.without_context_protector()
 
         # --command-args but no command after it
@@ -1160,7 +1161,7 @@ class TestMCPServerSpecMutations:
             args=["--command-args"],  # No command after --command-args
         )
 
-        with pytest.raises(ValueError, match="No command found after --command-args"):
+        with pytest.raises(ConfigValidationError, match="No command found after --command-args"):
             malformed2.without_context_protector()
 
     def test_round_trip_transformation(self):

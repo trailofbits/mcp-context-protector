@@ -9,6 +9,7 @@ import argparse
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from .errors import ConnectionConfigError
 from .guardrails import GuardrailProvider
 
 
@@ -64,20 +65,20 @@ class MCPWrapperConfig:
         if self.connection_type == "stdio":
             if self.command is None:
                 msg = "command must be provided for stdio connections"
-                raise ValueError(msg)
+                raise ConnectionConfigError(msg)
             if self.url is not None:
                 msg = "url should not be provided for stdio connections"
-                raise ValueError(msg)
+                raise ConnectionConfigError(msg)
         elif self.connection_type in ("http", "sse"):
             if self.url is None:
                 msg = f"url must be provided for {self.connection_type} connections"
-                raise ValueError(msg)
+                raise ConnectionConfigError(msg)
             if self.command is not None:
                 msg = f"command should not be provided for {self.connection_type} connections"
-                raise ValueError(msg)
+                raise ConnectionConfigError(msg)
         else:
             msg = f"Invalid connection_type: {self.connection_type}"
-            raise ValueError(msg)
+            raise ConnectionConfigError(msg)
 
     def _compute_server_identifier(self) -> str:
         """Compute the server identifier based on connection type and parameters."""
@@ -85,7 +86,7 @@ class MCPWrapperConfig:
             return self.command
         if self.url is not None:
             return self.url
-        raise ValueError
+        raise ConnectionConfigError
 
     @classmethod
     def from_args(
@@ -123,7 +124,7 @@ class MCPWrapperConfig:
                 "No valid connection type found in arguments. "
                 "Must provide command, url, or sse_url."
             )
-            raise ValueError(msg)
+            raise ConnectionConfigError(msg)
 
         # Set additional properties from args
         if hasattr(args, "server_config_file") and args.server_config_file:
