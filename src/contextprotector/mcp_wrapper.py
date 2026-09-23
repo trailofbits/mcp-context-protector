@@ -233,7 +233,7 @@ class MCPWrapperServer:
             except McpError as e:
                 logger.exception("Error fetching resource %s from downstream server", name)
                 error_msg = f"Error fetching resource from downstream server: {e!s}"
-                raise ConnectionError(error_msg) from e
+                raise ConnectionFailedError(error_msg) from e
 
         @self.server.list_tools()
         async def list_tools() -> list[types.Tool]:
@@ -370,7 +370,7 @@ class MCPWrapperServer:
             except McpError as e:
                 logger.exception("Error from downstream server during prompt dispatch")
                 error_msg = f"Error from downstream server: {e!s}"
-                raise ConnectionError(error_msg) from e
+                raise ConnectionFailedError(error_msg) from e
 
         @self.server.call_tool()
         async def call_tool(
@@ -493,7 +493,7 @@ class MCPWrapperServer:
             except McpError as e:
                 logger.exception("Error from child MCP server")
                 error_msg = f"Error from child MCP server: {e!s}"
-                raise ConnectionError(error_msg) from e
+                raise ConnectionFailedError(error_msg) from e
 
     async def _handle_context_protector_block(self) -> list[types.TextContent]:
         """Handle the context-protector-block tool call.
@@ -688,7 +688,7 @@ Note: This tool is only available when tools are blocked due to security restric
         except McpError as e:
             logger.exception("Error calling downstream tool '%s'", name)
             error_msg = f"Error calling downstream tool: {e!s}"
-            raise ConnectionError(error_msg) from e
+            raise ConnectionFailedError(error_msg) from e
 
     def _create_tool_response(
         self,

@@ -13,7 +13,9 @@ action:
 
 ``ConfigValidationError`` and ``ConnectionConfigError`` also subclass
 ``ValueError`` (multiple inheritance) so existing ``except ValueError``
-handlers keep working unchanged.
+handlers keep working unchanged. ``ConnectionFailedError`` likewise keeps
+``ConnectionError`` as a base class, since the downstream-communication
+failures it now covers previously surfaced as bare ``ConnectionError``.
 
 This module deliberately imports nothing from the rest of the package, so
 low-level modules (``mcp_wrapper``, ``mcp_config``, ...) can import from it
@@ -53,8 +55,12 @@ class ConnectionConfigError(ContextProtectorError, ValueError):
     """
 
 
-class ConnectionFailedError(ContextProtectorError):
-    """Raised when the downstream server connection fails or yields nothing."""
+class ConnectionFailedError(ContextProtectorError, ConnectionError):
+    """Raised when the downstream server connection fails or yields nothing.
+
+    Subclasses ``ConnectionError`` so existing ``except ConnectionError``
+    handlers keep working; new code should catch this type directly.
+    """
 
 
 class ChildServerNotConnectedError(ContextProtectorError, ConnectionError):
