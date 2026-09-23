@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
+from contextprotector.errors import ConfigConversionError
 from contextprotector.mcp_json_config import (
     MCPConfigManagerFactory,
     MCPServerSpec,
@@ -53,7 +54,9 @@ class TestSchemaDetection:
         """Test error handling for invalid schema."""
         data = {"invalidKey": "value"}
 
-        with pytest.raises(ValueError, match="Unknown or invalid MCP configuration schema"):
+        with pytest.raises(
+            ConfigConversionError, match="Unknown or invalid MCP configuration schema"
+        ):
             SchemaDetector.detect_schema(data)
 
 
@@ -119,10 +122,10 @@ class TestStandardMCPSchema:
         schema = StandardMCPSchema()
         data = {"mcpServers": {"server1": {"command": "echo"}}}
 
-        with pytest.raises(ValueError, match="does not support environments"):
+        with pytest.raises(ConfigConversionError, match="does not support environments"):
             schema.get_servers(data, environment="dev")
 
-        with pytest.raises(ValueError, match="does not support environments"):
+        with pytest.raises(ConfigConversionError, match="does not support environments"):
             schema.set_servers(data, {}, environment="dev")
 
 

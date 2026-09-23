@@ -7,6 +7,7 @@ import sys
 from dataclasses import dataclass
 
 from .cli_utils import confirm_prompt, display_colored_diff, print_separator, truncate_text
+from .errors import ConfigLoadError, ContextProtectorError
 from .mcp_json_config import (
     MCPConfigManagerFactory,
     MCPConfigSchema,
@@ -85,7 +86,7 @@ class EnvironmentSelector:
 
         Raises:
         ------
-            ValueError: If specified environment doesn't exist
+            ConfigLoadError: If specified environment doesn't exist
 
         """
         environments = schema.list_environments(data)
@@ -100,7 +101,7 @@ class EnvironmentSelector:
                 return cli_environment
             else:
                 available = ", ".join(environments)
-                raise ValueError(
+                raise ConfigLoadError(
                     f"Environment '{cli_environment}' not found. Available: {available}"
                 )
 
@@ -380,7 +381,7 @@ class MCPJsonManager:
             if new_spec.args:
                 print(f"New args: {' '.join(new_spec.args)}")
 
-        except ValueError as e:
+        except ContextProtectorError as e:
             print(f"\nError: {e}")
 
     def _save_with_confirmation(self) -> bool:
@@ -866,7 +867,7 @@ class WrapMCPJsonManager:
                     args_preview = truncate_text(args_preview, MAX_ARGS_DISPLAY_LENGTH)
                     print(f"    New args: {args_preview}")
 
-            except ValueError as e:
+            except ContextProtectorError as e:
                 print(f"    ❌ Failed to wrap {server_name}: {e}")
 
         # Update the configuration with wrapped servers (new system only)
