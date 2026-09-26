@@ -14,6 +14,13 @@ from mcp.shared.session import RequestResponder
 from pydantic import AnyUrl
 
 # ContentBlock import removed - using types.Content instead
+from .errors import (
+    ChildServerProtocolError,
+    ConnectionConfigError,
+    QuarantineError,
+    ToolCallBlockedError,
+)
+
 # Import guardrail types for type hints
 from .guardrail_types import GuardrailAlert, GuardrailProvider, ToolResponse
 from .mcp_config import (
@@ -76,7 +83,11 @@ class MCPWrapperServer:
         elif config.url is not None:  # http or sse
             instance.server_url = AnyUrl(config.url)
         else:
-            raise ValueError
+            msg = (
+                f"Cannot configure connection: connection_type is "
+                f"{config.connection_type!r} but neither command nor url is set"
+            )
+            raise ConnectionConfigError(msg)
 
         instance.visualize_ansi_codes = config.visualize_ansi_codes
 
@@ -402,7 +413,7 @@ class MCPWrapperServer:
                     "reason": "Server approval status not initialized. Try reconnecting.",
                 }
                 error_json = json.dumps(blocked_response)
-                raise ValueError(error_json)
+                raise ToolCallBlockedError(error_json)
 
             # Check if server is completely new or instructions changed
             if self.approval_status.get("is_new_server", False):
@@ -415,7 +426,7 @@ class MCPWrapperServer:
                     ),
                 }
                 error_json = json.dumps(blocked_response)
-                raise ValueError(error_json)
+                raise ToolCallBlockedError(error_json)
 
             # Check instructions approval - but differentiate between never-approved
             # and changed instructions
@@ -442,7 +453,7 @@ class MCPWrapperServer:
                     }
                 error_json = json.dumps(blocked_response)
                 error_json = json.dumps(blocked_response)
-                raise ValueError(error_json)
+                raise ToolCallBlockedError(error_json)
 
             # Check if this specific tool is approved
             # Only block if the tool exists in our config but is not approved
@@ -458,7 +469,7 @@ class MCPWrapperServer:
                     ),
                 }
                 error_json = json.dumps(blocked_response)
-                raise ValueError(error_json)
+                raise ToolCallBlockedError(error_json)
 
             # Tool is approved, proxy the call
             try:
@@ -569,17 +580,17 @@ Note: This tool is only available when tools are blocked due to security restric
 
         Raises:
         ------
-            ValueError: If the UUID is invalid or not found, or if the response
+            QuarantineError: If the UUID is invalid or not found, or if the response
                 is not available for release
 
         """
         if "uuid" not in arguments:
             msg = "Missing required parameter 'uuid' for quarantine_release tool"
-            raise ValueError(msg)
+            raise QuarantineError(msg)
 
         if self.quarantine is None:
             msg = "Quarantine not initialized"
-            raise ValueError(msg)
+            raise QuarantineError(msg)
 
         response_id = arguments["uuid"]
         logger.info("Processing quarantine_release request for UUID: %s", response_id)
@@ -588,7 +599,7 @@ Note: This tool is only available when tools are blocked due to security restric
 
         if not quarantined_response:
             error_msg = f"No quarantined response found with UUID: {response_id}"
-            raise ValueError(error_msg)
+            raise QuarantineError(error_msg)
 
         if quarantined_response.released:
             original_tool_info = {
@@ -984,7 +995,7 @@ Note: This tool is only available when tools are blocked due to security restric
 
             if not downstream_tools.tools:
                 msg = "No tools received from downstream server"
-                raise ValueError(msg)
+                raise ChildServerProtocolError(msg)
             logger.info("Received %d tools after update notification", len(downstream_tools.tools))
 
             await self._handle_tool_updates(downstream_tools.tools)
@@ -1016,7 +1027,7 @@ Note: This tool is only available when tools are blocked due to security restric
         downstream_tools = await self.session.list_tools()
         if not downstream_tools.tools:
             msg = "No tools received from downstream server during initialization"
-            raise ValueError(msg)
+            raise ChildServerProtocolError(msg)
 
         self.tool_specs = self._convert_mcp_tools_to_specs(downstream_tools.tools)
 
@@ -1085,12 +1096,12 @@ Note: This tool is only available when tools are blocked due to security restric
         if self.connection_type in ["http", "sse"] and self.server_url is not None:
             return str(self.server_url)
         error_msg = f"Unknown connection type: {self.connection_type}"
-        raise ValueError(error_msg)
+        raise ConnectionConfigError(error_msg)
 
     async def _connect_via_stdio(self) -> None:
         """Connect to a downstream server via stdio."""
         if self.child_command is None:
-            raise ValueError("child_command must be set for stdio connection")
+            raise ConnectionConfigError("child_command must be set for stdio connection")
 
         logger.info("Connecting to downstream server via stdio: %s", self.child_command)
 
@@ -1108,7 +1119,7 @@ Note: This tool is only available when tools are blocked due to security restric
             command_parts = self.child_command.split()
             if not command_parts:
                 msg = "Invalid command"
-                raise ValueError(msg)
+                raise ConnectionConfigError(msg)
 
             server_params = StdioServerParameters(
                 command=command_parts[0],
@@ -1136,7 +1147,7 @@ Note: This tool is only available when tools are blocked due to security restric
     async def _connect_via_http(self) -> None:
         """Connect to a downstream server via SSE (Server-Sent Events)."""
         if self.server_url is None:
-            raise ValueError("server_url must be set for SSE connection")
+            raise ConnectionConfigError("server_url must be set for SSE connection")
 
         logger.info("Connecting to downstream server via SSE: %s", self.server_url)
 
@@ -1169,7 +1180,7 @@ Note: This tool is only available when tools are blocked due to security restric
     async def _connect_via_streamable_http(self) -> None:
         """Connect to a downstream server via streamable HTTP."""
         if self.server_url is None:
-            raise ValueError("server_url must be set for streamable HTTP connection")
+            raise ConnectionConfigError("server_url must be set for streamable HTTP connection")
 
         logger.info("Connecting to downstream server via streamable HTTP: %s", self.server_url)
 
