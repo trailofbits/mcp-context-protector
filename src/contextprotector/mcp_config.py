@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Literal, TextIO
 
+from .errors import ConfigValidationError
+
 
 class ParameterType(str, Enum):
     """Types of MCP tool parameters."""
@@ -327,7 +329,7 @@ class MCPServerConfig:
         """
         if sum(x is not None for x in (json_str, path, fp)) != 1:
             msg = "Exactly one of json_str, path, or fp must be provided"
-            raise ValueError(msg)
+            raise ConfigValidationError(msg)
 
         data = None
         if path:
