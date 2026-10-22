@@ -444,11 +444,14 @@ class MCPWrapperServer:
                 error_json = json.dumps(blocked_response)
                 raise ValueError(error_json)
 
-            # Check if this specific tool is approved
-            # Only block if the tool exists in our config but is not approved
-            # If the tool doesn't exist in our config, let the downstream server handle it
+            # Check if this specific tool is approved. Fail closed: a tool that
+            # is absent from the approval database was never approved, so it
+            # must be blocked just like a tool that is explicitly unapproved.
+            # Otherwise a downstream server could add a tool without emitting
+            # notifications/tools/list_changed (or omit it from the re-list)
+            # and still have it invoked via a direct call_tool by name.
             tools_dict = self.approval_status.get("tools", {})
-            if name in tools_dict and not tools_dict[name]:
+            if not tools_dict.get(name, False):
                 logger.warning("Blocking tool '%s' - tool not approved", name)
                 blocked_response = {
                     "status": "blocked",
